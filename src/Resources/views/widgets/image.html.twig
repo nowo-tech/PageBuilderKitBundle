@@ -1,0 +1,5 @@
+{% if settings.src|default('') %}
+    <figure class="pbk-widget pbk-widget--image">
+        <img src="{{ settings.src|e('html_attr') }}" alt="{{ settings.alt|default('')|e('html_attr') }}" loading="lazy">
+    </figure>
+{% endif %}

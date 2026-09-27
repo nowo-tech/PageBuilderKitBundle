@@ -1,0 +1,2 @@
+{% set tag = settings.tag|default('h2') %}
+<{{ tag }} class="pbk-widget pbk-widget--heading">{{ settings.text|default('')|e }}</{{ tag }}>

@@ -1,0 +1,4 @@
+{# Recursive public widget wrapper (supports nested children). #}
+<div {{ nowo_pbk_element_attrs(widget.appearance|default({}), ['pbk-widget-wrap', 'pbk-widget-wrap--' ~ widget.type]) }}>
+    {% include widget.template with { widget: widget, settings: widget.settings } %}
+</div>

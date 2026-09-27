@@ -1,0 +1,52 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.canvas.title'|trans({'%key%': page_key}) }}{% endblock %}
+
+{% block header_actions %}
+    <div class="pbk-canvas-actions d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_seo', {pageKey: page_key}) }}">{{ 'admin.pages.seo'|trans }}</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ preview_url }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
+        <button type="button" class="btn btn-primary btn-sm" data-pbk-action="save">{{ 'admin.canvas.save'|trans }}</button>
+        <button type="button" class="btn btn-success btn-sm" data-pbk-action="publish">{{ 'admin.canvas.publish'|trans }}</button>
+    </div>
+{% endblock %}
+
+{% block admin %}
+    <div id="page-builder-canvas"
+         class="pbk-canvas pbk-canvas--grapesjs pbk-canvas--grapesjs-full"
+         data-pbk-engine="grapesjs"
+         data-pbk-save-url="{{ document_save_url }}"
+         data-pbk-publish-url="{{ document_publish_url }}"
+         data-pbk-csrf="{{ csrf_token }}"
+         data-pbk-default-locale="{{ default_locale }}"
+         data-pbk-grapes-config="{{ grapesjs_config|json_encode|e('html_attr') }}"
+         data-pbk-structure="{{ structure|json_encode|e('html_attr') }}">
+
+        <ul class="nav nav-tabs mb-2" role="tablist">
+            {% for locale in locales %}
+                <li class="nav-item" role="presentation">
+                    <button type="button"
+                            class="nav-link{% if locale == default_locale %} active{% endif %}"
+                            data-pbk-locale-tab="{{ locale }}">{{ locale|upper }}</button>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <p class="text-muted small mb-2">{{ 'admin.canvas.grapes_hint'|trans }}</p>
+        <div id="gjs" class="pbk-gjs"></div>
+        <p class="text-muted small mt-2" data-pbk-status></p>
+    </div>
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="https://unpkg.com/grapesjs@{{ grapesjs_cdn_version }}/dist/css/grapes.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/grapick/dist/grapick.min.css">
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script type="module" src="{{ asset('js/page-builder-canvas.js', 'nowo_page_builder_kit') }}"></script>
+{% endblock %}

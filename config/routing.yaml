@@ -1,0 +1,4 @@
+# Alias for host apps that import routes from the bundle root (Phase 1).
+# Canonical file: src/Resources/config/routing.yaml
+nowo_page_builder_kit:
+    resource: '@NowoPageBuilderKitBundle/Resources/config/routing.yaml'

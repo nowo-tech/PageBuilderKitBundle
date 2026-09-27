@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ page_tree.seo.title|default(page_title) }} · PBK Demo{% endblock %}
+
+{% block stylesheets %}
+    {% if page_tree.engine|default('classic') == 'grapesjs' and page_tree.css|default('') %}
+        <style id="pbk-grapes-css">{{ page_tree.css|raw }}</style>
+    {% endif %}
+{% endblock %}
+
+{% block toolbar %}
+<div class="pbk-demo-toolbar py-2">
+    <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge text-bg-primary text-uppercase">{{ page_key }}</span>
+            {% if use_case is defined %}
+                <span class="badge text-bg-{{ use_case.engine == 'classic' ? 'warning' : 'dark' }}">{{ use_case.engine }}</span>
+                {% if not use_case.publish %}<span class="badge text-bg-danger">draft</span>{% endif %}
+            {% endif %}
+            <strong>{{ page_title }}</strong>
+            <span class="text-muted">· seed v{{ seed_version|default('?') }} · {{ page_tree.engine|default('classic') }} · {{ page_tree.status|default('') }}</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-dark" href="{{ path('showcase') }}">All use cases</a>
+            {% if use_case is defined and use_case.engine == 'classic' %}
+                <a class="btn btn-sm btn-warning" href="{{ path('admin_page_builder_sections', {pageKey: page_key}) }}">Edit sections</a>
+            {% else %}
+                <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">Edit in GrapesJS</a>
+            {% endif %}
+            {% if use_case is not defined or use_case.publish %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">/p/{{ page_key }}</a>
+            {% endif %}
+            {% if page_tree.engine|default('') == 'classic' or (use_case is defined and use_case.engine == 'classic') %}
+                <a class="btn btn-sm btn-outline-info" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|default({})|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">
+                    Switch {{ app.request.locale == 'es' ? 'EN' : 'ES' }} content
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body %}
+{% if page_tree.engine|default('classic') == 'grapesjs' %}
+    {% if page_tree.html|default('') is empty %}
+        <div class="container py-5">
+            <div class="alert alert-info mb-0">
+                No GrapesJS content for <strong>{{ page_key }}</strong>.
+                Sign in (<code>admin</code>/<code>admin</code>) and open the canvas.
+            </div>
+        </div>
+    {% else %}
+        <div class="pbk-grapes-content">
+            {{ page_tree.html|raw }}
+        </div>
+    {% endif %}
+{% elseif page_tree.sections is empty %}
+    <div class="container py-5">
+        <div class="alert alert-info mb-0">No classic sections for <strong>{{ page_key }}</strong>.</div>
+    </div>
+{% else %}
+    <div class="container py-4 pbk-classic-demo">
+        {% for section in page_tree.sections %}
+            {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+<!DOCTYPE html>
+<html lang="{{ page_tree.locale|default('en') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_tree.seo.title|default(page_tree.title|default(page_tree.pageKey)) }}</title>
+    {% include '@NowoPageBuilderKitBundle/public/_seo_meta.html.twig' with { seo: page_tree.seo|default({}) } %}
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
+    {% if page_tree.engine|default('classic') == 'grapesjs' and page_tree.css|default('') %}
+        <style id="pbk-grapes-css">{{ page_tree.css|raw }}</style>
+    {% endif %}
+</head>
+<body class="pbk-public">
+    <a class="pbk-skip-link" href="#pbk-main-content">{{ 'public.skip_to_content'|trans }}</a>
+    <article class="pbk-page" id="pbk-main-content" tabindex="-1">
+        <header class="pbk-page__header">
+            <h1>{{ page_tree.title }}</h1>
+        </header>
+        {% if page_tree.engine|default('classic') == 'grapesjs' %}
+            <div class="pbk-grapes-content">
+                {{ page_tree.html|default('')|raw }}
+            </div>
+        {% else %}
+            {% for section in page_tree.sections %}
+                {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+            {% endfor %}
+        {% endif %}
+    </article>
+</body>
+</html>

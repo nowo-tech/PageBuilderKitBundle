@@ -1,0 +1,35 @@
+{# Page-level SEO / Open Graph / robots. Expects `seo` array from PageRenderProvider. #}
+{% set seo = seo|default({}) %}
+{% if seo.description|default('') %}
+<meta name="description" content="{{ seo.description|e('html_attr') }}">
+{% endif %}
+{% if seo.robots|default('') %}
+<meta name="robots" content="{{ seo.robots|e('html_attr') }}">
+{% endif %}
+{% if seo.canonical|default('') %}
+<link rel="canonical" href="{{ seo.canonical|e('html_attr') }}">
+{% endif %}
+{% if seo.og is defined %}
+<meta property="og:type" content="{{ seo.og.type|default('website')|e('html_attr') }}">
+<meta property="og:title" content="{{ seo.og.title|default(seo.title|default(''))|e('html_attr') }}">
+{% if seo.og.description|default('') %}
+<meta property="og:description" content="{{ seo.og.description|e('html_attr') }}">
+{% endif %}
+{% if seo.og.image|default('') %}
+<meta property="og:image" content="{{ seo.og.image|e('html_attr') }}">
+{% endif %}
+{% if seo.og.site_name|default('') %}
+<meta property="og:site_name" content="{{ seo.og.site_name|e('html_attr') }}">
+{% endif %}
+{% if seo.og.locale|default('') %}
+<meta property="og:locale" content="{{ seo.og.locale|e('html_attr') }}">
+{% endif %}
+<meta name="twitter:card" content="{{ seo.og.image|default('') ? 'summary_large_image' : 'summary' }}">
+<meta name="twitter:title" content="{{ seo.og.title|default(seo.title|default(''))|e('html_attr') }}">
+{% if seo.og.description|default('') %}
+<meta name="twitter:description" content="{{ seo.og.description|e('html_attr') }}">
+{% endif %}
+{% if seo.og.image|default('') %}
+<meta name="twitter:image" content="{{ seo.og.image|e('html_attr') }}">
+{% endif %}
+{% endif %}

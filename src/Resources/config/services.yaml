@@ -1,0 +1,81 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Nowo\PageBuilderKitBundle\:
+        resource: '../../*'
+        exclude:
+            - '../../DependencyInjection/'
+            - '../../Entity/'
+            - '../../Media/LocalFilesystemAssetStorage.php'
+            - '../../Media/AwsS3AssetStorage.php'
+            - '../../NowoPageBuilderKitBundle.php'
+            - '../../Resources/'
+            - '../../Security/PageBuilderProtection.php'
+            - '../../Security/PageBuilderProtectionConfig.php'
+            - '../../Security/Html/'
+
+    Nowo\PageBuilderKitBundle\Controller\:
+        resource: '../../Controller/'
+        tags: ['controller.service_arguments']
+
+    Nowo\PageBuilderKitBundle\Locale\BuilderLocales:
+        public: true
+        arguments:
+            $defaultLocale: '%nowo_page_builder_kit.default_locale%'
+            $locales: '%nowo_page_builder_kit.locales%'
+
+    Nowo\PageBuilderKitBundle\Form\:
+        resource: '../../Form/'
+        tags: ['form.type']
+
+    Nowo\PageBuilderKitBundle\Widget\Type\:
+        resource: '../../Widget/Type/'
+        tags: ['nowo_page_builder_kit.widget_type']
+
+    Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry:
+        arguments:
+            $types: []
+
+    Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface:
+        alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository
+
+    Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface:
+        alias: Nowo\PageBuilderKitBundle\Service\PageRenderProvider
+
+    Nowo\PageBuilderKitBundle\Service\DocumentService:
+        arguments:
+            $protection: '@Nowo\PageBuilderKitBundle\Security\PageBuilderProtection'
+            $grapesDocumentSanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
+
+    Nowo\PageBuilderKitBundle\Service\PageRenderProvider:
+        arguments:
+            $protection: '@Nowo\PageBuilderKitBundle\Security\PageBuilderProtection'
+            $grapesDocumentSanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
+            $grapesTwigRenderer: '@Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer'
+            $pageSeoBuilder: '@Nowo\PageBuilderKitBundle\Service\PageSeoBuilder'
+            $twigContextProviders: !tagged_iterator nowo_page_builder_kit.grapes_twig_context
+
+    Nowo\PageBuilderKitBundle\Service\PageSeoBuilder:
+        arguments:
+            $siteName: '%nowo_page_builder_kit.seo.site_name%'
+            $defaultOgImage: '%nowo_page_builder_kit.seo.default_og_image%'
+            $canonicalBaseUrl: '%nowo_page_builder_kit.seo.canonical_base_url%'
+            $defaultRobots: '%nowo_page_builder_kit.seo.default_robots%'
+
+    Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer:
+        arguments:
+            $allowScripts: '%nowo_page_builder_kit.grapesjs.allow_scripts%'
+
+    Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer:
+        arguments:
+            $enabled: true
+            $strictVariables: false
+            $sanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
+
+    Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension:
+        arguments:
+            $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
+            $cssFramework: '%nowo_page_builder_kit.web_ui.css_framework%'
+        tags: ['twig.extension']

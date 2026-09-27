@@ -1,0 +1,3 @@
+nowo_page_builder_kit:
+    resource: ../../Controller/
+    type: attribute

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="{{ app.request.locale|default('en') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Page Builder Kit Demo{% endblock %}</title>
+    {% if page_tree is defined and page_tree.seo is defined %}
+        {% include '@NowoPageBuilderKitBundle/public/_seo_meta.html.twig' with { seo: page_tree.seo } %}
+    {% endif %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
+    <style>
+        body.pbk-demo-shell { background: #fff; }
+        .pbk-demo-shell main.pbk-demo-main { max-width: none; padding: 0; margin: 0; }
+        .pbk-demo-shell .pbk-demo-toolbar {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: .875rem;
+        }
+    </style>
+    {% block stylesheets %}{% endblock %}
+</head>
+<body class="pbk-demo-shell">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand fw-semibold" href="{{ path('showcase') }}">Page Builder Kit · Demo</a>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-sm btn-warning" href="{{ path('showcase') }}">Use cases</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ path('home') }}">Home</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ path('compounds') }}">Compounds</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ path('classic') }}">Classic v1</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ path('draft') }}">Draft</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ path('i18n') }}">i18n</a>
+            <span class="vr text-secondary d-none d-lg-inline"></span>
+            <a class="btn btn-sm btn-outline-warning" href="{{ path('admin_page_builder_list') }}">Admin</a>
+            {% if app.user %}
+                <a class="btn btn-sm btn-outline-warning" href="{{ path('app_logout') }}">Logout</a>
+            {% else %}
+                <a class="btn btn-sm btn-primary" href="{{ path('app_login') }}">Login</a>
+            {% endif %}
+            {% set _route = app.request.attributes.get('_route') %}
+            {% set _params = app.request.attributes.get('_route_params')|default({}) %}
+            {% if _route %}
+                <a class="btn btn-sm btn-outline-info" href="{{ path(_route, _params|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">
+                    {{ app.request.locale == 'es' ? 'EN' : 'ES' }}
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+{% block toolbar %}{% endblock %}
+<main class="pbk-demo-main">
+    {% block body %}{% endblock %}
+</main>
+</body>
+</html>

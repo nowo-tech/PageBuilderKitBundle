@@ -1,0 +1,39 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.seo.title'|trans({'%key%': page_key}) }}{% endblock %}
+
+{% block header_actions %}
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+        <a class="btn btn-primary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">{{ 'admin.pages.edit'|trans }}</a>
+    </div>
+{% endblock %}
+
+{% block admin %}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        {% for loc in locales %}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link{% if loc == locale %} active{% endif %}"
+                   href="{{ path('admin_page_builder_seo', {pageKey: page_key, locale: loc}) }}">{{ loc|upper }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <p class="text-muted small">{{ 'admin.seo.hint'|trans }}</p>
+
+    {{ form_start(form) }}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form_row(form.title) }}</div>
+            <div class="col-md-6">{{ form_row(form.slug) }}</div>
+            <div class="col-md-6">{{ form_row(form.metaTitle) }}</div>
+            <div class="col-md-6">{{ form_row(form.robots) }}</div>
+            <div class="col-12">{{ form_row(form.metaDescription) }}</div>
+            <div class="col-md-6">{{ form_row(form.ogTitle) }}</div>
+            <div class="col-md-6">{{ form_row(form.ogImage) }}</div>
+            <div class="col-12">{{ form_row(form.ogDescription) }}</div>
+            <div class="col-12">{{ form_row(form.canonicalUrl) }}</div>
+        </div>
+        <button type="submit" class="btn btn-success mt-3">{{ 'admin.seo.save'|trans }}</button>
+    {{ form_end(form) }}
+{% endblock %}

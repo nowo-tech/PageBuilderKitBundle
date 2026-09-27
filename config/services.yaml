@@ -1,0 +1,4 @@
+# Alias for host apps that import config from the bundle root (Phase 1).
+# Canonical file: src/Resources/config/services.yaml
+imports:
+    - { resource: '../src/Resources/config/services.yaml' }

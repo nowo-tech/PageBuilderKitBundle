@@ -1,0 +1,81 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.sections.title'|trans({'%key%': page_key}) }}{% endblock %}
+
+{% block header_actions %}
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_seo', {pageKey: page_key}) }}">{{ 'admin.pages.seo'|trans }}</a>
+        <a class="btn btn-outline-primary btn-sm" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
+    </div>
+{% endblock %}
+
+{% block admin %}
+    <p class="text-muted">{{ 'admin.sections.hint'|trans }}</p>
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        {% for loc in locales %}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link{% if loc == locale %} active{% endif %}"
+                   href="{{ path('admin_page_builder_sections', {pageKey: page_key, locale: loc}) }}">{{ loc|upper }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <form method="post" class="pbk-sections-editor">
+        <input type="hidden" name="_token" value="{{ csrf_token('page_builder_sections') }}">
+
+        {% for section in sections_tree %}
+            <details class="card mb-3" open>
+                <summary class="card-header fw-semibold" style="cursor:pointer">
+                    {{ section.label }}
+                    <span class="text-muted small ms-2">{{ section.id }}</span>
+                </summary>
+                <div class="card-body">
+                    {% for column in section.columns %}
+                        <div class="border rounded p-3 mb-3 bg-light">
+                            <div class="small text-muted mb-2">{{ 'admin.sections.column'|trans({'%width%': column.width, '%id%': column.id}) }}</div>
+                            {% for widget in column.widgets %}
+                                <div class="border rounded bg-white p-3 mb-2" style="margin-left: {{ widget.depth * 1.25 }}rem">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong>{{ widget.label|trans }}</strong>
+                                        <span class="badge text-bg-secondary">{{ widget.type }} · {{ widget.id }}</span>
+                                    </div>
+                                    {% for field in widget.fields %}
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1" for="w-{{ widget.id }}-{{ field }}">{{ field }}</label>
+                                            {% set value = widget.props[field]|default('') %}
+                                            {% if field in ['html', 'alt'] or (value|length > 80) %}
+                                                <textarea class="form-control form-control-sm"
+                                                          id="w-{{ widget.id }}-{{ field }}"
+                                                          name="widgets[{{ widget.id }}][{{ field }}]"
+                                                          rows="3">{{ value }}</textarea>
+                                            {% else %}
+                                                <input class="form-control form-control-sm"
+                                                       id="w-{{ widget.id }}-{{ field }}"
+                                                       type="text"
+                                                       name="widgets[{{ widget.id }}][{{ field }}]"
+                                                       value="{{ value }}">
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted small mb-0">{{ 'admin.sections.no_props'|trans }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted small mb-0">{{ 'admin.sections.empty_column'|trans }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
+        {% else %}
+            <div class="alert alert-info">{{ 'admin.sections.empty'|trans }}</div>
+        {% endfor %}
+
+        {% if sections_tree is not empty %}
+            <button type="submit" class="btn btn-success">{{ 'admin.sections.save'|trans({'%locale%': locale|upper}) }}</button>
+        {% endif %}
+    </form>
+{% endblock %}

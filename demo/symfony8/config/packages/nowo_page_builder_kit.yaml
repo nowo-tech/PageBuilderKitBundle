@@ -1,0 +1,54 @@
+nowo_page_builder_kit:
+    default_locale: en
+    locales: [en, es]
+    security:
+        access_roles: [ROLE_ADMIN]
+        allow_unauthenticated: false
+    web_ui:
+        layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
+        css_framework: bootstrap5
+    doctrine:
+        table_prefix: ''
+    html:
+        sanitize:
+            strategy: allowlist
+    seo:
+        site_name: 'Page Builder Kit Demo'
+        default_og_image: 'https://picsum.photos/seed/pbk-default-og/1200/630'
+        canonical_base_url: 'http://localhost:8137'
+        default_robots: 'index,follow'
+    grapesjs:
+        enabled: true
+        cdn_version: '0.22.9'
+        allow_scripts: false
+        allow_custom_code: true
+        compound_examples: true
+        a11y_helpers: true
+        show_devices: true
+        asset_embed_as_base64: false
+        assets_upload:
+            enabled: true
+            storage: local
+            max_bytes: 5242880
+            local:
+                directory: '%kernel.project_dir%/public/uploads/page-builder'
+                public_prefix: /uploads/page-builder
+        twig:
+            enabled: true
+            strict_variables: false
+            canvas_helpers: true
+        plugins:
+            preset_webpage: true
+            blocks_basic: true
+            forms: true
+            navbar: true
+            countdown: true
+            export: true
+            tabs: true
+            custom_code: true
+            touch: true
+            parser_postcss: true
+            tooltip: true
+            style_bg: true
+            typed: true
+            tui_image_editor: true

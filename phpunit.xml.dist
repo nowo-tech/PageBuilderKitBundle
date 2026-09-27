@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.5/phpunit.xsd" bootstrap="tests/bootstrap.php" colors="true" cacheDirectory=".phpunit.cache" executionOrder="depends,defects" beStrictAboutOutputDuringTests="true" failOnRisky="true" failOnWarning="false" displayDetailsOnTestsThatTriggerWarnings="true">
+  <php>
+    <!-- REQ-SF-005: fail on direct deprecations from this package -->
+    <env name="SYMFONY_DEPRECATIONS_HELPER" value="max[direct]=0"/>
+  </php>
+  <testsuites>
+    <testsuite name="default">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <source restrictNotices="true" restrictWarnings="true" ignoreIndirectDeprecations="true">
+    <include>
+      <directory>src</directory>
+    </include>
+    <exclude>
+      <directory>src/Controller</directory>
+      <directory>src/Resources</directory>
+      <!-- Doctrine ServiceEntityRepository needs a full ORM runtime; covered via contract tests. -->
+      <directory>src/Repository</directory>
+    </exclude>
+  </source>
+  <coverage>
+    <report>
+      <html outputDirectory="coverage"/>
+      <clover outputFile="coverage.xml"/>
+    </report>
+  </coverage>
+</phpunit>

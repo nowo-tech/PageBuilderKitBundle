@@ -1,0 +1,7 @@
+<section {{ nowo_pbk_element_attrs(section.appearance|default(section.settings|default({})), ['pbk-section']) }}>
+    <div class="pbk-section__columns row">
+        {% for column in section.columns %}
+            {% include '@NowoPageBuilderKitBundle/widgets/_column.html.twig' with { column: column } %}
+        {% endfor %}
+    </div>
+</section>

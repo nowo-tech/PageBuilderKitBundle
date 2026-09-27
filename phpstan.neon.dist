@@ -1,0 +1,21 @@
+# PHPStan configuration for Page Builder Kit Bundle
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - demo/*
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors: []
+
+services:
+    -
+        class: Nowo\PageBuilderKitBundle\Tests\PHPStan\DoctrineGeneratedIdPropertiesExtension
+        tags:
+            - phpstan.properties.readWriteExtension
+
+includes:
+  - vendor/nowo-tech/phpstan-frankenphp/ruleset-classic.neon
+  - vendor/nowo-tech/phpstan-frankenphp/ruleset-worker.neon

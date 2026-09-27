@@ -1,0 +1,10 @@
+{% if settings.url|default('') and settings.label|default('') %}
+    <p class="pbk-widget pbk-widget--button">
+        <a href="{{ settings.url|e('html_attr') }}"
+           class="btn btn-primary"
+           target="{{ settings.target|default('_self')|e('html_attr') }}"
+           {% if settings.target|default('_self') == '_blank' %}rel="noopener noreferrer"{% endif %}>
+            {{ settings.label|e }}
+        </a>
+    </p>
+{% endif %}

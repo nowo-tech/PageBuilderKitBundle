@@ -1,0 +1,152 @@
+.pbk-admin .pbk-canvas {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    background: #fff;
+}
+
+.pbk-canvas--grapesjs-full {
+    min-height: calc(100vh - 160px);
+}
+
+.pbk-canvas--grapesjs-full .pbk-gjs {
+    min-height: calc(100vh - 260px);
+    border: 1px solid #1e293b;
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+/* GrapesJS webpage preset chrome */
+.pbk-gjs .gjs-one-bg { background-color: #1e293b; }
+.pbk-gjs .gjs-two-color { color: #e2e8f0; }
+.pbk-gjs .gjs-three-bg { background-color: #0f172a; }
+.pbk-gjs .gjs-four-color,
+.pbk-gjs .gjs-four-color-h:hover { color: #38bdf8; }
+.pbk-gjs .gjs-pn-panel { background: #0f172a; }
+.pbk-gjs .gjs-blocks-c { background: #0f172a; }
+.pbk-gjs .gjs-block { border-color: #334155; color: #e2e8f0; }
+.pbk-gjs .gjs-category-title,
+.pbk-gjs .gjs-layer-title,
+.pbk-gjs .gjs-sm-sector .gjs-sm-title,
+.pbk-gjs .gjs-clm-tags .gjs-sm-title,
+.pbk-gjs .gjs-traits-label,
+.pbk-gjs .gjs-block-category .gjs-title { background: #1e293b; color: #f8fafc; }
+
+.pbk-public .pbk-compound--feature-grid .pbk-compound__grid,
+.pbk-grapes-content .pbk-compound--feature-grid .pbk-compound__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .pbk-public .pbk-compound--feature-grid .pbk-compound__grid,
+    .pbk-grapes-content .pbk-compound--feature-grid .pbk-compound__grid,
+    .pbk-public .pbk-compound--media-split > div,
+    .pbk-grapes-content .pbk-compound--media-split > div,
+    .pbk-public .pbk-compound--stats > div,
+    .pbk-grapes-content .pbk-compound--stats > div {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+.pbk-public .pbk-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+}
+
+.pbk-public .pbk-grapes-content {
+    max-width: 100%;
+}
+
+.pbk-public .pbk-widget--image img {
+    max-width: 100%;
+    height: auto;
+}
+
+.pbk-element.pbk-widget-wrap {
+    display: block;
+}
+
+/* Legacy classic canvas (schema v1) — kept for BC CSS hooks */
+.pbk-canvas-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .pbk-canvas-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pbk-inspector {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+}
+
+.pbk-section {
+    border: 1px dashed #adb5bd;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: #f8f9fa;
+}
+
+.pbk-widget-card {
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #fff;
+}
+
+/* Accessibility */
+.pbk-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10000;
+    padding: 0.75rem 1rem;
+    background: #0f172a;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 0 0 0.35rem 0;
+}
+.pbk-skip-link:focus {
+    left: 0;
+}
+.pbk-public .pbk-page:focus {
+    outline: none;
+}
+.pbk-public .pbk-page:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 4px;
+}
+
+/* Classic multi-section demo */
+.pbk-classic-demo .pbk-classic-section {
+    margin-bottom: 0;
+}
+.pbk-classic-demo .pbk-classic-section--hero .pbk-widget--heading h1,
+.pbk-classic-demo .pbk-classic-section--hero h1 {
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    margin-bottom: 1rem;
+}
+.pbk-classic-demo .pbk-classic-section--features .pbk-widget {
+    padding: 0.5rem;
+}
+.pbk-classic-demo .pbk-classic-section--cta a.btn,
+.pbk-classic-demo .pbk-classic-section--cta .pbk-widget--button a {
+    background: #fff;
+    color: #1d4ed8;
+}

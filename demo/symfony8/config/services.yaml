@@ -1,0 +1,14 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\Controller\:
+        resource: '../src/Controller/'
+        tags: ['controller.service_arguments']
+
+    App\Demo\:
+        resource: '../src/Demo/'
+
+    App\Demo\DemoGrapesTwigContextProvider:
+        tags: ['nowo_page_builder_kit.grapes_twig_context']

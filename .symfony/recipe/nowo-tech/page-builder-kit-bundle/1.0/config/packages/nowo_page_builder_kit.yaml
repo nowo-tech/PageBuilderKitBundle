@@ -1,0 +1,10 @@
+nowo_page_builder_kit:
+    default_locale: en
+    locales: [en, es]
+    security:
+        access_roles: [ROLE_EDITOR]
+    web_ui:
+        css_framework: tailwind
+    html:
+        sanitize:
+            strategy: allowlist

@@ -1,0 +1,8 @@
+{
+    "bundles": {
+        "Nowo\\PageBuilderKitBundle\\NowoPageBuilderKitBundle": ["all"]
+    },
+    "copy-from-recipe": {
+        "config/": "%CONFIG_DIR%/"
+    }
+}

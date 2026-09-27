@@ -1,0 +1,66 @@
+name: page-builder-kit-bundle-demo-symfony-8
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: page-builder-kit-bundle-demo-symfony-8-php
+    working_dir: /app
+    ports:
+      - "${PORT:-8137}:80"
+    volumes:
+      - .:/app
+      - ../..:/var/page-builder-kit-bundle
+      - ./docker/frankenphp/Caddyfile.dev:/etc/frankenphp/Caddyfile.dev
+      - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
+      - ./docker/php-dev.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
+      - composer-cache:/root/.composer/cache
+    env_file:
+      - .env
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
+      - APP_ENV=dev
+      - APP_DEBUG=1
+      - APP_SECRET=${APP_SECRET:-demo-secret}
+      - FRANKENPHP_MODE=${FRANKENPHP_MODE:-worker}
+      - SERVER_NAME=:80
+      - DATABASE_URL=mysql://${MYSQL_USER:-demo}:${MYSQL_PASSWORD:-demo}@mysql:3306/${MYSQL_DATABASE:-page_builder_kit_demo}?serverVersion=8.0.32&charset=utf8mb4
+    # Public DNS for Composer / Packagist (Docker/WSL resolver failures)
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - page-builder-kit-demo-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: page-builder-kit-bundle-demo-symfony-8-mysql
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-page_builder_kit_demo}
+      MYSQL_USER: ${MYSQL_USER:-demo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-demo}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    # REQ-DEMO: database ports must not be published to the host
+    networks:
+      - page-builder-kit-demo-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  composer-cache:
+  mysql-data:
+
+networks:
+  page-builder-kit-demo-network:
+    driver: bridge

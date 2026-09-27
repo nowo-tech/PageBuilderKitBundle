@@ -1,0 +1,2 @@
+nowo_page_builder_kit:
+    resource: '@NowoPageBuilderKitBundle/Resources/config/routing.yaml'
