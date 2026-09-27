@@ -16,7 +16,7 @@
 
 In this repository, spec-driven development has three layers that stay in sync:
 
-1. **GitHub Spec Kit baseline**: `specs/001-baseline/` documents Phase 1 behavior and maps production files under `src/`.
+1. **GitHub Spec Kit**: `specs/001-baseline/` (Phase 1), `002`–`004` feature specs (Phases 2–4), plus canonical `code-inventory.md` under `001-baseline/`.
 2. **Product behavior**: Canvas admin, document API, widgets, i18n props, publish flow, and public rendering are documented in integrator docs.
 3. **Traceability anchors**: Stable `REQ-*` identifiers link docs, demo expectations, and QA workflows.
 
@@ -55,17 +55,23 @@ In this repository, spec-driven development has three layers that stay in sync:
 
 See ARCHITECTURE / USAGE. Success criteria met in v1.0.0.
 
+Spec Kit: [`specs/002-phase2-grapesjs/spec.md`](../specs/002-phase2-grapesjs/spec.md).
+
 ### Phase 3 — Revisions and templates (shipped)
 
 - Revision history UI + restore + diff preview
 - Duplicate page, import/export JSON (`formatVersion: 1`)
 - Named page templates (save from page → create draft from template)
 
+Spec Kit: [`specs/003-phase3-revisions-templates/spec.md`](../specs/003-phase3-revisions-templates/spec.md).
+
 ### Phase 4 — External widgets (shipped baseline)
 
 - `WidgetPackInterface` + `WidgetPackRegistry` + compiler pass
 - Author guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md)
 - Classic widget types remain the extension point; Grapes custom blocks stay host/CDN-owned
+
+Spec Kit: [`specs/004-phase4-external-widgets/spec.md`](../specs/004-phase4-external-widgets/spec.md).
 
 ### Follow-ups (optional)
 
@@ -105,14 +111,17 @@ make release-check
 2. Update or create the relevant spec artifact.
 3. Implement with tests when production behavior changes.
 4. Update integrator docs when host applications must act.
-5. Keep `specs/001-baseline/spec.md` and `code-inventory.md` aligned with `src/`.
+5. Keep phase specs (`001`–`004`) and `specs/001-baseline/code-inventory.md` aligned with `src/`.
 
 ## GitHub Spec Kit (summary)
 
 | Artifact | Path |
 | --- | --- |
-| Baseline spec | `specs/001-baseline/spec.md` |
-| Code inventory | `specs/001-baseline/code-inventory.md` |
+| Phase 1 baseline | `specs/001-baseline/spec.md` |
+| Code inventory (all phases) | `specs/001-baseline/code-inventory.md` |
+| Phase 2 GrapesJS | `specs/002-phase2-grapesjs/spec.md` |
+| Phase 3 revisions/templates | `specs/003-phase3-revisions-templates/spec.md` |
+| Phase 4 external widgets | `specs/004-phase4-external-widgets/spec.md` |
 | Tooling manual | `docs/SPEC-KIT.md` |
 
 See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.

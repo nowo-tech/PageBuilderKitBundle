@@ -2,6 +2,8 @@
 
 How to ship **classic schema v1** widget types as a Composer package or host module without forking Page Builder Kit Bundle.
 
+Spec Kit: [`specs/004-phase4-external-widgets/spec.md`](../specs/004-phase4-external-widgets/spec.md).
+
 ## Table of contents
 
 - [Quick start](#quick-start)
