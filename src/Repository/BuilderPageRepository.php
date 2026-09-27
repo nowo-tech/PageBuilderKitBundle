@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Repository;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use SortDirection;
 
 /** @extends ServiceEntityRepository<BuilderPage> */
 final class BuilderPageRepository extends ServiceEntityRepository implements BuilderPageRepositoryInterface
@@ -28,7 +29,7 @@ final class BuilderPageRepository extends ServiceEntityRepository implements Bui
     {
         /** @var list<BuilderPage> $pages */
         $pages = $this->createQueryBuilder('p')
-            ->orderBy('p.pageKey', 'ASC')
+            ->orderBy('p.pageKey', SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

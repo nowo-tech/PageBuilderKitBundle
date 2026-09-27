@@ -36,7 +36,7 @@
     "require": {
         "php": ">=8.4 <8.6",
         "doctrine/doctrine-bundle": "^2.10 || ^3.0",
-        "doctrine/orm": "^2.15 || ^3.0",
+        "doctrine/orm": "^3.7",
         "nowo-tech/form-kit-bundle": "^2.4",
         "nowo-tech/ui-kit-bundle": "^1.4",
         "symfony/asset": "^7.4 || ^8.0",

@@ -10,6 +10,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
+use SortDirection;
 
 #[ORM\Entity(repositoryClass: BuilderPageRepository::class)]
 #[ORM\Table(name: 'pb_page')]
@@ -48,7 +49,7 @@ class BuilderPage
 
     /** @var Collection<int, BuilderPageRevision> */
     #[ORM\OneToMany(targetEntity: BuilderPageRevision::class, mappedBy: 'page', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    #[ORM\OrderBy(['createdAt' => SortDirection::Descending])]
     private Collection $revisions;
 
     public function __construct()

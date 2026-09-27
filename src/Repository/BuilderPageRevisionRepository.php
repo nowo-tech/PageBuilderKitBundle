@@ -8,6 +8,7 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
+use SortDirection;
 
 /** @extends ServiceEntityRepository<BuilderPageRevision> */
 final class BuilderPageRevisionRepository extends ServiceEntityRepository implements BuilderPageRevisionRepositoryInterface
@@ -26,8 +27,8 @@ final class BuilderPageRevisionRepository extends ServiceEntityRepository implem
         $revisions = $this->createQueryBuilder('r')
             ->andWhere('r.page = :page')
             ->setParameter('page', $page)
-            ->orderBy('r.createdAt', 'DESC')
-            ->addOrderBy('r.id', 'DESC')
+            ->orderBy('r.createdAt', SortDirection::Descending)
+            ->addOrderBy('r.id', SortDirection::Descending)
             ->getQuery()
             ->getResult();
 
@@ -40,8 +41,8 @@ final class BuilderPageRevisionRepository extends ServiceEntityRepository implem
         $revision = $this->createQueryBuilder('r')
             ->andWhere('r.page = :page')
             ->setParameter('page', $page)
-            ->orderBy('r.createdAt', 'DESC')
-            ->addOrderBy('r.id', 'DESC')
+            ->orderBy('r.createdAt', SortDirection::Descending)
+            ->addOrderBy('r.id', SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
