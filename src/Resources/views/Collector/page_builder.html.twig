@@ -2,7 +2,7 @@
 
 {% block toolbar %}
     {% set icon %}
-        <span class="icon">PBK</span>
+        <span class="icon" aria-hidden="true">{{ source('@NowoPageBuilderKitBundle/Icon/page-builder.svg') }}</span>
         <span class="sf-toolbar-value">{{ collector.renderCount }}</span>
     {% endset %}
     {% set text %}
@@ -24,7 +24,7 @@
 
 {% block menu %}
     <span class="label {{ collector.renderCount == 0 and collector.publicOutcomes|length == 0 and collector.adminActions|length == 0 ? 'disabled' }}">
-        <span class="icon">PBK</span>
+        <span class="icon" aria-hidden="true">{{ source('@NowoPageBuilderKitBundle/Icon/page-builder.svg') }}</span>
         <strong>Page Builder</strong>
         <span class="count">
             <span>{{ collector.renderCount }}</span>

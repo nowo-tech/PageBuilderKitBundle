@@ -69,15 +69,17 @@ Spec Kit: [`specs/003-phase3-revisions-templates/spec.md`](../specs/003-phase3-r
 
 - `WidgetPackInterface` + `WidgetPackRegistry` + compiler pass
 - Author guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md)
-- Classic widget types remain the extension point; Grapes custom blocks stay host/CDN-owned
+- Classic widget types remain the extension point for schema v1; Grapes block packs ship reusable BlockManager entries (see follow-ups)
 
 Spec Kit: [`specs/004-phase4-external-widgets/spec.md`](../specs/004-phase4-external-widgets/spec.md).
 
 ### Follow-ups (optional)
 
-- Richer visual HTML/CSS side-by-side in revision diff
-- Template marketplace / sharing across projects
-- Grapes block packs analogous to classic widget packs
+Shipped in **v1.2.0**:
+
+- Richer visual HTML/CSS side-by-side in revision diff (`DocumentDiff` panels + admin UI)
+- Template JSON export/import for sharing across projects (`PageTemplateService::export` / `import`)
+- Grapes block packs analogous to classic widget packs (`GrapesBlockPackInterface` + canvas `blockPacks`)
 
 ## Validating the spec
 

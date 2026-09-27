@@ -44,6 +44,7 @@ Seed version: `App\Demo\DemoUseCases::SEED_VERSION` (bump to reseed).
 | `twig` | `/twig` | grapesjs | yes | Twig variables in Grapes HTML |
 | `seo` | `/seo` | grapesjs | yes | Meta / OG / robots + a11y landmarks |
 | `draft` | `/draft` | grapesjs | **no** | Unpublished → `/p/draft` = 404 |
+| `multi-render` | `/multi-render` | — (composite) | n/a | Embeds `pricing`+`about`+`faq` in one request (collector ≥3 renders; no Doctrine page) |
 
 ## How to explore
 

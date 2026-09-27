@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ page_title }} · PBK Demo{% endblock %}
+
+{% block stylesheets %}
+    {% for tree in page_trees %}
+        {% if tree.engine|default('classic') == 'grapesjs' and tree.css|default('') %}
+            <style id="pbk-grapes-css-{{ tree.pageKey|default(loop.index) }}">{{ tree.css|raw }}</style>
+        {% endif %}
+    {% endfor %}
+{% endblock %}
+
+{% block toolbar %}
+<div class="pbk-demo-toolbar py-2">
+    <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge text-bg-primary text-uppercase">{{ page_key }}</span>
+            <span class="badge text-bg-info">{{ page_trees|length }} renders</span>
+            <strong>{{ page_title }}</strong>
+            <span class="text-muted">· seed v{{ seed_version }} · Web Profiler collector demo</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-dark" href="{{ path('showcase') }}">All use cases</a>
+            {% for key in embed_keys %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ path(key) }}">{{ key }}</a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-3 px-lg-4 py-3">
+    <div class="alert alert-info small mb-4">
+        {% if locale == 'es' %}
+            Esta ruta llama a <code>PageRenderProvider::getRenderedTree()</code>
+            {{ page_trees|length }} veces en la misma petición HTTP
+            (<code>{{ embed_keys|join(', ') }}</code>).
+            Abre el panel <strong>Page Builder</strong> del Web Profiler: el contador de renders debe ser ≥ {{ page_trees|length }}.
+        {% else %}
+            This route calls <code>PageRenderProvider::getRenderedTree()</code>
+            {{ page_trees|length }} times in one HTTP request
+            (<code>{{ embed_keys|join(', ') }}</code>).
+            Open the Web Profiler <strong>Page Builder</strong> panel: render count should be ≥ {{ page_trees|length }}.
+        {% endif %}
+    </div>
+</div>
+
+{% for tree in page_trees %}
+    <section class="pbk-multi-render-chunk border-top" data-pbk-embed="{{ tree.pageKey|default(loop.index) }}">
+        <div class="container-fluid px-3 px-lg-4 py-2 bg-light border-bottom">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge text-bg-dark">#{{ loop.index }}</span>
+                <span class="badge text-bg-secondary">{{ tree.pageKey|default('?') }}</span>
+                <span class="badge text-bg-{{ tree.engine|default('') == 'classic' ? 'warning' : 'primary' }}">{{ tree.engine|default('?') }}</span>
+                <strong>{{ tree.title|default(tree.pageKey) }}</strong>
+                <a class="btn btn-sm btn-outline-primary ms-auto" href="{{ path('admin_page_builder_canvas', {pageKey: tree.pageKey}) }}">Canvas</a>
+            </div>
+        </div>
+        {% if tree.engine|default('classic') == 'grapesjs' %}
+            {% if tree.html|default('') is empty %}
+                <div class="container py-4">
+                    <div class="alert alert-warning mb-0">No content for <strong>{{ tree.pageKey }}</strong>.</div>
+                </div>
+            {% else %}
+                <div class="pbk-grapes-content">
+                    {{ tree.html|raw }}
+                </div>
+            {% endif %}
+        {% elseif tree.sections is empty %}
+            <div class="container py-4">
+                <div class="alert alert-warning mb-0">No classic sections for <strong>{{ tree.pageKey }}</strong>.</div>
+            </div>
+        {% else %}
+            <div class="container py-4 pbk-classic-demo">
+                {% for section in tree.sections %}
+                    {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+{% endfor %}
+{% endblock %}

@@ -64,10 +64,16 @@ final class DemoControllerTest extends WebTestCase
     {
         $client = static::createClient();
         $client->loginUser(new InMemoryUser('admin', 'admin', ['ROLE_ADMIN']));
-        $client->request('GET', '/admin/page-builder/pages/twig/revisions');
+        // Hit a public use-case first so DemoPageSeeder ensures pages + demo revisions.
+        $client->request('GET', '/pricing');
+        self::assertResponseIsSuccessful();
+
+        $client->request('GET', '/admin/page-builder/pages/pricing/revisions');
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Versions');
+        self::assertSelectorTextContains('body', 'Demo version');
+        self::assertSelectorExists('a[href*="/revisions/"][href$="/diff"]');
     }
 
     public function testCanvasExposesUnpublishWhenPageIsPublished(): void
@@ -79,5 +85,17 @@ final class DemoControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-pbk-action="unpublish"]');
         self::assertSelectorExists('[data-pbk-unpublish-url]');
+    }
+
+    public function testMultiRenderPageEmbedsSeveralTreesInOneRequest(): void
+    {
+        $client = static::createClient();
+        $client->request('GET', '/multi-render');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-pbk-embed="pricing"]');
+        self::assertSelectorExists('[data-pbk-embed="about"]');
+        self::assertSelectorExists('[data-pbk-embed="faq"]');
+        self::assertSelectorTextContains('body', '3 renders');
     }
 }

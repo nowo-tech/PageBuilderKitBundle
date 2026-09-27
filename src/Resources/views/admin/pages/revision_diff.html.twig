@@ -28,4 +28,38 @@
             </ul>
         {% endif %}
     {% endif %}
+
+    {% set panels = diff.panels|default({}) %}
+    {% if panels is not empty %}
+        <p class="text-muted mt-3">{{ 'admin.revisions.diff_panels_hint'|trans }}</p>
+
+        {% for panelKey, panel in panels %}
+            {% set panelTitle = 'admin.revisions.diff_panel_' ~ panelKey %}
+            <section class="pbk-diff-panel mb-4">
+                <h2 class="h5">{{ panelTitle|trans }}</h2>
+                <div class="pbk-diff-sbs" role="region" aria-label="{{ panelTitle|trans }}">
+                    <div class="pbk-diff-sbs__col">
+                        <div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_live'|trans }}</div>
+                    </div>
+                    <div class="pbk-diff-sbs__col">
+                        <div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_revision'|trans }}</div>
+                    </div>
+                    {% for row in panel.rows %}
+                        <div class="pbk-diff-sbs__row pbk-diff-sbs__row--{{ row.type }}">
+                            <pre class="pbk-diff-sbs__cell">{{ row.left }}</pre>
+                            <pre class="pbk-diff-sbs__cell">{{ row.right }}</pre>
+                        </div>
+                    {% else %}
+                        <div class="pbk-diff-sbs__row pbk-diff-sbs__row--same">
+                            <pre class="pbk-diff-sbs__cell text-muted">(empty)</pre>
+                            <pre class="pbk-diff-sbs__cell text-muted">(empty)</pre>
+                        </div>
+                    {% endfor %}
+                </div>
+                {% if panel.truncated %}
+                    <p class="small text-muted mt-1">{{ 'admin.revisions.diff_truncated'|trans({'%max%': 400}) }}</p>
+                {% endif %}
+            </section>
+        {% endfor %}
+    {% endif %}
 {% endblock %}

@@ -160,7 +160,7 @@ demo-smoke:
 		sleep 3; \
 	done; \
 	if [ "$$code" != "200" ]; then echo "demo-smoke failed: HTTP $$code"; (cd demo/symfony8 && docker compose logs --tail 80 php) || true; exit 1; fi; \
-	for path_expected in "/showcase:200" "/classic:200" "/draft:200" "/i18n:200" "/forms:200" "/p/home:200" "/p/draft:404"; do \
+	for path_expected in "/showcase:200" "/classic:200" "/draft:200" "/i18n:200" "/forms:200" "/multi-render:200" "/p/home:200" "/p/draft:404"; do \
 		path=$${path_expected%%:*}; \
 		expected=$${path_expected##*:}; \
 		c=$$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$$PORT$$path" || echo 000); \

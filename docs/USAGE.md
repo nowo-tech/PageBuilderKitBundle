@@ -38,6 +38,9 @@ Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the
 | --- | --- | --- | --- |
 | `admin_page_builder_list` | GET, POST | `{prefix}/pages` | List pages; create new page (form) |
 | `admin_page_builder_templates` | GET | `{prefix}/templates` | Page templates library |
+| `admin_page_builder_templates_export_all` | GET | `{prefix}/templates/export` | Export all templates JSON |
+| `admin_page_builder_templates_export` | GET | `{prefix}/templates/{templateKey}/export` | Export one template JSON |
+| `admin_page_builder_templates_import` | POST | `{prefix}/templates/import` | Import template JSON (single or bundle) |
 | `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell |
 | `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON |
 | `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document |
@@ -503,12 +506,22 @@ Core classic widgets ship with the bundle. Hosts and Composer packs can add more
 
 Full guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
 
+## GrapesJS block packs
+
+For schema v2 (Grapes) canvases, implement `GrapesBlockPackInterface` (tag `nowo_page_builder_kit.grapes_block_pack`). Blocks appear in the BlockManager via canvas config `blockPacks`. See [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md#grapesjs-block-packs).
+
+## Template sharing
+
+Export/import template JSON (`admin_page_builder_templates_export` / `_export_all` / `_import`) to move reusable structures between projects. Format: `formatVersion: 1`, `kind: page_builder_template` (single) or `page_builder_templates` (bundle).
+
 ## Web Profiler collector
 
-In `dev` (`kernel.debug=true`), the toolbar shows a **PBK** panel when `debug.collector` is true (default). It lists:
+In `dev` (`kernel.debug=true`), the toolbar shows a **Page Builder** panel (layout icon) when `debug.collector` is true (default). It lists:
 
 - Renders: `pageKey`, locale, status, engine, Twig applied/error, context **key names**, timings (ms)
 - Public outcomes: `published` / `draft_preview` / `not_found_draft` / `not_found_missing`
 - Admin actions: save, publish, unpublish, restore, duplicate, export, import, template_*
+
+Render count is **per HTTP request**. The FrankenPHP demo route `/multi-render` calls `getRenderedTree()` three times so the toolbar shows ≥ 3.
 
 See [CONFIGURATION.md](CONFIGURATION.md#debug).

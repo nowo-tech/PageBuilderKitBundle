@@ -19,7 +19,10 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
+use function count;
+use function is_array;
 use function is_string;
+use function json_decode;
 use function trim;
 
 final class PageTemplatesController extends AbstractController
@@ -144,6 +147,72 @@ final class PageTemplatesController extends AbstractController
         }
 
         $this->addFlash('success', 'admin.templates.deleted');
+
+        return $this->redirectToRoute('admin_page_builder_templates');
+    }
+
+    #[Route('/templates/export', name: 'admin_page_builder_templates_export_all', methods: ['GET'])]
+    public function exportAll(): JsonResponse
+    {
+        $payload = $this->templateService->exportAll();
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('templates_export_all', (string) count($payload['templates']));
+
+        return new JsonResponse($payload);
+    }
+
+    #[Route('/templates/{templateKey}/export', name: 'admin_page_builder_templates_export', requirements: ['templateKey' => '[a-z0-9_-]+'], methods: ['GET'])]
+    public function export(string $templateKey): JsonResponse
+    {
+        try {
+            $payload = $this->templateService->export($templateKey);
+        } catch (InvalidArgumentException $exception) {
+            return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('template_export', $templateKey);
+
+        return new JsonResponse($payload);
+    }
+
+    #[Route('/templates/import', name: 'admin_page_builder_templates_import', methods: ['POST'])]
+    public function import(Request $request): Response
+    {
+        if (!$this->validateCsrf($request)) {
+            return $this->error($request, 'invalid_csrf', Response::HTTP_FORBIDDEN);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        if ($payload === [] && $request->request->has('payload')) {
+            $decoded = json_decode((string) $request->request->get('payload'), true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+
+        $overwrite = true;
+        if (isset($payload['overwrite'])) {
+            $overwrite = (bool) $payload['overwrite'];
+            unset($payload['overwrite']);
+        } elseif ($request->request->has('overwrite')) {
+            $overwrite = (bool) $request->request->get('overwrite');
+        }
+
+        try {
+            $keys = $this->templateService->import($payload, $overwrite);
+        } catch (InvalidArgumentException $exception) {
+            return $this->error($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('templates_import', (string) count($keys));
+
+        if ($this->wantsJson($request)) {
+            return new JsonResponse(['ok' => true, 'templateKeys' => $keys]);
+        }
+
+        $this->addFlash('success', 'admin.templates.imported');
 
         return $this->redirectToRoute('admin_page_builder_templates');
     }

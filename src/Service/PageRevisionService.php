@@ -77,7 +77,8 @@ final readonly class PageRevisionService
      *     structureChanged: bool,
      *     propsChanged: bool,
      *     summary: list<string>,
-     *     changedPaths: list<string>
+     *     changedPaths: list<string>,
+     *     panels: array<string, mixed>
      * }
      */
     public function diff(BuilderPage $page, int $revisionId): array

@@ -1040,7 +1040,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "acc9db7cc3817975578b99503b57b2cb813ab34f"
+                "reference": "dfbcc76f5d7a9900486dedf81bbc5a4ff3885053"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",

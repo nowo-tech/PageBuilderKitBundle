@@ -122,7 +122,7 @@ Historical Phase 1 non-goals that are **now shipped** elsewhere:
 Still deferred (not Phase 1–4 baseline acceptance criteria):
 
 - External widget / template marketplace or sharing across projects
-- Grapes block packs (Phase 4 follow-up)
+- Grapes block packs (shipped follow-up)
 - Full theme/site builder ownership for host applications
 - Optional follow-ups listed in [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)
 

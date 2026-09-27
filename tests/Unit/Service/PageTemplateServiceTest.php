@@ -25,6 +25,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+use function count;
+
 #[CoversClass(PageTemplateService::class)]
 final class PageTemplateServiceTest extends TestCase
 {
@@ -221,6 +223,257 @@ final class PageTemplateServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $service->createPageFromTemplate('unknown', 'page', 'Title', 'es');
+    }
+
+    #[Test]
+    public function exportImportRoundTripSingleAndBundle(): void
+    {
+        $templates    = [];
+        $templateRepo = new class($templates) implements BuilderPageTemplateRepositoryInterface {
+            /** @param array<string, BuilderPageTemplate> $templates */
+            public function __construct(private array &$templates)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $this->templates[$templateKey] ?? null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return array_values($this->templates);
+            }
+
+            public function put(BuilderPageTemplate $template): void
+            {
+                $this->templates[$template->getTemplateKey()] = $template;
+            }
+        };
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('persist')->willReturnCallback(
+            static function (BuilderPageTemplate $template) use ($templateRepo): void {
+                $templateRepo->put($template);
+            },
+        );
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $em,
+            $this->documents(),
+            new DocumentNormalizer(),
+        );
+
+        $seed = (new BuilderPageTemplate())
+            ->setTemplateKey('hero-tpl')
+            ->setLabel('Hero')
+            ->setStructure([
+                'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'          => '<h1>Hi</h1>',
+                'css'           => '.x{}',
+                'grapes'        => [],
+                'localeContent' => [],
+            ])
+            ->setWidgetPropsByLocale(['es' => []]);
+        $templateRepo->put($seed);
+
+        $single = $service->export('hero-tpl');
+        self::assertSame(PageTemplateService::KIND_SINGLE, $single['kind']);
+        self::assertSame('hero-tpl', $single['templateKey']);
+
+        $keys = $service->import([
+            ...$single,
+            'templateKey' => 'hero-imported',
+            'label'       => 'Hero imported',
+        ]);
+        self::assertSame(['hero-imported'], $keys);
+        self::assertNotNull($templateRepo->findOneByTemplateKey('hero-imported'));
+
+        $bundle = $service->exportAll();
+        self::assertSame(PageTemplateService::KIND_BUNDLE, $bundle['kind']);
+        self::assertGreaterThanOrEqual(2, count($bundle['templates']));
+
+        $imported = $service->import([
+            'formatVersion' => PageTemplateService::FORMAT_VERSION,
+            'kind'          => PageTemplateService::KIND_BUNDLE,
+            'templates'     => [
+                [
+                    'templateKey'         => 'from-bundle',
+                    'label'               => 'From bundle',
+                    'structure'           => $single['structure'],
+                    'widgetPropsByLocale' => [],
+                ],
+            ],
+        ]);
+        self::assertSame(['from-bundle'], $imported);
+    }
+
+    #[Test]
+    public function importRejectsBadFormatAndOverwriteConflict(): void
+    {
+        $templates    = [];
+        $templateRepo = new class($templates) implements BuilderPageTemplateRepositoryInterface {
+            /** @param array<string, BuilderPageTemplate> $templates */
+            public function __construct(private array &$templates)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $this->templates[$templateKey] ?? null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return array_values($this->templates);
+            }
+
+            public function put(BuilderPageTemplate $template): void
+            {
+                $this->templates[$template->getTemplateKey()] = $template;
+            }
+        };
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('persist')->willReturnCallback(
+            static function (BuilderPageTemplate $template) use ($templateRepo): void {
+                $templateRepo->put($template);
+            },
+        );
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $em,
+            $this->documents(),
+            new DocumentNormalizer(),
+        );
+
+        $structure = [
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ];
+
+        $templateRepo->put(
+            (new BuilderPageTemplate())
+                ->setTemplateKey('exists')
+                ->setLabel('Exists')
+                ->setStructure($structure),
+        );
+
+        try {
+            $service->import(['formatVersion' => 99, 'kind' => PageTemplateService::KIND_SINGLE]);
+            self::fail('Expected formatVersion rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('formatVersion', $exception->getMessage());
+        }
+
+        try {
+            $service->export('missing');
+            self::fail('Expected unknown export rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('Unknown template', $exception->getMessage());
+        }
+
+        try {
+            $service->import([
+                'formatVersion' => PageTemplateService::FORMAT_VERSION,
+                'kind'          => PageTemplateService::KIND_BUNDLE,
+            ]);
+            self::fail('Expected missing templates list rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('templates must be a list', $exception->getMessage());
+        }
+
+        try {
+            $service->import([
+                'formatVersion' => PageTemplateService::FORMAT_VERSION,
+                'kind'          => 'other',
+            ]);
+            self::fail('Expected unsupported kind rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('Unsupported template kind', $exception->getMessage());
+        }
+
+        $service->import([
+            'formatVersion' => PageTemplateService::FORMAT_VERSION,
+            'kind'          => PageTemplateService::KIND_BUNDLE,
+            'templates'     => [
+                'skip-me',
+                [
+                    'templateKey'         => 'exists',
+                    'label'               => '',
+                    'structure'           => $structure,
+                    'widgetPropsByLocale' => ['es' => ['ok' => 1], 'bad' => 'x'],
+                ],
+            ],
+        ]);
+        self::assertSame('exists', $templateRepo->findOneByTemplateKey('exists')?->getLabel());
+
+        try {
+            $service->import([
+                'formatVersion' => PageTemplateService::FORMAT_VERSION,
+                'kind'          => PageTemplateService::KIND_SINGLE,
+                'templateKey'   => 123,
+                'structure'     => $structure,
+            ]);
+            self::fail('Expected non-string key rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('Invalid template key.', $exception->getMessage());
+        }
+
+        try {
+            $service->import([
+                'formatVersion' => PageTemplateService::FORMAT_VERSION,
+                'kind'          => PageTemplateService::KIND_SINGLE,
+                'templateKey'   => '!!!',
+                'structure'     => $structure,
+            ]);
+            self::fail('Expected invalid key rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('Invalid template key.', $exception->getMessage());
+        }
+
+        try {
+            $service->import([
+                'formatVersion' => PageTemplateService::FORMAT_VERSION,
+                'kind'          => PageTemplateService::KIND_SINGLE,
+                'templateKey'   => 'no-structure',
+            ]);
+            self::fail('Expected structure rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('structure must be an object.', $exception->getMessage());
+        }
+
+        try {
+            $service->import([
+                'formatVersion'       => PageTemplateService::FORMAT_VERSION,
+                'kind'                => PageTemplateService::KIND_SINGLE,
+                'templateKey'         => 'bad-props',
+                'structure'           => $structure,
+                'widgetPropsByLocale' => 'nope',
+            ]);
+            self::fail('Expected widgetProps rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('widgetPropsByLocale must be an object.', $exception->getMessage());
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->import([
+            'formatVersion'       => PageTemplateService::FORMAT_VERSION,
+            'kind'                => PageTemplateService::KIND_SINGLE,
+            'templateKey'         => 'exists',
+            'label'               => 'Exists',
+            'structure'           => $structure,
+            'widgetPropsByLocale' => [],
+        ], overwrite: false);
     }
 
     #[Test]

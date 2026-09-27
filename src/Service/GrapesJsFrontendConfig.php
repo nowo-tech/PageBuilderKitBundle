@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Service;
 
+use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackRegistry;
+
 use function array_key_exists;
 
 /**
@@ -36,6 +38,7 @@ final readonly class GrapesJsFrontendConfig
         private bool $twigEnabled = true,
         private bool $twigCanvasHelpers = true,
         private array $twigVariables = [],
+        private GrapesBlockPackRegistry $blockPackRegistry = new GrapesBlockPackRegistry(),
     ) {
     }
 
@@ -67,6 +70,7 @@ final readonly class GrapesJsFrontendConfig
             'assetEmbedAsBase64'  => $embedAsBase64,
             'assetsUploadEnabled' => $this->assetsUploadEnabled,
             'pluginCdnBase'       => 'https://esm.sh',
+            'blockPacks'          => $this->blockPackRegistry->toFrontend(),
             'twig'                => [
                 'enabled'       => $this->twigEnabled,
                 'canvasHelpers' => $this->twigCanvasHelpers,

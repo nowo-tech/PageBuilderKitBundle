@@ -58,7 +58,7 @@ Phase 2 replaces the Phase 1 classic-only canvas with a **GrapesJS** admin edito
 
 - Revision history UI, templates library, duplicate/import-export → Phase 3
 - External classic widget packs → Phase 4 baseline ([`../004-phase4-external-widgets/spec.md`](../004-phase4-external-widgets/spec.md))
-- Grapes **block packs** analogous to widget packs → optional follow-up
+- Grapes **block packs** analogous to widget packs → shipped follow-up (`GrapesBlockPackInterface`)
 
 ## Validation
 

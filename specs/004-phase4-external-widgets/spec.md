@@ -47,13 +47,14 @@ Phase 4 baseline lets hosts and Composer packages ship **classic schema v1** wid
 
 ## Non-goals (Phase 4 baseline)
 
-Deferred (optional follow-ups, not acceptance criteria of this baseline):
+Originally deferred follow-ups (now shipped — see [Follow-ups](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)):
 
 - Grapes **block packs** analogous to classic widget packs
-- Template / widget marketplace or cross-project sharing
-- Bundled third-party widget Composer packages inside this repo
+- Template JSON export/import for cross-project sharing
 
-See [Follow-ups](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional).
+Still out of scope for this baseline:
+
+- Bundled third-party widget Composer packages inside this repo
 
 ## Validation
 

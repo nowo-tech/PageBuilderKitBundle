@@ -10,7 +10,7 @@ This bundle uses [GitHub Spec Kit](https://github.com/github/spec-kit) with **Cu
 | `specs/001-baseline/code-inventory.md` | Canonical map of every production file under `src/` → requirements (all shipped phases) |
 | `specs/002-phase2-grapesjs/spec.md` | Phase 2 GrapesJS canvas / schema v2 (**shipped** v1.0.0) |
 | `specs/003-phase3-revisions-templates/spec.md` | Phase 3 revisions, templates, I/O, draft preview (**shipped** v1.1.0) |
-| `specs/004-phase4-external-widgets/spec.md` | Phase 4 classic widget packs baseline (**shipped** v1.1.0) |
+| `specs/004-phase4-external-widgets/spec.md` | Phase 4 classic widget packs baseline (**shipped** v1.1.0); Grapes block packs follow-up in **v1.2.0** |
 | `docs/SPEC-DRIVEN-DEVELOPMENT.md` | User stories, scope, roadmap, `REQ-*` anchors |
 | `.specify/` | Templates and constitution (after `specify init`) |
 | `.cursor/skills/speckit-*/` | Cursor slash commands |

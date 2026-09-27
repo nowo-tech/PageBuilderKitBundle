@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
+use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
@@ -188,6 +189,9 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
         $container->registerForAutoconfiguration(WidgetPackInterface::class)
             ->addTag('nowo_page_builder_kit.widget_pack');
+
+        $container->registerForAutoconfiguration(GrapesBlockPackInterface::class)
+            ->addTag('nowo_page_builder_kit.grapes_block_pack');
 
         if (
             !$config['security']['allow_unauthenticated']

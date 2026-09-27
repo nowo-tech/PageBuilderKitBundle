@@ -27,6 +27,10 @@ services:
         arguments:
             $packs: []
 
+    Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackRegistry:
+        arguments:
+            $packs: []
+
     Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepository
 

@@ -16,12 +16,17 @@ namespace App\Demo;
  *     engine: 'grapesjs'|'classic',
  *     publish: bool,
  *     description_en: string,
- *     description_es: string
+ *     description_es: string,
+ *     seed?: bool,
+ *     embeds?: list<string>
  * }
  */
 final class DemoUseCases
 {
     public const int SEED_VERSION = 11;
+
+    /** Page keys rendered together by the multi-render collector demo. */
+    public const array MULTI_RENDER_EMBED_KEYS = ['pricing', 'about', 'faq'];
 
     /**
      * @return list<UseCase>
@@ -249,7 +254,28 @@ final class DemoUseCases
                 'description_en' => 'Visible in demo app; /p/draft returns 404 until published.',
                 'description_es' => 'Visible en la demo; /p/draft da 404 hasta publicar.',
             ],
+            [
+                'key'            => 'multi-render',
+                'route'          => 'multi_render',
+                'title_en'       => 'Multi-render (collector)',
+                'title_es'       => 'Multi-render (collector)',
+                'category'       => 'Debug',
+                'engine'         => 'grapesjs',
+                'publish'        => true,
+                'seed'           => false,
+                'embeds'         => self::MULTI_RENDER_EMBED_KEYS,
+                'description_en' => 'One HTTP request renders pricing + about + faq — Web Profiler shows render count ≥ 3.',
+                'description_es' => 'Una petición HTTP renderiza pricing + about + faq — el Web Profiler muestra ≥ 3 renders.',
+            ],
         ];
+    }
+
+    /**
+     * @param UseCase $case
+     */
+    public static function shouldSeed(array $case): bool
+    {
+        return ($case['seed'] ?? true) !== false;
     }
 
     /**

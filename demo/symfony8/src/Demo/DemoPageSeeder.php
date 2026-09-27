@@ -4,29 +4,46 @@ declare(strict_types=1);
 
 namespace App\Demo;
 
+use Doctrine\ORM\EntityManagerInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 
+use function array_key_exists;
 use function is_array;
 use function is_string;
+use function json_decode;
+use function json_encode;
+use function preg_match;
+use function preg_replace;
 use function sprintf;
 use function str_contains;
+use function str_replace;
+use function str_starts_with;
 
 /**
- * Seeds / reseeds every demo use-case page.
+ * Seeds / reseeds every demo use-case page (including labeled revision history).
  */
 final class DemoPageSeeder
 {
+    private const string DEMO_REVISION_PREFIX = 'Demo version';
+
     public function __construct(
         private readonly DocumentService $documentService,
+        private readonly PageRevisionStore $revisionStore,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
     public function ensureAll(): void
     {
         foreach (DemoUseCases::all() as $case) {
+            if (!DemoUseCases::shouldSeed($case)) {
+                continue;
+            }
             $this->ensure($case['key']);
         }
     }
@@ -34,7 +51,7 @@ final class DemoPageSeeder
     public function ensure(string $pageKey): void
     {
         $case = DemoUseCases::byKey($pageKey);
-        if ($case === null) {
+        if ($case === null || !DemoUseCases::shouldSeed($case)) {
             return;
         }
 
@@ -42,6 +59,7 @@ final class DemoPageSeeder
         if ($page instanceof BuilderPage && !$this->needsReseed($page, $case['engine'], $pageKey)) {
             $this->applySeoDefaults($page, $case);
             $this->syncPublishState($page, $case['publish']);
+            $this->ensureDemoRevisions($page, $case);
 
             return;
         }
@@ -78,6 +96,181 @@ final class DemoPageSeeder
         }
 
         $this->syncPublishState($page, $case['publish']);
+        $this->ensureDemoRevisions($page, $case);
+    }
+
+    /**
+     * Ensure each demo page has labeled historical revisions for Versions / Diff UI.
+     *
+     * @param array<string, mixed> $case
+     */
+    private function ensureDemoRevisions(BuilderPage $page, array $case): void
+    {
+        if (!$this->revisionStore->isEnabled()) {
+            return;
+        }
+
+        $labeled = 0;
+        foreach ($this->revisionStore->listForPage($page) as $revision) {
+            if (str_starts_with((string) $revision->getLabel(), self::DEMO_REVISION_PREFIX)) {
+                ++$labeled;
+            }
+        }
+        if ($labeled >= 2) {
+            return;
+        }
+
+        $live = $this->revisionStore->extractLivePayload($page);
+        if ($live === null) {
+            return;
+        }
+
+        foreach ($this->buildDemoRevisionHistory($case, $live) as [$label, $structure, $props]) {
+            $revision = (new BuilderPageRevision())
+                ->setPage($page)
+                ->setStructure($structure)
+                ->setWidgetPropsByLocale($props)
+                ->setLabel($label);
+            $page->addRevision($revision);
+            $this->entityManager->persist($revision);
+        }
+
+        $this->entityManager->flush();
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     * @param array{structure: array<string, mixed>, widgetPropsByLocale: array<string, mixed>, fingerprint: string} $live
+     *
+     * @return list<array{0: string, 1: array<string, mixed>, 2: array<string, mixed>}>
+     */
+    private function buildDemoRevisionHistory(array $case, array $live): array
+    {
+        $engine = is_string($case['engine'] ?? null) ? $case['engine'] : 'grapesjs';
+        $key    = is_string($case['key'] ?? null) ? $case['key'] : 'page';
+
+        if ($engine === 'classic') {
+            return [
+                [
+                    self::DEMO_REVISION_PREFIX . ' 1 — first classic draft',
+                    $this->mutateClassicStructure($live['structure'], 'v1'),
+                    $this->mutateClassicProps($live['widgetPropsByLocale'], 'First draft'),
+                ],
+                [
+                    self::DEMO_REVISION_PREFIX . ' 2 — before publish polish',
+                    $this->mutateClassicStructure($live['structure'], 'v2'),
+                    $this->mutateClassicProps($live['widgetPropsByLocale'], 'Pre-publish'),
+                ],
+            ];
+        }
+
+        return [
+            [
+                self::DEMO_REVISION_PREFIX . ' 1 — early draft',
+                $this->mutateGrapesStructure($live['structure'], $key, 'early'),
+                $live['widgetPropsByLocale'],
+            ],
+            [
+                self::DEMO_REVISION_PREFIX . ' 2 — copy refresh',
+                $this->mutateGrapesStructure($live['structure'], $key, 'refresh'),
+                $live['widgetPropsByLocale'],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $structure
+     *
+     * @return array<string, mixed>
+     */
+    private function mutateGrapesStructure(array $structure, string $pageKey, string $stage): array
+    {
+        $marker = sprintf('data-pbk-demo-revision="%s"', $stage);
+        $badge  = sprintf(
+            '<p class="pbk-muted" %s>Demo revision snapshot · %s · %s</p>',
+            $marker,
+            $pageKey,
+            $stage,
+        );
+
+        $html = $structure['html'] ?? '';
+        if (is_string($html) && $html !== '') {
+            $structure['html'] = $this->injectRevisionBanner($html, $badge);
+        }
+
+        $localeContent = $structure['localeContent'] ?? null;
+        if (is_array($localeContent)) {
+            foreach ($localeContent as $locale => $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $localeHtml = $row['html'] ?? '';
+                if (is_string($localeHtml) && $localeHtml !== '') {
+                    $row['html']                 = $this->injectRevisionBanner($localeHtml, $badge);
+                    $localeContent[$locale]      = $row;
+                }
+            }
+            $structure['localeContent'] = $localeContent;
+        }
+
+        return $structure;
+    }
+
+    private function injectRevisionBanner(string $html, string $badge): string
+    {
+        if (str_contains($html, 'data-pbk-demo-revision=')) {
+            $replaced = preg_replace(
+                '/<p class="pbk-muted" data-pbk-demo-revision="[^"]*"[^>]*>.*?<\/p>/s',
+                $badge,
+                $html,
+                1,
+            );
+
+            return is_string($replaced) ? $replaced : ($badge . $html);
+        }
+
+        if (preg_match('/(<div[^>]*data-pbk-demo-seed="[^"]*"[^>]*>)/', $html, $matches) === 1) {
+            return str_replace($matches[1], $matches[1] . $badge, $html);
+        }
+
+        return $badge . $html;
+    }
+
+    /**
+     * @param array<string, mixed> $structure
+     *
+     * @return array<string, mixed>
+     */
+    private function mutateClassicStructure(array $structure, string $suffix): array
+    {
+        $json = (string) json_encode($structure);
+        $json = str_replace('demo-seed-v' . DemoUseCases::SEED_VERSION, 'demo-seed-v' . DemoUseCases::SEED_VERSION . '-' . $suffix, $json);
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : $structure;
+    }
+
+    /**
+     * @param array<string, mixed> $props
+     *
+     * @return array<string, mixed>
+     */
+    private function mutateClassicProps(array $props, string $headingSuffix): array
+    {
+        foreach ($props as $locale => $localeProps) {
+            if (!is_array($localeProps)) {
+                continue;
+            }
+            foreach ($localeProps as $widgetId => $widgetProps) {
+                if (!is_array($widgetProps) || !array_key_exists('text', $widgetProps) || !is_string($widgetProps['text'])) {
+                    continue;
+                }
+                $props[$locale][$widgetId]['text'] = $widgetProps['text'] . ' · ' . $headingSuffix;
+                break;
+            }
+        }
+
+        return $props;
     }
 
     private function syncPublishState(BuilderPage $page, bool $publish): void

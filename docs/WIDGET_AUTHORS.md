@@ -11,7 +11,7 @@ Spec Kit: [`specs/004-phase4-external-widgets/spec.md`](../specs/004-phase4-exte
 - [Capabilities](#capabilities)
 - [Templates](#templates)
 - [Sanitization](#sanitization)
-- [GrapesJS note](#grapesjs-note)
+- [GrapesJS block packs](#grapesjs-block-packs)
 
 ## Quick start
 
@@ -130,6 +130,40 @@ Override `getPublicTemplate()` or place a host override under:
 
 Always sanitize user-controlled HTML through `PageBuilderProtection` in `sanitizeProps` / `sanitizeMergedProps`. Never trust raw props on public render.
 
-## GrapesJS note
+## GrapesJS block packs
 
-Free-form GrapesJS pages (schema v2) do **not** use classic widget types. Custom Grapes blocks belong in the host canvas JS / CDN plugins. Classic widgets remain the extension point for schema v1 Sections pages and nested containers.
+Free-form GrapesJS pages (schema v2) do **not** use classic widget types. Ship reusable BlockManager entries with `GrapesBlockPackInterface` (tag `nowo_page_builder_kit.grapes_block_pack`). Packs are serialized into the canvas config as `blockPacks` and registered client-side.
+
+```php
+use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
+
+final class AcmeMarketingBlockPack implements GrapesBlockPackInterface
+{
+    public function getName(): string
+    {
+        return 'acme/marketing-blocks';
+    }
+
+    public function getVersion(): string
+    {
+        return '1.0.0';
+    }
+
+    public function getCapabilities(): array
+    {
+        return ['marketing'];
+    }
+
+    public function getBlocks(): array
+    {
+        return [[
+            'id'       => 'acme-promo',
+            'label'    => 'Promo banner',
+            'category' => 'Acme',
+            'content'  => '<div class="acme-promo">Promo</div>',
+        ]];
+    }
+}
+```
+
+Classic widgets remain the extension point for schema v1 Sections pages and nested containers.

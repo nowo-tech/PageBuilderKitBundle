@@ -33,7 +33,7 @@ interface PageBuilderKitTraceInterface
     public function addPublicOutcome(string $pageKey, string $outcome, ?string $locale = null): void;
 
     /**
-     * @param 'duplicate'|'export'|'import'|'publish'|'restore'|'save'|'template_apply'|'template_save'|'unpublish' $action
+     * @param 'duplicate'|'export'|'import'|'publish'|'restore'|'save'|'template_apply'|'template_export'|'template_save'|'templates_export_all'|'templates_import'|'unpublish' $action
      */
     public function addAdminAction(string $action, string $pageKey, ?int $revisionId = null): void;
 

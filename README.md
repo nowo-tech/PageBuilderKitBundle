@@ -98,8 +98,9 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | **Phase 3** | **Shipped (v1.1.0)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
 | **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
 | **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
+| **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
 
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`004` (docs closure in **v1.1.1**).
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`004` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**).
 
 ## Development
 

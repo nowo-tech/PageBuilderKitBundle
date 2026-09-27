@@ -54,13 +54,11 @@ Phase 3 adds operational CMS workflows on top of the Phase 1–2 document model:
 
 ## Non-goals (Phase 3)
 
-Explicitly **deferred** (optional follow-ups, not acceptance criteria):
+Optional follow-ups (now shipped — see [Follow-ups](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)):
 
 - Richer visual HTML/CSS side-by-side revision diff
-- Template marketplace / sharing across projects
+- Template JSON export/import for sharing across projects
 - Grapes block packs
-
-See [Follow-ups](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional).
 
 ## Validation
 

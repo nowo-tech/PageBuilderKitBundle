@@ -159,6 +159,51 @@ final class DemoController extends AbstractController
         return $this->renderDemoPage('draft', $request);
     }
 
+    /** One request → several getRenderedTree() calls (Web Profiler renderCount ≥ 3). */
+    #[Route('/multi-render', name: 'multi_render')]
+    public function multiRender(Request $request): Response
+    {
+        $case = DemoUseCases::byKey('multi-render');
+        if ($case === null) {
+            throw $this->createNotFoundException();
+        }
+
+        $this->demoPageSeeder->ensureAll();
+        $locale = $this->resolveLocale($request);
+        $keys   = $case['embeds'] ?? DemoUseCases::MULTI_RENDER_EMBED_KEYS;
+        $trees  = [];
+
+        foreach ($keys as $pageKey) {
+            try {
+                $trees[] = $this->pageRenderProvider->getRenderedTree($pageKey, $locale);
+            } catch (RuntimeException) {
+                $embedCase = DemoUseCases::byKey($pageKey);
+                $trees[]   = [
+                    'pageKey'  => $pageKey,
+                    'locale'   => $locale,
+                    'status'   => PageStatus::Published->value,
+                    'title'    => $pageKey,
+                    'slug'     => $pageKey,
+                    'engine'   => $embedCase['engine'] ?? 'grapesjs',
+                    'html'     => '',
+                    'css'      => '',
+                    'sections' => [],
+                ];
+            }
+        }
+
+        return $this->render('demo/multi_render.html.twig', [
+            'current_page_key' => 'multi-render',
+            'page_key'         => 'multi-render',
+            'page_title'       => $locale === 'es' ? $case['title_es'] : $case['title_en'],
+            'page_trees'       => $trees,
+            'embed_keys'       => $keys,
+            'use_case'         => $case,
+            'seed_version'     => DemoUseCases::SEED_VERSION,
+            'locale'           => $locale,
+        ]);
+    }
+
     #[Route('/login', name: 'app_login')]
     public function login(AuthenticationUtils $authenticationUtils): Response
     {

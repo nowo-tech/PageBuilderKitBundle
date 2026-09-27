@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [[Unreleased]](#unreleased)
 
+- [[1.2.0] - 2026-09-27](#120---2026-09-27)
+
 - [[1.1.1] - 2026-09-27](#111---2026-09-27)
 
 - [[1.1.0] - 2026-09-27](#110---2026-09-27)
@@ -16,6 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-09-27
+
+### Added
+
+- Visual side-by-side HTML/CSS (and classic JSON) panels on revision diff (`DocumentDiff` panels + admin UI).
+- Template JSON **export/import** for sharing templates across projects (`PageTemplateService`, admin `/templates/export`, `/templates/import`).
+- GrapesJS **block packs** (`GrapesBlockPackInterface`, `GrapesBlockPackRegistry`, canvas `blockPacks`) — analogous to classic widget packs; see [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md#grapesjs-block-packs).
+- Demo: `DemoGrapesBlockPack`, composite route `/multi-render` (collector shows ≥3 renders), labeled demo revisions for Versions/Diff UI.
+- Web Profiler toolbar/menu: layout SVG icon instead of the `PBK` text label.
+
+### Changed
+
+- Spec Kit follow-ups marked shipped ([SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)).
+- Demo use-case matrix documents composite (non-seeded) routes such as `multi-render`.
+
+### Notes
+
+- Backward compatible for hosts on `^1.1`. **No** Doctrine schema changes. Optional: register Grapes block packs; use template export/import for cross-project sharing. See [UPGRADING.md](UPGRADING.md#120).
 
 ## [1.1.1] - 2026-09-27
 

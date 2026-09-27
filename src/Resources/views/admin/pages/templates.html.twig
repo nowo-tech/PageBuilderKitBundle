@@ -4,6 +4,7 @@
 {% block page_title %}{{ 'admin.templates.title'|trans }}{% endblock %}
 
 {% block header_actions %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates_export_all') }}">{{ 'admin.templates.export_all'|trans }}</a>
     <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
 {% endblock %}
 
@@ -29,6 +30,16 @@
         {% endif %}
     </section>
 
+    <section class="mb-4">
+        <h2 class="h5">{{ 'admin.templates.import'|trans }}</h2>
+        <p class="text-muted small">{{ 'admin.templates.import_hint'|trans }}</p>
+        <form method="post" action="{{ path('admin_page_builder_templates_import') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <textarea name="payload" class="form-control font-monospace small mb-2" rows="6" required placeholder="{{ 'admin.templates.payload'|trans }}"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">{{ 'admin.templates.import_submit'|trans }}</button>
+        </form>
+    </section>
+
     {% if templates is empty %}
         <p class="text-muted">{{ 'admin.templates.empty'|trans }}</p>
     {% else %}
@@ -47,6 +58,7 @@
                             <td><code>{{ template.templateKey }}</code></td>
                             <td>{{ template.label }}</td>
                             <td class="text-end">
+                                <a class="btn btn-outline-secondary btn-sm mb-1" href="{{ path('admin_page_builder_templates_export', {templateKey: template.templateKey}) }}">{{ 'admin.templates.export'|trans }}</a>
                                 <form method="post" action="{{ path('admin_page_builder_templates_apply', {templateKey: template.templateKey}) }}" class="d-inline-flex gap-1 mb-1">
                                     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                                     <input class="form-control form-control-sm" name="pageKey" placeholder="{{ 'form.page_key'|trans }}" required pattern="[a-z0-9_-]+">

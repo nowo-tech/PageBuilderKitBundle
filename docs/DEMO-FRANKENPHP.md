@@ -50,6 +50,7 @@ The demo proves that:
 | `/legal` `/empty` `/i18n` | … | Legal, blank, locale divergence |
 | `/classic` | `classic` | Schema **v1** widgets + nesting |
 | `/draft` | `draft` | Unpublished (`/p/draft` → 404) |
+| `/multi-render` | — (embeds `pricing`+`about`+`faq`) | One request, ≥3 collector renders |
 
 Seeds re-apply when `data-pbk-demo-seed` / classic marker does not match `DemoUseCases::SEED_VERSION`. Locale: `?_locale=es` / `en`.
 

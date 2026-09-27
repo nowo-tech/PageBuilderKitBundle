@@ -10,6 +10,10 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+use function array_column;
+use function implode;
+use function range;
+
 #[CoversClass(DocumentDiff::class)]
 final class DocumentDiffTest extends TestCase
 {
@@ -48,6 +52,32 @@ final class DocumentDiffTest extends TestCase
         self::assertFalse($diff['identical']);
         self::assertTrue($diff['structureChanged']);
         self::assertNotEmpty($diff['summary']);
+        self::assertArrayHasKey('html', $diff['panels']);
+        self::assertArrayHasKey('css', $diff['panels']);
+        self::assertNotEmpty($diff['panels']['html']['rows']);
+        self::assertContains(
+            'changed',
+            array_column($diff['panels']['html']['rows'], 'type'),
+        );
+    }
+
+    #[Test]
+    public function sideBySideMarksAddedRemovedAndTruncates(): void
+    {
+        $diff  = new DocumentDiff();
+        $panel = $diff->sideBySide("a\nb", "a\nc\nd");
+
+        self::assertSame('same', $panel['rows'][0]['type']);
+        self::assertSame('changed', $panel['rows'][1]['type']);
+        self::assertSame('added', $panel['rows'][2]['type']);
+
+        $truncated = $diff->sideBySide(
+            implode("\n", range(1, 10)),
+            implode("\n", range(1, 10)),
+            3,
+        );
+        self::assertTrue($truncated['truncated']);
+        self::assertCount(3, $truncated['rows']);
     }
 
     #[Test]

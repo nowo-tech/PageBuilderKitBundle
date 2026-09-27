@@ -729,6 +729,32 @@ async function boot() {
       });
       } // end compoundExamples
 
+      var hostPacks = Array.isArray(config.blockPacks) ? config.blockPacks : [];
+      hostPacks.forEach(function (pack) {
+        if (!pack || typeof pack !== 'object') {
+          return;
+        }
+        var packBlocks = Array.isArray(pack.blocks) ? pack.blocks : [];
+        var packCategory = pack.name || 'Host';
+        packBlocks.forEach(function (block) {
+          if (!block || !block.id) {
+            return;
+          }
+          var entry = {
+            label: block.label || block.id,
+            category: block.category || packCategory,
+            content: block.content != null ? block.content : '<div></div>',
+          };
+          if (block.media) {
+            entry.media = block.media;
+          }
+          if (block.attributes && typeof block.attributes === 'object') {
+            entry.attributes = block.attributes;
+          }
+          bm.add(String(block.id), entry);
+        });
+      });
+
       if (allowCustomCode) {
         bm.add('pbk-custom-html', {
           label: 'Custom HTML',

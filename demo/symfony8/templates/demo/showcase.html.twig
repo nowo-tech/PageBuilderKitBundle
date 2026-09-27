@@ -57,11 +57,15 @@
                             <p class="small text-muted flex-grow-1">{{ locale == 'es' ? case.description_es : case.description_en }}</p>
                             <div class="d-flex flex-wrap gap-2">
                                 <a class="btn btn-sm btn-dark" href="{{ path(case.route) }}">{{ locale == 'es' ? 'Ver' : 'View' }}</a>
-                                <a class="btn btn-sm btn-outline-primary" href="{{ path('admin_page_builder_canvas', {pageKey: case.key}) }}">Canvas</a>
-                                {% if case.publish %}
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('page_builder_public_render', {pageKey: case.key}) }}" target="_blank" rel="noopener">/p/{{ case.key }}</a>
+                                {% if case.seed is defined and case.seed == false %}
+                                    <span class="btn btn-sm btn-outline-secondary disabled" title="Composite route — no Doctrine page">no page</span>
                                 {% else %}
-                                    <span class="btn btn-sm btn-outline-secondary disabled">/p/{{ case.key }} 404</span>
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ path('admin_page_builder_canvas', {pageKey: case.key}) }}">Canvas</a>
+                                    {% if case.publish %}
+                                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('page_builder_public_render', {pageKey: case.key}) }}" target="_blank" rel="noopener">/p/{{ case.key }}</a>
+                                    {% else %}
+                                        <span class="btn btn-sm btn-outline-secondary disabled">/p/{{ case.key }} 404</span>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </div>
