@@ -31,7 +31,7 @@ final class AssetUploadHandlerTest extends TestCase
     #[Test]
     public function handleStoresValidFiles(): void
     {
-        $tmp    = sys_get_temp_dir() . '/pbk-' . uniqid('', true) . '.png';
+        $tmp = sys_get_temp_dir() . '/pbk-' . uniqid('', true) . '.png';
         file_put_contents($tmp, 'x');
         $upload = new UploadedFile($tmp, 'x.png', 'image/png', null, true);
 

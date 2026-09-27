@@ -11,13 +11,13 @@ use Nowo\PageBuilderKitBundle\DependencyInjection\TablePrefixListener;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
 use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 
@@ -68,9 +68,9 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', ['SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle']);
-        $container->register('security.authorization_checker', \stdClass::class);
-        $container->register('core_aws_s3.service.helper', \stdClass::class);
-        $container->register('app.storage', \stdClass::class);
+        $container->register('security.authorization_checker', stdClass::class);
+        $container->register('core_aws_s3.service.helper', stdClass::class);
+        $container->register('app.storage', stdClass::class);
 
         $config = [
             'security' => [
@@ -81,13 +81,13 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
             'doctrine' => ['table_prefix' => ''],
             'grapesjs' => [
                 'assets_upload' => [
-                    'enabled'  => true,
-                    'storage'  => 's3',
-                    'service'  => null,
-                    'max_bytes'=> 1000,
+                    'enabled'      => true,
+                    'storage'      => 's3',
+                    'service'      => null,
+                    'max_bytes'    => 1000,
                     'allowed_mime' => ['image/png'],
-                    'local'    => ['directory' => '/tmp', 'public_prefix' => '/u'],
-                    's3'       => [
+                    'local'        => ['directory' => '/tmp', 'public_prefix' => '/u'],
+                    's3'           => [
                         'helper_service'  => 'core_aws_s3.service.helper',
                         'folder'          => 'pb',
                         'private'         => true,
@@ -114,7 +114,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', []);
-        $container->register('app.storage', \stdClass::class);
+        $container->register('app.storage', stdClass::class);
 
         (new NowoPageBuilderKitExtension())->load([[
             'security' => ['allow_unauthenticated' => true],
@@ -198,7 +198,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
                 return 'security';
             }
         });
-        $container->register('security.authorization_checker', \stdClass::class);
+        $container->register('security.authorization_checker', stdClass::class);
 
         (new NowoPageBuilderKitExtension())->load([[
             'security' => ['allow_unauthenticated' => false, 'access_roles' => ['ROLE_X']],
@@ -232,7 +232,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', ['SecurityBundle' => 'x']);
-        $container->register('app.checker', \stdClass::class);
+        $container->register('app.checker', stdClass::class);
 
         (new NowoPageBuilderKitExtension())->load([[
             'security' => [
@@ -258,7 +258,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
                 return 'security';
             }
         });
-        $container->register('security.authorization_checker', \stdClass::class);
+        $container->register('security.authorization_checker', stdClass::class);
 
         (new NowoPageBuilderKitExtension())->load([[
             'security' => ['allow_unauthenticated' => false, 'access_roles' => ['ROLE_X']],

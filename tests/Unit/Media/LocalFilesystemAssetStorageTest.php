@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
+use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,7 +21,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
     #[Test]
     public function storesValidImageUnderPublicPrefix(): void
     {
-        $dir = sys_get_temp_dir() . '/pbk-upload-' . uniqid('', true);
+        $dir     = sys_get_temp_dir() . '/pbk-upload-' . uniqid('', true);
         $storage = new LocalFilesystemAssetStorage($dir, '/uploads/page-builder', 5_000_000, ['image/png']);
 
         $tmp = sys_get_temp_dir() . '/pbk-src-' . uniqid('', true) . '.png';
@@ -41,14 +42,14 @@ final class LocalFilesystemAssetStorageTest extends TestCase
     #[Test]
     public function rejectsDisallowedMime(): void
     {
-        $dir = sys_get_temp_dir() . '/pbk-upload-' . uniqid('', true);
+        $dir     = sys_get_temp_dir() . '/pbk-upload-' . uniqid('', true);
         $storage = new LocalFilesystemAssetStorage($dir, '/uploads/page-builder', 5_000_000, ['image/png']);
 
         $tmp = sys_get_temp_dir() . '/pbk-src-' . uniqid('', true) . '.txt';
         file_put_contents($tmp, 'not an image');
         $upload = new UploadedFile($tmp, 'note.txt', 'text/plain', null, true);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $storage->store($upload);
     }
 
@@ -60,7 +61,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
         $tmp     = sys_get_temp_dir() . '/pbk-src-' . uniqid('', true) . '.png';
         file_put_contents($tmp, str_repeat('a', 20));
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $storage->store(new UploadedFile($tmp, 'big.png', 'image/png', null, true));
     }
 
@@ -82,7 +83,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
             }
         };
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid file name.');
         $storage->store($upload);
     }

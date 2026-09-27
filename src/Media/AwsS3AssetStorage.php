@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Media;
 
+use finfo;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Throwable;
 
 use function bin2hex;
 use function class_exists;
@@ -29,6 +31,7 @@ use function strtolower;
 use function trim;
 
 use const FILEINFO_MIME_TYPE;
+use const PATHINFO_BASENAME;
 
 /**
  * Stores uploads via core/aws-s3-bundle AwsS3Helper (optional dependency).
@@ -63,15 +66,15 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
     {
         $this->assertValidUpload($file);
 
-        $mime = $this->resolveMimeType($file) ?: 'application/octet-stream';
+        $mime      = $this->resolveMimeType($file) ?: 'application/octet-stream';
         $extension = strtolower((string) ($file->getClientOriginalExtension() ?: match ($mime) {
             // @codeCoverageIgnoreStart — finfo usually supplies png/jpeg from bytes before these arms
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
+            'image/jpeg'    => 'jpg',
+            'image/png'     => 'png',
+            'image/gif'     => 'gif',
+            'image/webp'    => 'webp',
             'image/svg+xml' => 'svg',
-            default => 'bin',
+            default         => 'bin',
             // @codeCoverageIgnoreEnd
         }));
         $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
@@ -174,7 +177,7 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
     private function resolveMimeType(UploadedFile $file): string
     {
         $path = $file->getPathname();
-        if ($path !== '' && class_exists(\finfo::class)) {
+        if ($path !== '' && class_exists(finfo::class)) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             if ($finfo !== false) {
                 $detected = finfo_file($finfo, $path);
@@ -192,7 +195,7 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
         // @codeCoverageIgnoreStart
         try {
             return (string) ($file->getMimeType() ?: '');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return '';
         }
         // @codeCoverageIgnoreEnd

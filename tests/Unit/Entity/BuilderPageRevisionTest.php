@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Entity;
 
-use DateTimeImmutable;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use PHPUnit\Framework\Attributes\CoversClass;

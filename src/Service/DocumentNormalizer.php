@@ -73,8 +73,8 @@ final class DocumentNormalizer
      */
     private function normalizeGrapes(array $structure): array
     {
-        $html = is_string($structure['html'] ?? null) ? $structure['html'] : '';
-        $css  = is_string($structure['css'] ?? null) ? $structure['css'] : '';
+        $html   = is_string($structure['html'] ?? null) ? $structure['html'] : '';
+        $css    = is_string($structure['css'] ?? null) ? $structure['css'] : '';
         $grapes = is_array($structure['grapes'] ?? null) ? $structure['grapes'] : [];
 
         $localeContent = [];
@@ -195,8 +195,6 @@ final class DocumentNormalizer
     }
 
     /**
-     * @param mixed $widget
-     *
      * @return array<string, mixed>|null
      */
     public function normalizeWidget(mixed $widget, int $depth): ?array

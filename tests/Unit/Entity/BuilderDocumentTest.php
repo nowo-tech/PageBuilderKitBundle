@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Entity;
 
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
-use Nowo\PageBuilderKitBundle\Entity\BuilderDocumentLocale;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;

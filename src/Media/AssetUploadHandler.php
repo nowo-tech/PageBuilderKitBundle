@@ -56,8 +56,6 @@ final class AssetUploadHandler
     /**
      * Normalize GrapesJS / browser multipart payloads into a flat file list.
      *
-     * @param mixed $files
-     *
      * @return list<UploadedFile|null>
      */
     public static function normalizeFiles(mixed $files): array

@@ -9,22 +9,21 @@ use LogicException;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
+use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
+use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
+use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
+use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
+use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
-use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
-use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
-use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
-
-use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
-use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
-use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
-use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
-use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -206,8 +205,8 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         } else {
             match ($upload['storage']) {
                 'service' => $this->registerCustomAssetStorage($container, $storageId, $upload['service'] ?? null),
-                's3' => $this->registerS3AssetStorage($container, $storageId, $upload),
-                default => $container->register($storageId, LocalFilesystemAssetStorage::class)
+                's3'      => $this->registerS3AssetStorage($container, $storageId, $upload),
+                default   => $container->register($storageId, LocalFilesystemAssetStorage::class)
                     ->setAutowired(false)
                     ->setArgument('$directory', (string) $upload['local']['directory'])
                     ->setArgument('$publicPrefix', (string) $upload['local']['public_prefix'])

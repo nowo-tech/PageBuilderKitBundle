@@ -13,6 +13,8 @@ use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use RuntimeException;
 use Traversable;
 
+use function is_array;
+use function is_string;
 use function iterator_to_array;
 use function sprintf;
 
@@ -216,7 +218,6 @@ final class PageRenderProvider implements PageRenderProviderInterface
     }
 
     /**
-     * @param mixed                $widget
      * @param array<string, mixed> $mergedProps
      *
      * @return array<string, mixed>|null

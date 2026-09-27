@@ -11,7 +11,6 @@ use Twig\Loader\ArrayLoader;
 use Twig\Sandbox\SecurityPolicy;
 use Twig\Sandbox\SecurityPolicyInterface;
 
-use function is_string;
 use function str_contains;
 
 /**

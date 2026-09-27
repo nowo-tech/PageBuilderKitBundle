@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Service;
 
+use function array_key_exists;
+
 /**
  * Builds the GrapesJS frontend options consumed by the admin canvas.
  */
 final class GrapesJsFrontendConfig
 {
     /**
-     * @param list<string>               $canvasStyles
-     * @param array<string, bool>        $plugins
+     * @param list<string> $canvasStyles
+     * @param array<string, bool> $plugins
      * @param list<array<string, mixed>> $assets
      * @param list<array{name: string, sample: string, label: string}> $twigVariables
      */
@@ -49,23 +51,23 @@ final class GrapesJsFrontendConfig
         }
 
         return [
-            'enabled'            => $this->enabled,
-            'cdnVersion'         => $this->cdnVersion,
-            'height'             => $this->height,
-            'allowScripts'       => $this->allowScripts,
-            'allowCustomCode'    => $this->allowCustomCode,
-            'compoundExamples'   => $this->compoundExamples,
-            'a11yHelpers'        => $this->a11yHelpers,
-            'showDevices'        => $this->showDevices,
-            'noticeOnUnload'     => $this->noticeOnUnload,
-            'cssFramework'       => $this->cssFramework,
-            'canvasStyles'       => $this->resolveCanvasStyles(),
-            'plugins'            => $this->normalizePlugins(),
-            'assets'             => $this->assets !== [] ? $this->assets : $this->defaultAssets(),
-            'assetEmbedAsBase64' => $embedAsBase64,
-            'assetsUploadEnabled'=> $this->assetsUploadEnabled,
-            'pluginCdnBase'      => 'https://esm.sh',
-            'twig'               => [
+            'enabled'             => $this->enabled,
+            'cdnVersion'          => $this->cdnVersion,
+            'height'              => $this->height,
+            'allowScripts'        => $this->allowScripts,
+            'allowCustomCode'     => $this->allowCustomCode,
+            'compoundExamples'    => $this->compoundExamples,
+            'a11yHelpers'         => $this->a11yHelpers,
+            'showDevices'         => $this->showDevices,
+            'noticeOnUnload'      => $this->noticeOnUnload,
+            'cssFramework'        => $this->cssFramework,
+            'canvasStyles'        => $this->resolveCanvasStyles(),
+            'plugins'             => $this->normalizePlugins(),
+            'assets'              => $this->assets !== [] ? $this->assets : $this->defaultAssets(),
+            'assetEmbedAsBase64'  => $embedAsBase64,
+            'assetsUploadEnabled' => $this->assetsUploadEnabled,
+            'pluginCdnBase'       => 'https://esm.sh',
+            'twig'                => [
                 'enabled'       => $this->twigEnabled,
                 'canvasHelpers' => $this->twigCanvasHelpers,
                 'variables'     => $this->twigVariables !== [] ? $this->twigVariables : (new GrapesTwigRenderer())->catalogVariables(),
@@ -103,20 +105,20 @@ final class GrapesJsFrontendConfig
     private function normalizePlugins(): array
     {
         $defaults = [
-            'blocks_basic'      => true,
-            'forms'             => true,
-            'countdown'         => true,
-            'export'            => true,
-            'tabs'              => true,
-            'custom_code'       => true,
-            'touch'             => true,
-            'parser_postcss'    => true,
-            'tooltip'           => true,
-            'style_bg'          => true,
-            'typed'             => true,
-            'tui_image_editor'  => true,
-            'navbar'            => true,
-            'preset_webpage'    => true,
+            'blocks_basic'     => true,
+            'forms'            => true,
+            'countdown'        => true,
+            'export'           => true,
+            'tabs'             => true,
+            'custom_code'      => true,
+            'touch'            => true,
+            'parser_postcss'   => true,
+            'tooltip'          => true,
+            'style_bg'         => true,
+            'typed'            => true,
+            'tui_image_editor' => true,
+            'navbar'           => true,
+            'preset_webpage'   => true,
         ];
 
         foreach ($defaults as $key => $default) {

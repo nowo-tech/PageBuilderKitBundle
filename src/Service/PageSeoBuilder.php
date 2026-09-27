@@ -41,7 +41,7 @@ final class PageSeoBuilder
      */
     public function build(?BuilderPageTranslation $translation, string $pageKey, string $locale, string $fallbackTitle): array
     {
-        $title = $fallbackTitle;
+        $title     = $fallbackTitle;
         $metaTitle = $translation?->getMetaTitle();
         if (is_string($metaTitle) && trim($metaTitle) !== '') {
             $title = trim($metaTitle);

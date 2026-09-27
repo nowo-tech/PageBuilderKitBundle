@@ -29,8 +29,8 @@ final class BuilderPageSeoType extends AbstractType
                 'constraints' => [new Assert\NotBlank(), new Assert\Length(max: 255)],
             ])
             ->add('metaTitle', TextType::class, [
-                'label'    => 'form.meta_title',
-                'required' => false,
+                'label'       => 'form.meta_title',
+                'required'    => false,
                 'constraints' => [new Assert\Length(max: 255)],
             ])
             ->add('metaDescription', TextareaType::class, [
@@ -39,8 +39,8 @@ final class BuilderPageSeoType extends AbstractType
                 'attr'     => ['rows' => 3],
             ])
             ->add('ogTitle', TextType::class, [
-                'label'    => 'form.og_title',
-                'required' => false,
+                'label'       => 'form.og_title',
+                'required'    => false,
                 'constraints' => [new Assert\Length(max: 255)],
             ])
             ->add('ogDescription', TextareaType::class, [
@@ -49,19 +49,19 @@ final class BuilderPageSeoType extends AbstractType
                 'attr'     => ['rows' => 3],
             ])
             ->add('ogImage', TextType::class, [
-                'label'    => 'form.og_image',
-                'required' => false,
+                'label'       => 'form.og_image',
+                'required'    => false,
                 'constraints' => [new Assert\Length(max: 512)],
             ])
             ->add('canonicalUrl', TextType::class, [
-                'label'    => 'form.canonical_url',
-                'required' => false,
+                'label'       => 'form.canonical_url',
+                'required'    => false,
                 'constraints' => [new Assert\Length(max: 512)],
             ])
             ->add('robots', TextType::class, [
-                'label'    => 'form.robots',
-                'required' => false,
-                'attr'     => ['placeholder' => 'index,follow'],
+                'label'       => 'form.robots',
+                'required'    => false,
+                'attr'        => ['placeholder' => 'index,follow'],
                 'constraints' => [new Assert\Length(max: 64)],
             ]);
     }

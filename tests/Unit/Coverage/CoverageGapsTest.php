@@ -39,6 +39,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use RuntimeException;
+use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -50,6 +51,8 @@ use function file_put_contents;
 use function strtolower;
 use function sys_get_temp_dir;
 use function uniqid;
+
+use const UPLOAD_ERR_NO_FILE;
 
 #[CoversClass(DocumentService::class)]
 #[CoversClass(DocumentNormalizer::class)]
@@ -103,8 +106,8 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function setDocumentRelinksWhenDocumentBelongsToAnotherPage(): void
     {
-        $pageA = new BuilderPage();
-        $pageB = new BuilderPage();
+        $pageA    = new BuilderPage();
+        $pageB    = new BuilderPage();
         $document = new BuilderDocument();
         $document->setPage($pageA);
 
@@ -156,7 +159,7 @@ final class CoverageGapsTest extends TestCase
     public function documentNormalizerClassicEdgeBranches(): void
     {
         $normalizer = new DocumentNormalizer();
-        $result = $normalizer->normalize([
+        $result     = $normalizer->normalize([
             'version'  => 99,
             'sections' => 'not-array',
         ]);
@@ -175,8 +178,8 @@ final class CoverageGapsTest extends TestCase
                             'widgets'  => 'bad',
                         ],
                         [
-                            'id'       => 'c2',
-                            'widgets'  => [
+                            'id'      => 'c2',
+                            'widgets' => [
                                 'skip',
                                 [
                                     'id'       => 'w1',
@@ -295,7 +298,7 @@ final class CoverageGapsTest extends TestCase
             ],
         ];
         $sanitized = $service->sanitizeWidgetPropsForStructure($structure, [
-            'h1' => ['text' => 'Hi'],
+            'h1'      => ['text' => 'Hi'],
             'missing' => ['x' => 1],
         ]);
         self::assertArrayHasKey('h1', $sanitized);
@@ -321,7 +324,7 @@ final class CoverageGapsTest extends TestCase
     public function documentServiceRejectsDeepNestingAndBadChildren(): void
     {
         $service = $this->documentService();
-        $node = ['id' => 'w', 'type' => 'container', 'children' => []];
+        $node    = ['id' => 'w', 'type' => 'container', 'children' => []];
         for ($i = 0; $i < DocumentNormalizer::MAX_NESTING_DEPTH + 2; ++$i) {
             $node = ['id' => 'c' . $i, 'type' => 'container', 'children' => [$node]];
         }
@@ -352,7 +355,7 @@ final class CoverageGapsTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $page = (new BuilderPage())->setPageKey('g');
+        $page    = (new BuilderPage())->setPageKey('g');
         $service = $this->documentService(null, $em);
 
         $mixed = ['es' => 'not-array'];
@@ -378,14 +381,14 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function coverRemainingPrivateBranchesViaReflection(): void
     {
-        $service = $this->documentService();
+        $service         = $this->documentService();
         $sanitizeLocales = new ReflectionMethod(DocumentService::class, 'sanitizeGrapesLocaleContent');
         $sanitizeLocales->setAccessible(true);
         $out = $sanitizeLocales->invoke($service, ['localeContent' => 'bad']);
         self::assertSame([], $out['localeContent']);
         $out = $sanitizeLocales->invoke($service, [
             'localeContent' => [
-                0 => ['html' => 'x'],
+                0    => ['html' => 'x'],
                 'es' => 'bad',
                 'en' => ['html' => '<b>x</b>', 'css' => 1, 'grapes' => 'x'],
             ],
@@ -415,11 +418,11 @@ final class CoverageGapsTest extends TestCase
         self::assertSame([], $sanitized);
 
         $sanitizer = new GrapesDocumentSanitizer(false);
-        $html = $sanitizer->sanitizeHtml('<p>hi</p><script>alert(1)</script>');
+        $html      = $sanitizer->sanitizeHtml('<p>hi</p><script>alert(1)</script>');
         self::assertStringNotContainsString('<script', strtolower($html));
 
-        $dir = sys_get_temp_dir() . '/pbk-lf-' . uniqid('', true);
-        $local = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png', 'text/plain']);
+        $dir          = sys_get_temp_dir() . '/pbk-lf-' . uniqid('', true);
+        $local        = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png', 'text/plain']);
         $resolveLocal = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'resolveMimeType');
         $resolveLocal->setAccessible(true);
         $tmp2 = sys_get_temp_dir() . '/pbk-lf2-' . uniqid('', true);
@@ -498,8 +501,8 @@ final class CoverageGapsTest extends TestCase
         };
 
         $storage = new AwsS3AssetStorage($helper, '', false, 5_000_000, ['image/png']);
-        $tmp = sys_get_temp_dir() . '/pbk-s3c-' . uniqid('', true) . '.png';
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
+        $tmp     = sys_get_temp_dir() . '/pbk-s3c-' . uniqid('', true) . '.png';
+        $png     = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
         self::assertNotFalse($png);
         file_put_contents($tmp, $png);
 
@@ -534,7 +537,7 @@ final class CoverageGapsTest extends TestCase
         $helper3 = new class {
             public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): object
             {
-                return new \stdClass();
+                return new stdClass();
             }
 
             /** @param array<string, mixed> $config */
@@ -574,7 +577,7 @@ final class CoverageGapsTest extends TestCase
         };
 
         $storage = new AwsS3AssetStorage($helper, 'f', false, 5_000_000, ['image/png']);
-        $tmp = sys_get_temp_dir() . '/pbk-s3f-' . uniqid('', true) . '.txt';
+        $tmp     = sys_get_temp_dir() . '/pbk-s3f-' . uniqid('', true) . '.txt';
         file_put_contents($tmp, 'plain');
         try {
             $storage->store(new UploadedFile($tmp, 'n.txt', 'text/plain', null, true));
@@ -584,7 +587,7 @@ final class CoverageGapsTest extends TestCase
         }
 
         $tmp2 = sys_get_temp_dir() . '/pbk-s3g-' . uniqid('', true) . '.png';
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
+        $png  = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
         self::assertNotFalse($png);
         file_put_contents($tmp2, $png);
         $this->expectException(RuntimeException::class);
@@ -594,7 +597,7 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function localFilesystemMimeFallbackAndExtensions(): void
     {
-        $dir = sys_get_temp_dir() . '/pbk-loc-' . uniqid('', true);
+        $dir     = sys_get_temp_dir() . '/pbk-loc-' . uniqid('', true);
         $storage = new LocalFilesystemAssetStorage($dir, '/u/', 5_000_000, [
             'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/png',
         ]);
@@ -626,11 +629,11 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function localFilesystemRejectsInvalidUpload(): void
     {
-        $dir = sys_get_temp_dir() . '/pbk-loc2-' . uniqid('', true);
+        $dir     = sys_get_temp_dir() . '/pbk-loc2-' . uniqid('', true);
         $storage = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png']);
-        $tmp = sys_get_temp_dir() . '/pbk-inv-' . uniqid('', true) . '.png';
+        $tmp     = sys_get_temp_dir() . '/pbk-inv-' . uniqid('', true) . '.png';
         file_put_contents($tmp, 'x');
-        $upload = new UploadedFile($tmp, 'x.png', 'image/png', \UPLOAD_ERR_NO_FILE, true);
+        $upload = new UploadedFile($tmp, 'x.png', 'image/png', UPLOAD_ERR_NO_FILE, true);
         $this->expectException(InvalidArgumentException::class);
         $storage->store($upload);
     }
@@ -638,7 +641,7 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function pageRenderProviderTraversableProvidersAndClassicBranches(): void
     {
-        $page = (new BuilderPage())->setPageKey('home')->setUuid('u');
+        $page     = (new BuilderPage())->setPageKey('home')->setUuid('u');
         $document = (new BuilderDocument())->setPage($page)->setStructure([
             'version'  => DocumentNormalizer::SCHEMA_VERSION,
             'sections' => [
@@ -733,7 +736,7 @@ final class CoverageGapsTest extends TestCase
     {
         $page = (new BuilderPage())->setPageKey('p')->setUuid('u');
         (new BuilderDocument())->setPage($page)->setStructure([
-            'version' => DocumentNormalizer::SCHEMA_VERSION,
+            'version'  => DocumentNormalizer::SCHEMA_VERSION,
             'sections' => [
                 'bad',
                 [

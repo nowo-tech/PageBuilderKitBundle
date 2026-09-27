@@ -9,12 +9,16 @@ use DOMElement;
 use DOMNode;
 use DOMXPath;
 
+use function in_array;
 use function is_array;
 use function is_string;
 use function libxml_clear_errors;
 use function libxml_use_internal_errors;
 use function preg_replace;
 use function trim;
+
+use const LIBXML_HTML_NODEFDTD;
+use const LIBXML_HTML_NOIMPLIED;
 
 /**
  * Sanitizes GrapesJS-exported HTML/CSS for public render.
@@ -33,10 +37,10 @@ final class GrapesDocumentSanitizer
             return '';
         }
 
-        $wrapped = '<div id="pbk-root">' . $html . '</div>';
+        $wrapped  = '<div id="pbk-root">' . $html . '</div>';
         $previous = libxml_use_internal_errors(true);
-        $dom = new DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $dom      = new DOMDocument('1.0', 'UTF-8');
+        $loaded   = $dom->loadHTML('<?xml encoding="UTF-8">' . $wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
 

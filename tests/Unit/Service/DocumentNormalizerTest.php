@@ -40,11 +40,11 @@ final class DocumentNormalizerTest extends TestCase
     public function normalizeGrapesStructure(): void
     {
         $result = $this->normalizer->normalize([
-            'version' => 2,
-            'engine'  => 'grapesjs',
-            'html'    => '<p>Hi</p>',
-            'css'     => '.x{color:red}',
-            'grapes'  => ['pages' => []],
+            'version'       => 2,
+            'engine'        => 'grapesjs',
+            'html'          => '<p>Hi</p>',
+            'css'           => '.x{color:red}',
+            'grapes'        => ['pages' => []],
             'localeContent' => [
                 'es' => ['html' => '<p>Hola</p>', 'css' => '', 'grapes' => ['a' => 1]],
                 0    => 'bad',

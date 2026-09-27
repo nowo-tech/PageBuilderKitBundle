@@ -255,10 +255,10 @@ final class DocumentService
                 continue;
             }
             $sanitized[$locale] = [
-                'html'   => $this->grapesDocumentSanitizer->sanitizeHtml(
+                'html' => $this->grapesDocumentSanitizer->sanitizeHtml(
                     is_string($content['html'] ?? null) ? $content['html'] : '',
                 ),
-                'css'    => $this->grapesDocumentSanitizer->sanitizeCss(
+                'css' => $this->grapesDocumentSanitizer->sanitizeCss(
                     is_string($content['css'] ?? null) ? $content['css'] : '',
                 ),
                 'grapes' => is_array($content['grapes'] ?? null) ? $content['grapes'] : [],
@@ -269,9 +269,6 @@ final class DocumentService
         return $structure;
     }
 
-    /**
-     * @param mixed $widget
-     */
     private function validateWidgetNode(mixed $widget, int $depth): void
     {
         if ($depth > DocumentNormalizer::MAX_NESTING_DEPTH) {

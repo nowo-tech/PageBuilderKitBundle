@@ -21,7 +21,7 @@ final class NowoPageBuilderKitExtensionElseBranchTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', []);
-        $config    = [
+        $config = [
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => ['assets_upload' => ['enabled' => false]],
         ];

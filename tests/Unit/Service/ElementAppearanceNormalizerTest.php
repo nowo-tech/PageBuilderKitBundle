@@ -72,11 +72,11 @@ final class ElementAppearanceNormalizerTest extends TestCase
     public function normalizesResponsiveBucketsAndRejectsUnsafeValues(): void
     {
         $result = $this->normalizer->normalize([
-            'css_id'     => 'bad id',
-            'css_classes'=> 'ok',
-            'tablet'     => ['style' => ['marginTop' => '4px', 'color' => 'javascript:alert(1)']],
-            'mobile'     => ['paddingTop' => '2px'],
-            'attributes' => [
+            'css_id'      => 'bad id',
+            'css_classes' => 'ok',
+            'tablet'      => ['style' => ['marginTop' => '4px', 'color' => 'javascript:alert(1)']],
+            'mobile'      => ['paddingTop' => '2px'],
+            'attributes'  => [
                 ['key' => 'role', 'value' => 'banner'],
                 ['name' => 'onclick', 'value' => 'x'],
             ],

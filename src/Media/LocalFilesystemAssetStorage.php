@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Media;
 
+use finfo;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Throwable;
 
 use function bin2hex;
 use function class_exists;
@@ -61,7 +63,7 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
             // @codeCoverageIgnoreEnd
         }
 
-        $mime = $this->resolveMimeType($file);
+        $mime      = $this->resolveMimeType($file);
         $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $this->extensionFromMime($mime) ?: 'bin'));
         $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
         $basename  = bin2hex(random_bytes(16)) . '.' . $extension;
@@ -116,7 +118,7 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
     private function resolveMimeType(UploadedFile $file): string
     {
         $path = $file->getPathname();
-        if ($path !== '' && class_exists(\finfo::class)) {
+        if ($path !== '' && class_exists(finfo::class)) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             if ($finfo !== false) {
                 $detected = finfo_file($finfo, $path);
@@ -133,7 +135,7 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
 
         try {
             return (string) ($file->getMimeType() ?: '');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return '';
         }
     }
@@ -141,12 +143,12 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
     private function extensionFromMime(string $mime): string
     {
         return match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
+            'image/jpeg'    => 'jpg',
+            'image/png'     => 'png',
+            'image/gif'     => 'gif',
+            'image/webp'    => 'webp',
             'image/svg+xml' => 'svg',
-            default => '',
+            default         => '',
         };
     }
 }

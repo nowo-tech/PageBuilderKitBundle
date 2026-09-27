@@ -75,7 +75,7 @@ final class PageSectionsController extends AbstractController
                 ]);
             }
 
-            $submitted = $request->request->all('widgets');
+            $submitted              = $request->request->all('widgets');
             $propsByLocale[$locale] = $this->normalizeSubmittedProps($submitted);
 
             try {
@@ -117,14 +117,14 @@ final class PageSectionsController extends AbstractController
     }
 
     /**
-     * @param array<string, mixed>              $structure
+     * @param array<string, mixed> $structure
      * @param array<string, array<string, mixed>> $localeProps
      *
      * @return list<array{id: string, label: string, columns: list<array{id: string, width: int, widgets: list<array<string, mixed>>}>}>
      */
     private function buildSectionsTree(array $structure, array $localeProps): array
     {
-        $tree = [];
+        $tree  = [];
         $index = 1;
         foreach ($structure['sections'] ?? [] as $section) {
             if (!is_array($section)) {
@@ -147,7 +147,7 @@ final class PageSectionsController extends AbstractController
                 ];
             }
 
-            $cssId = is_string($section['settings']['cssId'] ?? null) ? $section['settings']['cssId'] : '';
+            $cssId  = is_string($section['settings']['cssId'] ?? null) ? $section['settings']['cssId'] : '';
             $tree[] = [
                 'id'      => $sectionId,
                 'label'   => $cssId !== '' ? sprintf('Section %d · #%s', $index, $cssId) : sprintf('Section %d', $index),
@@ -160,8 +160,7 @@ final class PageSectionsController extends AbstractController
     }
 
     /**
-     * @param list<array<string, mixed>>        $out
-     * @param mixed                             $widget
+     * @param list<array<string, mixed>> $out
      * @param array<string, array<string, mixed>> $localeProps
      */
     private function appendWidgetNodes(array &$out, mixed $widget, array $localeProps, int $depth): void

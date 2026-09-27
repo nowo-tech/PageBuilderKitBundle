@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
+use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function file_put_contents;
@@ -68,8 +70,8 @@ final class AwsS3AssetStorageTest extends TestCase
     #[Test]
     public function rejectsInvalidHelper(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        new AwsS3AssetStorage(new \stdClass());
+        $this->expectException(InvalidArgumentException::class);
+        new AwsS3AssetStorage(new stdClass());
     }
 
     #[Test]
@@ -114,7 +116,7 @@ final class AwsS3AssetStorageTest extends TestCase
         $helper = new class {
             public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): object
             {
-                return new \stdClass();
+                return new stdClass();
             }
 
             /** @param array<string, mixed> $config */
@@ -128,7 +130,7 @@ final class AwsS3AssetStorageTest extends TestCase
 
         $storage = new AwsS3AssetStorage($helper, 'pb', false, 10, ['image/png']);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $storage->store(new UploadedFile(__FILE__, 'big.png', 'image/png', 100, true));
     }
 }
