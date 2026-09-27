@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\DependencyInjection;
 
 use LogicException;
+use Nowo\PageBuilderKitBundle\DataCollector\PageBuilderKitDataCollector;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration;
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\DependencyInjection\TablePrefixListener;
@@ -266,5 +269,22 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         ]], $container);
 
         self::assertTrue($container->hasDefinition('nowo_page_builder_kit.access_checker.default'));
+    }
+
+    #[Test]
+    public function loadRegistersDebugCollectorWhenEnabledInDebugMode(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', []);
+        $container->setParameter('kernel.debug', true);
+
+        (new NowoPageBuilderKitExtension())->load([[
+            'security' => ['allow_unauthenticated' => true],
+            'debug'    => ['collector' => true],
+        ]], $container);
+
+        self::assertTrue($container->hasDefinition(PageBuilderKitTrace::class));
+        self::assertTrue($container->hasDefinition(PageBuilderKitDataCollector::class));
+        self::assertSame(PageBuilderKitTrace::class, (string) $container->getAlias(PageBuilderKitTraceInterface::class));
     }
 }

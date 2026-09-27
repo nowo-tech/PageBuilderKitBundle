@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
+use Nowo\PageBuilderKitBundle\Entity\BuilderDocumentLocale;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface;
@@ -91,6 +92,109 @@ final class PageRevisionStoreTest extends TestCase
             maxPerPage: 1,
         );
         $store->prune($page);
+    }
+
+    #[Test]
+    public function accessorsAndLookupHelpersReflectConfiguration(): void
+    {
+        $page     = $this->pageWithStructure();
+        $revision = (new BuilderPageRevision())->setPage($page)->setStructure(['version' => 2])->setWidgetPropsByLocale([]);
+
+        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private readonly BuilderPageRevision $revision)
+            {
+            }
+
+            public function findByPageNewestFirst(BuilderPage $page): array
+            {
+                return [$this->revision];
+            }
+
+            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            {
+                return $this->revision;
+            }
+
+            public function findOneForPage(BuilderPage $page, int $revisionId): ?BuilderPageRevision
+            {
+                return $revisionId === 7 ? $this->revision : null;
+            }
+        };
+
+        $store = new PageRevisionStore(
+            $this->createStub(EntityManagerInterface::class),
+            $repo,
+            enabled: true,
+            maxPerPage: 7,
+            onSave: false,
+            onPublish: true,
+        );
+
+        self::assertTrue($store->isEnabled());
+        self::assertFalse($store->isOnSave());
+        self::assertTrue($store->isOnPublish());
+        self::assertSame(7, $store->getMaxPerPage());
+        self::assertSame([$revision], $store->listForPage($page));
+        self::assertSame($revision, $store->findForPage($page, 7));
+        self::assertNull($store->findForPage($page, 99));
+    }
+
+    #[Test]
+    public function extractLivePayloadCollectsLocalePropsAndHandlesEmptyPage(): void
+    {
+        $store = $this->createStore(enabled: true);
+        $page  = new BuilderPage();
+
+        self::assertNull($store->extractLivePayload($page));
+
+        $page->setPageKey('home');
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([]));
+        self::assertNull($store->extractLivePayload($page));
+
+        $pageWithContent = $this->pageWithStructure();
+        $document        = $pageWithContent->getDocument();
+        self::assertInstanceOf(BuilderDocument::class, $document);
+        $document->getLocales()->add(
+            (new BuilderDocumentLocale())
+                ->setLocale('es')
+                ->setWidgetProps(['hero' => ['title' => 'Hola']])
+                ->setDocument($document),
+        );
+
+        $payload = $store->extractLivePayload($pageWithContent);
+
+        self::assertIsArray($payload);
+        self::assertSame(['hero' => ['title' => 'Hola']], $payload['widgetPropsByLocale']['es']);
+        self::assertNotSame('', $payload['fingerprint']);
+        self::assertStringStartsWith('Published ', $store->defaultPublishLabel());
+    }
+
+    #[Test]
+    public function snapshotCanIgnoreUnchangedGuardAndPruneCanBeDisabledByLimit(): void
+    {
+        $page     = $this->pageWithStructure();
+        $existing = (new BuilderPageRevision())
+            ->setPage($page)
+            ->setStructure($page->getDocument()?->getStructure() ?? [])
+            ->setWidgetPropsByLocale([]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
+        $em->expects(self::once())->method('flush');
+        $em->expects(self::never())->method('remove');
+
+        $store = new PageRevisionStore(
+            $em,
+            $this->repo(latest: $existing, list: [$existing]),
+            enabled: true,
+            maxPerPage: 0,
+        );
+
+        $revision = $store->snapshot($page, 'Forced', skipIfUnchanged: false);
+        $store->prune($page);
+
+        self::assertInstanceOf(BuilderPageRevision::class, $revision);
+        self::assertSame('Forced', $revision->getLabel());
     }
 
     private function createStore(bool $enabled): PageRevisionStore

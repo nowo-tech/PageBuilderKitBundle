@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
+use Nowo\PageBuilderKitBundle\Entity\BuilderDocumentLocale;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
@@ -39,6 +40,12 @@ final class PageTemplateServiceTest extends TestCase
             'grapes'        => [],
             'localeContent' => [],
         ]));
+        $page->getDocument()?->getLocales()->add(
+            (new BuilderDocumentLocale())
+                ->setLocale('es')
+                ->setWidgetProps(['hero' => ['title' => 'Plan']])
+                ->setDocument($page->getDocument()),
+        );
 
         $templates    = [];
         $templateRepo = new class($templates) implements BuilderPageTemplateRepositoryInterface {
@@ -121,6 +128,7 @@ final class PageTemplateServiceTest extends TestCase
 
         $saved = $service->saveFromPage($page, 'pricing-tpl', 'Pricing');
         self::assertSame('pricing-tpl', $saved->getTemplateKey());
+        self::assertSame(['hero' => ['title' => 'Plan']], $saved->getWidgetPropsByLocale()['es']);
         self::assertSame($saved, $service->findByKey('pricing-tpl'));
         self::assertCount(1, $service->list());
 
@@ -165,5 +173,128 @@ final class PageTemplateServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $service->saveFromPage(new BuilderPage(), 'Bad Key!', 'x');
+    }
+
+    #[Test]
+    public function saveFromPageRejectsBlankLabelAndMissingDocument(): void
+    {
+        $templateRepo = $this->createStub(BuilderPageTemplateRepositoryInterface::class);
+        $documents    = $this->documents();
+        $service      = new PageTemplateService(
+            $templateRepo,
+            $this->createStub(EntityManagerInterface::class),
+            $documents,
+            new DocumentNormalizer(),
+        );
+
+        $page = (new BuilderPage())->setPageKey('pricing');
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>Plan</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]));
+
+        try {
+            $service->saveFromPage($page, 'pricing-tpl', '   ');
+            self::fail('Expected blank label validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('Template label is required.', $exception->getMessage());
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->saveFromPage((new BuilderPage())->setPageKey('missing'), 'pricing-tpl', 'Pricing');
+    }
+
+    #[Test]
+    public function createPageFromTemplateRejectsUnknownTemplate(): void
+    {
+        $service = new PageTemplateService(
+            $this->createStub(BuilderPageTemplateRepositoryInterface::class),
+            $this->createStub(EntityManagerInterface::class),
+            $this->documents(),
+            new DocumentNormalizer(),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->createPageFromTemplate('unknown', 'page', 'Title', 'es');
+    }
+
+    #[Test]
+    public function createPageFromTemplateFiltersNonArrayWidgetPropsAndDeleteRejectsUnknown(): void
+    {
+        $template = (new BuilderPageTemplate())
+            ->setTemplateKey('pricing-tpl')
+            ->setLabel('Pricing')
+            ->setStructure([
+                'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'          => '<p>Plan</p>',
+                'css'           => '',
+                'grapes'        => [],
+                'localeContent' => [],
+            ])
+            ->setWidgetPropsByLocale([
+                'es'   => ['hero' => ['title' => 'Hola']],
+                'skip' => 'bad',
+            ]);
+
+        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private readonly BuilderPageTemplate $template)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $templateKey === 'pricing-tpl' ? $this->template : null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return [$this->template];
+            }
+        };
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $this->createStub(EntityManagerInterface::class),
+            $this->documents(),
+            new DocumentNormalizer(),
+        );
+
+        $page = $service->createPageFromTemplate('pricing-tpl', 'pricing-copy', 'Copy', 'es');
+
+        self::assertSame('pricing-copy', $page->getPageKey());
+        self::assertNotNull($page->getDocument());
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->delete('missing');
+    }
+
+    private function documents(): DocumentService
+    {
+        $pages = new class implements BuilderPageRepositoryInterface {
+            public function findOneByPageKey(string $pageKey): ?BuilderPage
+            {
+                return null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return [];
+            }
+        };
+
+        return new DocumentService(
+            $pages,
+            $this->createStub(EntityManagerInterface::class),
+            new BuilderLocales('es', ['es', 'en']),
+            new DocumentNormalizer(),
+            WidgetTypesFixture::registry(),
+            new PageBuilderProtection(new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null)),
+            new WidgetPropsMerger(),
+        );
     }
 }

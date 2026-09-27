@@ -54,4 +54,34 @@ final class WidgetPackRegistryTest extends TestCase
             ],
         ], $registry->summarize());
     }
+
+    #[Test]
+    public function acceptsPlainArrayInput(): void
+    {
+        $pack = new class implements WidgetPackInterface {
+            public function getName(): string
+            {
+                return 'acme/plain';
+            }
+
+            public function getVersion(): string
+            {
+                return '1.1.0';
+            }
+
+            public function getWidgetTypes(): array
+            {
+                return [];
+            }
+
+            public function getCapabilities(): array
+            {
+                return [];
+            }
+        };
+
+        $registry = new WidgetPackRegistry([$pack]);
+
+        self::assertSame([$pack], $registry->all());
+    }
 }

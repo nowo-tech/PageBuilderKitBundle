@@ -116,6 +116,18 @@ final class PageRevisionServiceTest extends TestCase
     }
 
     #[Test]
+    public function restoreThrowsWhenDisabled(): void
+    {
+        $service = new PageRevisionService(
+            $this->store(enabled: false),
+            $this->documentService(),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->restore((new BuilderPage())->setPageKey('x'), 1);
+    }
+
+    #[Test]
     public function diffComparesLiveDocumentAgainstRevision(): void
     {
         $page = (new BuilderPage())->setPageKey('home');
@@ -170,6 +182,73 @@ final class PageRevisionServiceTest extends TestCase
         self::assertSame(3, $diff['revisionId']);
         self::assertFalse($diff['identical']);
         self::assertTrue($diff['structureChanged']);
+    }
+
+    #[Test]
+    public function diffThrowsWhenDisabled(): void
+    {
+        $service = new PageRevisionService(
+            $this->store(enabled: false),
+            $this->documentService(),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->diff((new BuilderPage())->setPageKey('x'), 1);
+    }
+
+    #[Test]
+    public function accessorsAndCreateUseUnderlyingStore(): void
+    {
+        $page = (new BuilderPage())->setPageKey('home');
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>live</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]));
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $listed = new BuilderPageRevision();
+        $listed->setPage($page)->setStructure(['version' => 2])->setWidgetPropsByLocale([]);
+        $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
+        $idProp->setValue($listed, 11);
+
+        $repo = new class($listed) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private readonly BuilderPageRevision $listed)
+            {
+            }
+
+            public function findByPageNewestFirst(BuilderPage $page): array
+            {
+                return [$this->listed];
+            }
+
+            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            {
+                return null;
+            }
+
+            public function findOneForPage(BuilderPage $page, int $revisionId): ?BuilderPageRevision
+            {
+                return $revisionId === 11 ? $this->listed : null;
+            }
+        };
+
+        $store   = new PageRevisionStore($em, $repo, enabled: true, onSave: true, onPublish: false);
+        $service = new PageRevisionService($store, $this->documentService($em));
+
+        self::assertTrue($service->isEnabled());
+        self::assertSame([$listed], $service->list($page));
+
+        $created = $service->create($page, 'Manual');
+
+        self::assertInstanceOf(BuilderPageRevision::class, $created);
+        self::assertSame('Manual', $created->getLabel());
     }
 
     private function store(bool $enabled): PageRevisionStore

@@ -49,4 +49,59 @@ final class DocumentDiffTest extends TestCase
         self::assertTrue($diff['structureChanged']);
         self::assertNotEmpty($diff['summary']);
     }
+
+    #[Test]
+    public function reportsEngineAndPropsDifferences(): void
+    {
+        $left = [
+            'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'    => ['unexpected'],
+            'grapes'  => [],
+        ];
+        $right = [
+            'version'  => 1,
+            'sections' => [],
+        ];
+
+        $diff = (new DocumentDiff())->compare(
+            $left,
+            $right,
+            ['es' => ['hero' => ['title' => 'Hola']]],
+            ['en' => ['hero' => ['title' => 'Hello']]],
+        );
+
+        self::assertFalse($diff['identical']);
+        self::assertSame('grapesjs', $diff['leftEngine']);
+        self::assertSame('classic', $diff['rightEngine']);
+        self::assertTrue($diff['propsChanged']);
+        self::assertContains('engine', array_map('strtolower', $diff['changedPaths']));
+        self::assertStringContainsString('Engine:', implode(' | ', $diff['summary']));
+        self::assertStringContainsString('Widget props locales:', implode(' | ', $diff['summary']));
+    }
+
+    #[Test]
+    public function reportsClassicSectionAndNestedPathDifferences(): void
+    {
+        $left = [
+            'version'  => 1,
+            'sections' => [
+                ['widgets' => [['type' => 'text']]],
+            ],
+            'meta' => ['theme' => 'light'],
+        ];
+        $right = [
+            'version'  => 1,
+            'sections' => [],
+            'meta'     => ['theme' => 'dark'],
+            'extra'    => true,
+        ];
+
+        $diff = (new DocumentDiff())->compare($left, $right);
+
+        self::assertFalse($diff['identical']);
+        self::assertContains('extra', $diff['changedPaths']);
+        self::assertContains('meta.theme', $diff['changedPaths']);
+        self::assertStringContainsString('Sections: 1 → 0', implode(' | ', $diff['summary']));
+    }
 }

@@ -74,4 +74,22 @@ final class BuilderPageTest extends TestCase
 
         self::assertGreaterThanOrEqual($previous->getTimestamp(), $page->getUpdatedAt()->getTimestamp());
     }
+
+    #[Test]
+    public function revisionHelpersKeepOwningSideConsistent(): void
+    {
+        $page     = new BuilderPage();
+        $revision = new BuilderPageRevision();
+
+        $page->addRevision($revision);
+        $page->addRevision($revision);
+
+        self::assertCount(1, $page->getRevisions());
+        self::assertSame($page, $revision->getPage());
+
+        $page->removeRevision($revision);
+
+        self::assertCount(0, $page->getRevisions());
+        self::assertSame($page, $revision->getPage());
+    }
 }

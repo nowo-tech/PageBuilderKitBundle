@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Reference;
 
 #[CoversClass(WidgetPackPass::class)]
 final class WidgetPackPassTest extends TestCase
@@ -43,5 +44,53 @@ final class WidgetPackPassTest extends TestCase
         (new WidgetPackPass())->process($container);
 
         self::assertFalse($container->hasDefinition(WidgetPackRegistry::class));
+    }
+
+    #[Test]
+    public function keepsTypeRegistryStableWithoutDefinitionAndDeduplicatesTypes(): void
+    {
+        $container = new ContainerBuilder();
+        $container->register(WidgetPackRegistry::class, WidgetPackRegistry::class)->setArgument('$packs', []);
+        $container->register(WidgetTypeRegistry::class, WidgetTypeRegistry::class)->setArgument('$types', 'not-an-array');
+        $container->register('widget.heading', HeadingWidgetType::class);
+        $container->register('pack.demo', stdClass::class)
+            ->addTag('nowo_page_builder_kit.widget_pack', ['types' => 'bad'])
+            ->addTag('nowo_page_builder_kit.widget_pack', ['types' => ['widget.heading', 'widget.heading']]);
+
+        (new WidgetPackPass())->process($container);
+
+        $types = $container->getDefinition(WidgetTypeRegistry::class)->getArgument('$types');
+        self::assertCount(1, $types);
+    }
+
+    #[Test]
+    public function onlyRegistersPacksWhenTypeRegistryIsMissing(): void
+    {
+        $container = new ContainerBuilder();
+        $container->register(WidgetPackRegistry::class, WidgetPackRegistry::class)->setArgument('$packs', []);
+        $container->register('pack.demo', stdClass::class)
+            ->addTag('nowo_page_builder_kit.widget_pack');
+
+        (new WidgetPackPass())->process($container);
+
+        $packs = $container->getDefinition(WidgetPackRegistry::class)->getArgument('$packs');
+        self::assertCount(1, $packs);
+        self::assertFalse($container->hasDefinition(WidgetTypeRegistry::class));
+    }
+
+    #[Test]
+    public function ignoresNonReferenceTypesAlreadyPresentInRegistry(): void
+    {
+        $container = new ContainerBuilder();
+        $container->register(WidgetPackRegistry::class, WidgetPackRegistry::class)->setArgument('$packs', []);
+        $container->register(WidgetTypeRegistry::class, WidgetTypeRegistry::class)->setArgument('$types', ['skip-me', new Reference('widget.heading')]);
+        $container->register('widget.heading', HeadingWidgetType::class);
+        $container->register('pack.demo', stdClass::class)
+            ->addTag('nowo_page_builder_kit.widget_pack', ['types' => ['widget.heading']]);
+
+        (new WidgetPackPass())->process($container);
+
+        $types = $container->getDefinition(WidgetTypeRegistry::class)->getArgument('$types');
+        self::assertCount(1, $types);
     }
 }
