@@ -13,6 +13,20 @@
 
 This bundle is **FrankenPHP worker mode friendly**. Shared services stay request-safe; optional `BuilderLocales` static binding is cleared after each request. See [FRANKENPHP-WORKER-AUDIT.md](docs/FRANKENPHP-WORKER-AUDIT.md).
 
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/demo/overview.png" alt="Public pricing page compounds rendered by Page Builder Kit" />
+      <br /><sub>Public pricing compounds</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/demo/interaction.png" alt="GrapesJS admin canvas for a page" />
+      <br /><sub>Admin GrapesJS canvas</sub>
+    </td>
+  </tr>
+</table>
+
+
 ## What is this?
 
 Page Builder Kit Bundle gives Symfony applications a reusable visual page builder backed by Doctrine. Editors create pages with stable keys, compose layouts on a GrapesJS canvas (or classic sections), save locale-specific content, publish or leave as draft, and expose pages on host routes or through Twig helpers. It complements [Page Layout Kit Bundle](https://github.com/nowo-tech/PageLayoutKitBundle) when you need a free-form canvas instead of fixed typed blocks.
@@ -79,14 +93,20 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 
 | Phase | Status | Scope |
 | --- | --- | --- |
-| **Phase 1** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
-| **Phase 2** | Planned | Nested sections/widgets, responsive column settings, design tokens / per-widget style presets |
-| **Phase 3** | Partial in 1.0.0 | Revision history (`revisions.enabled`); templates / duplicate still planned |
-| **Phase 4** | Planned | External widget bundles, marketplace-style registration, host-defined widget packs |
+| **Phase 1–2** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
+| **Phase 3** | **Shipped (unreleased)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
+| **Phase 4** | **Shipped baseline (unreleased)** | `WidgetPackInterface`, author guide; classic widget tags |
+| **DX** | **Shipped (unreleased)** | Web Profiler DataCollector (`debug.collector`) |
 
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap-phases-2-4).
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
 
 ## Development
+
+```bash
+make -C demo/symfony8 test-e2e
+make -C demo/symfony8 demo-screenshots   # refreshes docs/images/demo/*.png
+```
+
 
 ```bash
 make up
@@ -103,6 +123,7 @@ Demo default URL: `http://localhost:8137`.
 - [Architecture (Mermaid)](docs/ARCHITECTURE.md)
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
+- [Widget authors](docs/WIDGET_AUTHORS.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Usage](docs/USAGE.md)
 - [Contributing](docs/CONTRIBUTING.md)

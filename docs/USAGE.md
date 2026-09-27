@@ -1,10 +1,21 @@
 # Usage
 
+## Screenshots
+
+| Overview | Interaction |
+|----------|-------------|
+| ![Public pricing page compounds rendered by Page Builder Kit](images/demo/overview.png) | ![GrapesJS admin canvas for a page](images/demo/interaction.png) |
+
+Regenerate with `make -C demo/symfony8 demo-screenshots` (REQ-DEMO-013).
+
+
 How to manage builder pages, save documents, and render them publicly.
 
 Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Table of contents
+
+- [Screenshots](#screenshots)
 
 - [Admin routes](#admin-routes)
 - [DocumentService](#documentservice)
@@ -16,7 +27,8 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [i18n: structure and props model](#i18n-structure-and-props-model)
 - [Custom access logic](#custom-access-logic)
 - [Twig overrides](#twig-overrides)
-- [Custom widgets (Phase 4 preview)](#custom-widgets-phase-4-preview)
+- [Custom widgets](#custom-widgets)
+- [Web Profiler collector](#web-profiler-collector)
 
 ## Admin routes
 
@@ -25,17 +37,23 @@ Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the
 | Route name | Method | Path (default prefix) | Purpose |
 | --- | --- | --- | --- |
 | `admin_page_builder_list` | GET, POST | `{prefix}/pages` | List pages; create new page (form) |
+| `admin_page_builder_templates` | GET | `{prefix}/templates` | Page templates library |
 | `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell |
 | `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON |
 | `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document |
 | `admin_page_builder_document_publish` | POST | `{prefix}/pages/{pageKey}/publish` | Set page status to published |
 | `admin_page_builder_document_unpublish` | POST | `{prefix}/pages/{pageKey}/unpublish` | Set page status back to draft |
+| `admin_page_builder_document_duplicate` | POST | `{prefix}/pages/{pageKey}/duplicate` | Clone page as a new draft |
+| `admin_page_builder_document_export` | GET | `{prefix}/pages/{pageKey}/export` | Export page JSON |
+| `admin_page_builder_document_import` | POST | `{prefix}/pages/import` | Import page JSON |
+| `admin_page_builder_revisions` | GET | `{prefix}/pages/{pageKey}/revisions` | Version list (when enabled) |
+| `admin_page_builder_revisions_diff` | GET | `{prefix}/pages/{pageKey}/revisions/{id}/diff` | Diff live vs revision |
 
 Public bundle route (optional for hosts that do not use custom controllers):
 
 | Route name | Method | Path | Purpose |
 | --- | --- | --- | --- |
-| `page_builder_public_render` | GET | `/p/{pageKey}` | Render published page (404 if draft) |
+| `page_builder_public_render` | GET | `/p/{pageKey}` | Render published page; **draft preview** for editors who pass the access checker (banner); 404 for everyone else when draft |
 
 ## DocumentService
 
@@ -476,8 +494,21 @@ templates/bundles/NowoPageBuilderKitBundle/
 
 Widget types resolve public templates via `@NowoPageBuilderKitBundle/widgets/{type}.html.twig`.
 
-## Custom widgets (Phase 4 preview)
+## Custom widgets
 
-Phase 1 ships six core widgets. Phase 4 will document host-provided widget bundles. Today you can register services tagged `nowo_page_builder_kit.widget_type` implementing `WidgetTypeInterface`; `WidgetTypePass` collects them into `WidgetTypeRegistry`.
+Core classic widgets ship with the bundle. Hosts and Composer packs can add more:
 
-See [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md#roadmap-phases-2-4).
+- Tag `WidgetTypeInterface` services with `nowo_page_builder_kit.widget_type`
+- Optionally group them with `WidgetPackInterface` (`nowo_page_builder_kit.widget_pack`)
+
+Full guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
+
+## Web Profiler collector
+
+In `dev` (`kernel.debug=true`), the toolbar shows a **PBK** panel when `debug.collector` is true (default). It lists:
+
+- Renders: `pageKey`, locale, status, engine, Twig applied/error, context **key names**, timings (ms)
+- Public outcomes: `published` / `draft_preview` / `not_found_draft` / `not_found_missing`
+- Admin actions: save, publish, unpublish, restore, duplicate, export, import, template_*
+
+See [CONFIGURATION.md](CONFIGURATION.md#debug).

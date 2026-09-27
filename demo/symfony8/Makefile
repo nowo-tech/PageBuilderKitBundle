@@ -1,4 +1,4 @@
-.PHONY: help up down build install shell logs test test-coverage cache-clear link-bundle update update-bundle update-deps ensure-up restart release-check database
+.PHONY: help up down build install shell logs test test-coverage cache-clear link-bundle update update-bundle update-deps ensure-up restart release-check database test-e2e demo-screenshots
 
 DOCKER_BIN := $(shell command -v docker 2>/dev/null)
 ifeq ($(DOCKER_BIN),)
@@ -14,6 +14,8 @@ help:
 	@echo "  Login:      /login (admin/admin)"
 	@echo "  Admin canvas home: /admin/page-builder/pages/home/canvas"
 	@echo "  Admin canvas contact: /admin/page-builder/pages/contact/canvas"
+	@echo "  make test-e2e       Playwright e2e (REQ-DEMO-013)"
+	@echo "  make demo-screenshots  Refresh docs/images/demo/*.png"
 
 up:
 	@if [ ! -f .env ]; then cp .env.example .env 2>/dev/null || true; fi
@@ -90,3 +92,29 @@ release-check: ensure-up update-bundle test test-coverage
 
 # Optional: monorepo helper absent on standalone GitHub Actions checkout.
 -include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk)
+
+# Paste into demo/symfony8/Makefile (REQ-DEMO-013). Uses official Playwright image.
+PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.63.0-jammy
+
+test-e2e: ensure-up
+	@mkdir -p e2e/node_modules
+	@PORT=$$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=$${PORT:-8137}; \
+	docker run --rm --network host \
+		-v "$(CURDIR)/e2e:/e2e" -w /e2e \
+		-e DEMO_BASE_URL=http://127.0.0.1:$$PORT \
+		$(PLAYWRIGHT_IMAGE) \
+		bash -lc 'npm install --no-fund --no-audit && npx playwright test --project=chromium'
+
+demo-screenshots: ensure-up
+	@mkdir -p ../../docs/images/demo e2e/node_modules
+	@PORT=$$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=$${PORT:-8137}; \
+	docker run --rm --network host \
+		-v "$(CURDIR)/e2e:/e2e" \
+		-v "$(CURDIR)/../../docs/images/demo:/screenshots" \
+		-w /e2e \
+		-e DEMO_BASE_URL=http://127.0.0.1:$$PORT \
+		-e SCREENSHOT_DIR=/screenshots \
+		$(PLAYWRIGHT_IMAGE) \
+		bash -lc 'npm install --no-fund --no-audit && npx playwright test --project=screenshots'
+	@echo "Screenshots written under docs/images/demo/"
+
