@@ -75,7 +75,7 @@ final class DocumentDiffTest extends TestCase
         self::assertSame('grapesjs', $diff['leftEngine']);
         self::assertSame('classic', $diff['rightEngine']);
         self::assertTrue($diff['propsChanged']);
-        self::assertContains('engine', array_map('strtolower', $diff['changedPaths']));
+        self::assertContains('engine', array_map(strtolower(...), $diff['changedPaths']));
         self::assertStringContainsString('Engine:', implode(' | ', $diff['summary']));
         self::assertStringContainsString('Widget props locales:', implode(' | ', $diff['summary']));
     }

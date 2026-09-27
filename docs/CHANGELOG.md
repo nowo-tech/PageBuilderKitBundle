@@ -9,15 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [[Unreleased]](#unreleased)
 
+- [[1.1.1] - 2026-09-27](#111---2026-09-27)
+
 - [[1.1.0] - 2026-09-27](#110---2026-09-27)
 
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-27
+
 ### Changed
 
-- Spec Kit: formal closure of Phase 2–4 docs — `specs/002-phase2-grapesjs`, `specs/003-phase3-revisions-templates`, `specs/004-phase4-external-widgets`, refreshed canonical `code-inventory.md` (no runtime changes).
+- Spec Kit: formal closure of Phase 2–4 documentation — `specs/002-phase2-grapesjs`, `specs/003-phase3-revisions-templates`, `specs/004-phase4-external-widgets`, refreshed canonical `code-inventory.md`.
+- Index updates in [SPEC-KIT.md](SPEC-KIT.md), [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md), and [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
+
+### Notes
+
+- Documentation-only release; **no runtime or schema changes**. Hosts on `^1.1` need no upgrade steps. See [UPGRADING.md](UPGRADING.md#111).
 
 ## [1.1.0] - 2026-09-27
 

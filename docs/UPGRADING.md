@@ -4,8 +4,19 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [1.1.1](#111)
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+
+## 1.1.1
+
+From **1.1.0**:
+
+1. Optional: bump to `^1.1.1` (or stay on `^1.1`) and run `composer update nowo-tech/page-builder-kit-bundle`.
+2. **No** Doctrine schema changes, config keys, or route renames.
+3. Spec Kit artifacts under `specs/002`–`004` document Phases 2–4 already shipped in 1.0/1.1 — useful for contributors only.
+
+See [CHANGELOG.md](CHANGELOG.md#111---2026-09-27).
 
 ## 1.1.0
 

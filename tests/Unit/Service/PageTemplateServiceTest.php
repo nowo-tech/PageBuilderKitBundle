@@ -31,20 +31,21 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function saveFromPageAndApplyRoundTrip(): void
     {
-        $page = (new BuilderPage())->setPageKey('pricing');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page     = (new BuilderPage())->setPageKey('pricing');
+        $document = (new BuilderDocument())->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Plan</p>',
             'css'           => '',
             'grapes'        => [],
             'localeContent' => [],
-        ]));
-        $page->getDocument()?->getLocales()->add(
+        ]);
+        $page->setDocument($document);
+        $document->getLocales()->add(
             (new BuilderDocumentLocale())
                 ->setLocale('es')
                 ->setWidgetProps(['hero' => ['title' => 'Plan']])
-                ->setDocument($page->getDocument()),
+                ->setDocument($document),
         );
 
         $templates    = [];

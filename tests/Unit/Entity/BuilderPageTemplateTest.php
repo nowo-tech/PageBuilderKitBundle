@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Entity;
 
-use DateTimeImmutable;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -29,7 +28,9 @@ final class BuilderPageTemplateTest extends TestCase
         self::assertSame('Hero', $template->getLabel());
         self::assertSame(['version' => 2, 'engine' => 'grapesjs'], $template->getStructure());
         self::assertSame(['es' => []], $template->getWidgetPropsByLocale());
-        self::assertInstanceOf(DateTimeImmutable::class, $template->getCreatedAt());
-        self::assertInstanceOf(DateTimeImmutable::class, $template->getUpdatedAt());
+        self::assertGreaterThanOrEqual(
+            $template->getCreatedAt()->getTimestamp(),
+            $template->getUpdatedAt()->getTimestamp(),
+        );
     }
 }

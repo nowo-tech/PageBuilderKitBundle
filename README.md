@@ -99,7 +99,7 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
 | **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
 
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`004` (docs closure in **v1.1.1**).
 
 ## Development
 

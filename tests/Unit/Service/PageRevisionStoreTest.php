@@ -118,7 +118,7 @@ final class PageRevisionStoreTest extends TestCase
                 return [$this->revision];
             }
 
-            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            public function findLatestForPage(BuilderPage $page): BuilderPageRevision
             {
                 return $this->revision;
             }

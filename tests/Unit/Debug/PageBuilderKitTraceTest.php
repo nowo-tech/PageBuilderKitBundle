@@ -36,7 +36,7 @@ final class PageBuilderKitTraceTest extends TestCase
     public function nullTraceIsNoOp(): void
     {
         $trace = new NullPageBuilderKitTrace();
-        $trace->addRender(['pageKey' => 'x']);
+        $trace->addRender(['pageKey' => 'x', 'locale' => 'es', 'status' => 'draft', 'engine' => 'grapesjs']);
         $trace->addPublicOutcome('x', 'published');
         $trace->addAdminAction('save', 'x');
         $trace->reset();
