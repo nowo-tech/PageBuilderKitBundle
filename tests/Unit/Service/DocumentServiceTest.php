@@ -8,15 +8,19 @@ use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
+use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
 use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
 use Nowo\PageBuilderKitBundle\Widget\Type\ContainerWidgetType;
@@ -216,6 +220,59 @@ final class DocumentServiceTest extends TestCase
         $service->unpublish($page);
         self::assertSame(PageStatus::Draft, $page->getStatus());
         self::assertNull($page->getPublishedAt());
+    }
+
+    #[Test]
+    public function duplicatePageThrowsWhenSourceHasNoDocument(): void
+    {
+        $service = $this->createService();
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->duplicatePage((new BuilderPage())->setPageKey('orphan'), 'orphan-copy');
+    }
+
+    #[Test]
+    public function publishAndSaveSnapshotThroughRevisionStore(): void
+    {
+        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>Hi</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]));
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('persist');
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $revisionRepo = new class implements BuilderPageRevisionRepositoryInterface {
+            public function findByPageNewestFirst(BuilderPage $page): array
+            {
+                return [];
+            }
+
+            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            {
+                return null;
+            }
+
+            public function findOneForPage(BuilderPage $page, int $revisionId): ?BuilderPageRevision
+            {
+                return null;
+            }
+        };
+
+        $store   = new PageRevisionStore($em, $revisionRepo, enabled: true, onSave: true, onPublish: true);
+        $service = $this->createService(null, $em, null, $store);
+
+        $service->saveDocument($page, $page->getDocument()?->getStructure() ?? [], []);
+        $service->publish($page);
+
+        self::assertSame(PageStatus::Published, $page->getStatus());
+        self::assertGreaterThanOrEqual(1, $page->getRevisions()->count());
     }
 
     #[Test]
@@ -635,6 +692,7 @@ final class DocumentServiceTest extends TestCase
         ?BuilderPage $existingPage = null,
         ?EntityManagerInterface $entityManager = null,
         ?WidgetTypeRegistry $registry = null,
+        ?PageRevisionStore $pageRevisionStore = null,
     ): DocumentService {
         $em = $entityManager ?? $this->createStub(EntityManagerInterface::class);
 
@@ -648,6 +706,8 @@ final class DocumentServiceTest extends TestCase
                 new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
             ),
             new WidgetPropsMerger(),
+            new GrapesDocumentSanitizer(),
+            $pageRevisionStore,
         );
     }
 

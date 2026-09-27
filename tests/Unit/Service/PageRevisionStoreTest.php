@@ -29,6 +29,14 @@ final class PageRevisionStoreTest extends TestCase
     }
 
     #[Test]
+    public function snapshotReturnsNullWhenLivePayloadMissing(): void
+    {
+        $store = $this->createStore(enabled: true);
+
+        self::assertNull($store->snapshot(new BuilderPage(), 'empty'));
+    }
+
+    #[Test]
     public function snapshotPersistsRevisionWhenEnabled(): void
     {
         $em = $this->createMock(EntityManagerInterface::class);

@@ -197,6 +197,69 @@ final class PageRevisionServiceTest extends TestCase
     }
 
     #[Test]
+    public function diffThrowsWhenRevisionMissing(): void
+    {
+        $service = new PageRevisionService(
+            $this->store(enabled: true),
+            $this->documentService(),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->diff((new BuilderPage())->setPageKey('home'), 404);
+    }
+
+    #[Test]
+    public function diffCollectsLiveLocaleProps(): void
+    {
+        $page     = (new BuilderPage())->setPageKey('home');
+        $document = (new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>live</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]);
+        $document->upsertLocale('es', ['w1' => ['text' => 'Hola']]);
+        $page->setDocument($document);
+
+        $revision = (new BuilderPageRevision())
+            ->setPage($page)
+            ->setStructure($document->getStructure())
+            ->setWidgetPropsByLocale(['es' => ['w1' => ['text' => 'Hola']]]);
+        $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
+        $idProp->setValue($revision, 9);
+
+        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private readonly BuilderPageRevision $revision)
+            {
+            }
+
+            public function findByPageNewestFirst(BuilderPage $page): array
+            {
+                return [];
+            }
+
+            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            {
+                return null;
+            }
+
+            public function findOneForPage(BuilderPage $page, int $revisionId): ?BuilderPageRevision
+            {
+                return $revisionId === 9 ? $this->revision : null;
+            }
+        };
+
+        $store   = new PageRevisionStore($this->createStub(EntityManagerInterface::class), $repo, enabled: true);
+        $service = new PageRevisionService($store, $this->documentService());
+        $diff    = $service->diff($page, 9);
+
+        self::assertSame(9, $diff['revisionId']);
+        self::assertTrue($diff['identical']);
+    }
+
+    #[Test]
     public function accessorsAndCreateUseUnderlyingStore(): void
     {
         $page = (new BuilderPage())->setPageKey('home');
