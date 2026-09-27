@@ -18,6 +18,7 @@ use function libxml_use_internal_errors;
 use function preg_replace;
 use function preg_replace_callback;
 use function rawurldecode;
+use function str_ireplace;
 use function trim;
 
 use const ENT_HTML5;
@@ -114,9 +115,18 @@ final readonly class GrapesDocumentSanitizer
 
     /**
      * Decode HTML/URL encoding that libxml applies inside {{ }}, {% %} and {# #} tokens.
+     *
+     * Attribute values may be fully percent-encoded (`{{` → `%7B%7B`), so restore
+     * delimiter bytes before matching Twig tokens and decoding spaces.
      */
     private function restoreTwigDelimiters(string $html): string
     {
+        $html = str_ireplace(
+            ['%7B%7B', '%7D%7D', '%7B%25', '%25%7D', '%7B%23', '%23%7D'],
+            ['{{', '}}', '{%', '%}', '{#', '#}'],
+            $html,
+        );
+
         $restored = preg_replace_callback(
             '/\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}/s',
             static function (array $matches): string {
