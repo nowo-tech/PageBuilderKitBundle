@@ -7,7 +7,10 @@ This bundle uses [GitHub Spec Kit](https://github.com/github/spec-kit) with **Cu
 | Path | Role |
 | --- | --- |
 | `specs/001-baseline/spec.md` | Phase 1 product baseline (`FR-*`, `SC-*`) |
-| `specs/001-baseline/code-inventory.md` | Every production file under `src/` mapped to requirements |
+| `specs/001-baseline/code-inventory.md` | Canonical map of every production file under `src/` → requirements (all shipped phases) |
+| `specs/002-phase2-grapesjs/spec.md` | Phase 2 GrapesJS canvas / schema v2 (**shipped** v1.0.0) |
+| `specs/003-phase3-revisions-templates/spec.md` | Phase 3 revisions, templates, I/O, draft preview (**shipped** v1.1.0) |
+| `specs/004-phase4-external-widgets/spec.md` | Phase 4 classic widget packs baseline (**shipped** v1.1.0) |
 | `docs/SPEC-DRIVEN-DEVELOPMENT.md` | User stories, scope, roadmap, `REQ-*` anchors |
 | `.specify/` | Templates and constitution (after `specify init`) |
 | `.cursor/skills/speckit-*/` | Cursor slash commands |
@@ -43,7 +46,7 @@ flowchart TB
 
 ## Maintainer workflow
 
-1. Change code → update baseline spec + inventory when behavior or files change.
+1. Change code → update the relevant phase spec (`001`–`004`) and the canonical `code-inventory.md` when behavior or files change.
 2. Change integrator-visible behavior → update `docs/USAGE.md` / `docs/CONFIGURATION.md` / `docs/ARCHITECTURE.md`.
 3. Run `make test`, `make phpstan`, `make release-check` before merge.
 
@@ -61,3 +64,6 @@ Full tooling manual: upstream [Spec Kit documentation](https://github.github.io/
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Mermaid system / ORM / lifecycle diagrams
 - [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md)
 - [specs/001-baseline/spec.md](../specs/001-baseline/spec.md)
+- [specs/002-phase2-grapesjs/spec.md](../specs/002-phase2-grapesjs/spec.md)
+- [specs/003-phase3-revisions-templates/spec.md](../specs/003-phase3-revisions-templates/spec.md)
+- [specs/004-phase4-external-widgets/spec.md](../specs/004-phase4-external-widgets/spec.md)

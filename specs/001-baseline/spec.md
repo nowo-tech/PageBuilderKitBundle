@@ -4,13 +4,21 @@
 **Namespace:** `Nowo\PageBuilderKitBundle`  
 **Bundle class:** `Nowo\PageBuilderKitBundle\NowoPageBuilderKitBundle`  
 **Config alias:** `nowo_page_builder_kit`  
-**Status:** 1.0.0 (initial release, Phase 1 shipped)
+**Status:** Phase 1 shipped (v1.0.0). Phases 2–4 are shipped (2–3 full; 4 baseline) and documented in sibling Spec Kit dirs (not out of scope).
 
 ## Overview
 
 Page Builder Kit Bundle is a reusable Symfony visual page builder backed by Doctrine. Phase 1 delivers a section/column/widget document model, admin canvas with drag-and-drop, CSRF-protected JSON document API, locale-specific widget props, publish workflow, and Twig-based public rendering for six core widget types.
 
-Phases 2–4 (nesting/styles, revisions/templates, external widgets) are documented in [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap-phases-2-4) and are **out of scope** for this baseline unless explicitly added later.
+Later phases (shipped):
+
+- Phase 2 — GrapesJS canvas / schema v2: [`specs/002-phase2-grapesjs/spec.md`](../002-phase2-grapesjs/spec.md)
+- Phase 3 — Revisions and templates: [`specs/003-phase3-revisions-templates/spec.md`](../003-phase3-revisions-templates/spec.md)
+- Phase 4 — External classic widget packs (baseline): [`specs/004-phase4-external-widgets/spec.md`](../004-phase4-external-widgets/spec.md)
+
+Roadmap and optional follow-ups: [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
+
+Canonical production inventory (all phases): [`code-inventory.md`](code-inventory.md).
 
 ## User scenarios (`US-*`)
 
@@ -69,7 +77,7 @@ As a maintainer, I boot the Symfony 8 FrankenPHP demo on port **8137** and run Q
 | --- | --- |
 | FR-REN-001 | `PageRenderProvider::getRenderedTree()` merges structure, props, and locale fallback |
 | FR-REN-002 | Twig function `nowo_page_builder_render()` exposes the rendered tree |
-| FR-REN-003 | Route `/p/{pageKey}` renders published pages only |
+| FR-REN-003 | Route `/p/{pageKey}` renders published pages (draft preview for editors is Phase 3 — see FR-P3-PREV-001) |
 | FR-REN-004 | Public templates live under `@NowoPageBuilderKitBundle/widgets/` |
 
 ### Security (`FR-SEC-*`)
@@ -104,12 +112,19 @@ As a maintainer, I boot the Symfony 8 FrankenPHP demo on port **8137** and run Q
 | FR-DEMO-001 | Symfony 8 FrankenPHP demo defaults to port **8137** |
 | FR-QA-001 | Tests, docs, and Spec Kit baseline validate Phase 1 behavior |
 
-## Non-goals (Phase 1)
+## Non-goals (this baseline)
 
-- Nested sections/widgets beyond flat section → column → widget (Phase 2)
-- Revision history UI (Phase 3; entity exists but no admin surface)
-- External widget marketplace (Phase 4)
+Historical Phase 1 non-goals that are **now shipped** elsewhere:
+
+- Nested classic widgets / Grapes free-form layout → Phase 2 (`002-phase2-grapesjs`)
+- Revision history UI, templates, duplicate, import/export → Phase 3 (`003-phase3-revisions-templates`)
+
+Still deferred (not Phase 1–4 baseline acceptance criteria):
+
+- External widget / template marketplace or sharing across projects
+- Grapes block packs (Phase 4 follow-up)
 - Full theme/site builder ownership for host applications
+- Optional follow-ups listed in [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)
 
 ## Success criteria (`SC-*`)
 
@@ -117,7 +132,7 @@ As a maintainer, I boot the Symfony 8 FrankenPHP demo on port **8137** and run Q
 | --- | --- |
 | SC-01 | Editors can create a page and save a document from the canvas |
 | SC-02 | Published pages render at `/p/{pageKey}` or via `nowo_page_builder_render()` |
-| SC-03 | `code-inventory.md` maps all production files under `src/` (68 files) |
+| SC-03 | [`code-inventory.md`](code-inventory.md) maps all production files under `src/` (current tree; all shipped phases) |
 | SC-04 | Demo answers on `http://localhost:8137` |
 | SC-05 | `make demo-smoke` returns HTTP 200 |
 
@@ -133,4 +148,4 @@ make release-check
 
 ## Related requirements
 
-See `docs/SPEC-DRIVEN-DEVELOPMENT.md` for `REQ-*` traceability and Phases 2–4 roadmap.
+See `docs/SPEC-DRIVEN-DEVELOPMENT.md` for `REQ-*` traceability and the full roadmap.

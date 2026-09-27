@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Spec Kit: formal closure of Phase 2–4 docs — `specs/002-phase2-grapesjs`, `specs/003-phase3-revisions-templates`, `specs/004-phase4-external-widgets`, refreshed canonical `code-inventory.md` (no runtime changes).
+
 ## [1.1.0] - 2026-09-27
 
 ### Added
