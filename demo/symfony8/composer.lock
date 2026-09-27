@@ -1040,11 +1040,11 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "bcf3f59f495a29bef4b078832aff58dc13aceceb"
+                "reference": "d810fb7ec6e38f02483cb917b54a587e9ed42356"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",
-                "doctrine/orm": "^2.15 || ^3.0",
+                "doctrine/orm": "^3.7",
                 "nowo-tech/form-kit-bundle": "^2.4",
                 "nowo-tech/ui-kit-bundle": "^1.4",
                 "php": ">=8.4 <8.6",

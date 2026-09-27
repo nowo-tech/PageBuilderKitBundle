@@ -11,6 +11,7 @@ All options live under the root key `nowo_page_builder_kit`.
 - [doctrine](#doctrine)
 - [html.sanitize](#htmlsanitize)
 - [revisions](#revisions)
+- [debug](#debug)
 - [grapesjs](#grapesjs)
 - [Twig integration](#twig-integration)
 - [Examples](#examples)
@@ -46,6 +47,8 @@ nowo_page_builder_kit:
         max_per_page: 50
         on_save: true
         on_publish: true
+    debug:
+        collector: true   # Web Profiler panel; only when kernel.debug is true
     grapesjs:
         enabled: true
         cdn_version: '0.22.9'
@@ -102,6 +105,7 @@ Production hosts should prefer `html.sanitize.strategy: allowlist` when untruste
 | `doctrine` | map | see YAML | Table prefixing and connection name for host alignment. |
 | `html` | map | see YAML | Rich-text sanitization for widgets that store HTML. |
 | `revisions` | map | see YAML | Optional document version history (`BuilderPageRevision`). |
+| `debug` | map | see YAML | Web Profiler DataCollector (dev only). |
 | `grapesjs` | map | see YAML | GrapesJS canvas engine options. |
 
 ## revisions
@@ -113,7 +117,15 @@ Production hosts should prefer `html.sanitize.strategy: allowlist` when untruste
 | `on_save` | `true` | Snapshot the previous live document before each admin save. |
 | `on_publish` | `true` | Snapshot the live document when publishing (labeled `Published …`). |
 
-Admin: `/admin/page-builder/pages/{pageKey}/revisions` · JSON: `…/revisions.json`. Twig: `nowo_page_builder_revisions_enabled()`.
+Admin: `/admin/page-builder/pages/{pageKey}/revisions` · JSON: `…/revisions.json` · Diff: `…/revisions/{id}/diff`. Twig: `nowo_page_builder_revisions_enabled()`.
+
+## debug
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `collector` | `true` | When `kernel.debug` is also true, registers the **Page Builder Kit** Web Debug Toolbar panel (`nowo_page_builder_kit`). Shows renders (engine, Twig apply/error, context key names, timings), public `/p/{pageKey}` outcomes, and admin actions. Disabled automatically in production. Set `false` to opt out in `dev`. |
+
+No HTML/CSS document dumps are collected (size / PII). FrankenPHP-safe via `kernel.reset` on the request-scoped trace.
 
 ## security
 

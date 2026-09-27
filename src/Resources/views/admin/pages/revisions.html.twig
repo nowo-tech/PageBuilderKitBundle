@@ -50,7 +50,11 @@
                                 {% set _engine = revision.structure.engine|default('classic') %}
                                 <span class="badge bg-secondary">{{ _engine }}</span>
                             </td>
-                            <td class="text-end">
+                            <td class="text-end d-flex gap-2 justify-content-end">
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   href="{{ path('admin_page_builder_revisions_diff', {pageKey: page_key, revisionId: revision.id}) }}">
+                                    {{ 'admin.revisions.diff'|trans }}
+                                </a>
                                 <form method="post"
                                       action="{{ path('admin_page_builder_revisions_restore', {pageKey: page_key, revisionId: revision.id}) }}"
                                       onsubmit="return confirm({{ ('admin.revisions.restore_confirm')|trans|json_encode|raw }});">

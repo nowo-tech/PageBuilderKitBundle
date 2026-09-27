@@ -130,6 +130,61 @@ final readonly class DocumentService
         return $page;
     }
 
+    /**
+     * Clone structure, locale props, and translations into a new draft page.
+     */
+    public function duplicatePage(BuilderPage $source, string $newPageKey, ?string $title = null): BuilderPage
+    {
+        $sourceDocument = $source->getDocument();
+        if (!$sourceDocument instanceof BuilderDocument) {
+            throw new InvalidArgumentException(sprintf('Page "%s" has no document.', $source->getPageKey()));
+        }
+
+        $defaultLocale    = $this->builderLocales->getDefault();
+        $firstTranslation = $source->getTranslations()->first();
+        $sourceTitle      = $source->getTranslation($defaultLocale)?->getTitle()
+            ?? ($firstTranslation instanceof BuilderPageTranslation ? $firstTranslation->getTitle() : null)
+            ?? $source->getPageKey();
+        $newTitle = $title !== null && trim($title) !== '' ? trim($title) : $sourceTitle . ' (copy)';
+
+        $page = $this->createPage($newPageKey, $newTitle, $defaultLocale);
+
+        $props = [];
+        foreach ($sourceDocument->getLocales() as $localeDocument) {
+            $props[$localeDocument->getLocale()] = $localeDocument->getWidgetProps();
+        }
+
+        $this->saveDocument($page, $sourceDocument->getStructure(), $props);
+
+        foreach ($source->getTranslations() as $sourceTranslation) {
+            $locale = $sourceTranslation->getLocale();
+            if (!in_array($locale, $this->builderLocales->getAll(), true)) {
+                continue;
+            }
+
+            $translation = $page->getTranslation($locale);
+            if (!$translation instanceof BuilderPageTranslation) {
+                $translation = (new BuilderPageTranslation())->setLocale($locale);
+                $page->addTranslation($translation);
+            }
+
+            $translation
+                ->setTitle($locale === $defaultLocale ? $newTitle : $sourceTranslation->getTitle())
+                ->setSlug($locale === $defaultLocale ? $page->getPageKey() : $sourceTranslation->getSlug())
+                ->setMetaTitle($sourceTranslation->getMetaTitle())
+                ->setMetaDescription($sourceTranslation->getMetaDescription())
+                ->setOgTitle($sourceTranslation->getOgTitle())
+                ->setOgDescription($sourceTranslation->getOgDescription())
+                ->setOgImage($sourceTranslation->getOgImage())
+                ->setCanonicalUrl($sourceTranslation->getCanonicalUrl())
+                ->setRobots($sourceTranslation->getRobots());
+        }
+
+        $this->flushPage($page);
+
+        return $page;
+    }
+
     public function publish(BuilderPage $page): void
     {
         if ($this->pageRevisionStore?->isOnPublish() === true) {

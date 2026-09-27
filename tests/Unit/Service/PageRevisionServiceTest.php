@@ -115,6 +115,63 @@ final class PageRevisionServiceTest extends TestCase
         $service->restore((new BuilderPage())->setPageKey('x'), 99);
     }
 
+    #[Test]
+    public function diffComparesLiveDocumentAgainstRevision(): void
+    {
+        $page = (new BuilderPage())->setPageKey('home');
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>live</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]));
+
+        $revision = (new BuilderPageRevision())
+            ->setPage($page)
+            ->setStructure([
+                'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'          => '<p>old</p>',
+                'css'           => '',
+                'grapes'        => [],
+                'localeContent' => [],
+            ])
+            ->setWidgetPropsByLocale([]);
+        $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
+        $idProp->setValue($revision, 3);
+
+        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private readonly BuilderPageRevision $revision)
+            {
+            }
+
+            public function findByPageNewestFirst(BuilderPage $page): array
+            {
+                return [];
+            }
+
+            public function findLatestForPage(BuilderPage $page): ?BuilderPageRevision
+            {
+                return null;
+            }
+
+            public function findOneForPage(BuilderPage $page, int $revisionId): ?BuilderPageRevision
+            {
+                return $revisionId === 3 ? $this->revision : null;
+            }
+        };
+
+        $store   = new PageRevisionStore($this->createStub(EntityManagerInterface::class), $repo, enabled: true);
+        $service = new PageRevisionService($store, $this->documentService());
+        $diff    = $service->diff($page, 3);
+
+        self::assertSame(3, $diff['revisionId']);
+        self::assertFalse($diff['identical']);
+        self::assertTrue($diff['structureChanged']);
+    }
+
     private function store(bool $enabled): PageRevisionStore
     {
         $repo = new class implements BuilderPageRevisionRepositoryInterface {

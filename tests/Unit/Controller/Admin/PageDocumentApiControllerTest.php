@@ -13,6 +13,7 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
+use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
@@ -67,11 +68,18 @@ final class PageDocumentApiControllerTest extends TestCase
             static fn (CsrfToken $token): bool => $token->getValue() === 'ok',
         );
 
+        $importExport = new DocumentImportExportService(
+            $documents,
+            new DocumentNormalizer(),
+            new BuilderLocales('es', ['es', 'en']),
+        );
+
         $controller = new PageDocumentApiController(
             $repo,
             $documents,
             new DocumentNormalizer(),
             $csrf,
+            $importExport,
         );
 
         $request = Request::create('/admin/page-builder/pages/home/unpublish', 'POST');

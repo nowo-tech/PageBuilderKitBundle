@@ -1,0 +1,67 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.templates.title'|trans }}{% endblock %}
+
+{% block header_actions %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+{% endblock %}
+
+{% block admin %}
+    <p class="text-muted">{{ 'admin.templates.hint'|trans }}</p>
+
+    <section class="mb-4">
+        <h2 class="h5">{{ 'admin.templates.save_from_page'|trans }}</h2>
+        {% if pages is empty %}
+            <p class="text-muted">{{ 'admin.pages.empty'|trans }}</p>
+        {% else %}
+            {% for page in pages %}
+                <form method="post"
+                      action="{{ path('admin_page_builder_templates_save', {pageKey: page.pageKey}) }}"
+                      class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <span class="me-2"><code>{{ page.pageKey }}</code></span>
+                    <input name="templateKey" class="form-control form-control-sm" style="max-width:10rem" pattern="[a-z0-9_-]+" placeholder="{{ 'admin.templates.key'|trans }}" required>
+                    <input name="label" class="form-control form-control-sm" style="max-width:12rem" placeholder="{{ 'admin.templates.label'|trans }}" required>
+                    <button type="submit" class="btn btn-success btn-sm">{{ 'admin.templates.save'|trans }}</button>
+                </form>
+            {% endfor %}
+        {% endif %}
+    </section>
+
+    {% if templates is empty %}
+        <p class="text-muted">{{ 'admin.templates.empty'|trans }}</p>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>{{ 'admin.templates.key'|trans }}</th>
+                        <th>{{ 'admin.templates.label'|trans }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                        <tr>
+                            <td><code>{{ template.templateKey }}</code></td>
+                            <td>{{ template.label }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ path('admin_page_builder_templates_apply', {templateKey: template.templateKey}) }}" class="d-inline-flex gap-1 mb-1">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                    <input class="form-control form-control-sm" name="pageKey" placeholder="{{ 'form.page_key'|trans }}" required pattern="[a-z0-9_-]+">
+                                    <input class="form-control form-control-sm" name="title" placeholder="{{ 'form.page_title'|trans }}">
+                                    <button class="btn btn-primary btn-sm" type="submit">{{ 'admin.templates.apply'|trans }}</button>
+                                </form>
+                                <form method="post" action="{{ path('admin_page_builder_templates_delete', {templateKey: template.templateKey}) }}" class="d-inline" onsubmit="return confirm({{ ('admin.templates.delete_confirm')|trans|json_encode|raw }});">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">{{ 'admin.templates.delete'|trans }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

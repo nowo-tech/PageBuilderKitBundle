@@ -11,5 +11,10 @@ interface PageRenderProviderInterface
      *
      * @return array<string, mixed>
      */
-    public function getRenderedTree(string $pageKey, ?string $locale = null, array $context = []): array;
+    public function getRenderedTree(
+        string $pageKey,
+        ?string $locale = null,
+        array $context = [],
+        bool $draftPreview = false,
+    ): array;
 }

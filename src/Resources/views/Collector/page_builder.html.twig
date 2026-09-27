@@ -1,0 +1,150 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% block toolbar %}
+    {% set icon %}
+        <span class="icon">PBK</span>
+        <span class="sf-toolbar-value">{{ collector.renderCount }}</span>
+    {% endset %}
+    {% set text %}
+        <div class="sf-toolbar-info-piece">
+            <b>Renders</b>
+            <span>{{ collector.renderCount }}</span>
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Admin prefix</b>
+            <span>{{ collector.pathPrefix }}</span>
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Revisions</b>
+            <span>{{ collector.revisionsEnabled ? 'on' : 'off' }}</span>
+        </div>
+    {% endset %}
+    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { link: collector.renderCount > 0 or collector.publicOutcomes|length > 0 or collector.adminActions|length > 0 }) }}
+{% endblock %}
+
+{% block menu %}
+    <span class="label {{ collector.renderCount == 0 and collector.publicOutcomes|length == 0 and collector.adminActions|length == 0 ? 'disabled' }}">
+        <span class="icon">PBK</span>
+        <strong>Page Builder</strong>
+        <span class="count">
+            <span>{{ collector.renderCount }}</span>
+        </span>
+    </span>
+{% endblock %}
+
+{% block panel %}
+    <h2>Page Builder Kit</h2>
+
+    <div class="metrics">
+        <div class="metric">
+            <span class="value">{{ collector.renderCount }}</span>
+            <span class="label">Renders</span>
+        </div>
+        <div class="metric">
+            <span class="value">{{ collector.pathPrefix }}</span>
+            <span class="label">Admin path prefix</span>
+        </div>
+        <div class="metric">
+            <span class="value">{{ collector.revisionsEnabled ? 'enabled' : 'disabled' }}</span>
+            <span class="label">Revisions</span>
+        </div>
+    </div>
+
+    <h3>Public outcomes</h3>
+    {% if collector.publicOutcomes is empty %}
+        <div class="empty"><p>No public /p/{pageKey} hits in this request.</p></div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>pageKey</th>
+                    <th>outcome</th>
+                    <th>locale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in collector.publicOutcomes %}
+                    <tr>
+                        <td>{{ row.pageKey }}</td>
+                        <td>{{ row.outcome }}</td>
+                        <td>{{ row.locale|default('—') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <h3>Renders</h3>
+    {% if collector.renders is empty %}
+        <div class="empty"><p>No <code>PageRenderProvider</code> renders in this request.</p></div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>pageKey</th>
+                    <th>locale</th>
+                    <th>status</th>
+                    <th>engine</th>
+                    <th>Twig</th>
+                    <th>context keys</th>
+                    <th>timings (ms)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in collector.renders %}
+                    <tr>
+                        <td>
+                            {{ row.pageKey }}
+                            {% if row.draftPreview|default(false) %}
+                                <span class="badge status-warning">draft preview</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ row.locale }}</td>
+                        <td>{{ row.status }}</td>
+                        <td>{{ row.engine }}</td>
+                        <td>
+                            {% if row.twigApplied|default(false) %}
+                                applied
+                            {% elseif row.twigError|default(null) %}
+                                <span class="badge status-error">error</span>
+                                <br><small>{{ row.twigError }}</small>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td><code>{{ (row.contextKeys|default([]))|join(', ') }}</code></td>
+                        <td>
+                            {% for name, ms in row.timingsMs|default({}) %}
+                                {{ name }}: {{ ms }}{% if not loop.last %}; {% endif %}
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <h3>Admin actions</h3>
+    {% if collector.adminActions is empty %}
+        <div class="empty"><p>No admin document actions in this request.</p></div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>action</th>
+                    <th>pageKey</th>
+                    <th>revisionId</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in collector.adminActions %}
+                    <tr>
+                        <td>{{ row.action }}</td>
+                        <td>{{ row.pageKey }}</td>
+                        <td>{{ row.revisionId|default('—') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

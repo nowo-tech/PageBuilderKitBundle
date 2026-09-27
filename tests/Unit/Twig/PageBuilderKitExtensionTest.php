@@ -54,8 +54,14 @@ final class PageBuilderKitExtensionTest extends TestCase
 
         $registry       = new WidgetTypeRegistry([$heading]);
         $renderProvider = new class implements PageRenderProviderInterface {
-            public function getRenderedTree(string $pageKey, ?string $locale = null, array $context = []): array
-            {
+            public function getRenderedTree(
+                string $pageKey,
+                ?string $locale = null,
+                array $context = [],
+                bool $draftPreview = false,
+            ): array {
+                unset($draftPreview);
+
                 return ['pageKey' => $pageKey, 'sections' => [], 'context' => $context];
             }
         };

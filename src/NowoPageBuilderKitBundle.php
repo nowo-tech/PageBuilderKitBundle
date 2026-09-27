@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\TwigPathsPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetTypePass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
@@ -20,6 +21,7 @@ final class NowoPageBuilderKitBundle extends Bundle
     {
         $container->addCompilerPass(new TwigPathsPass());
         $container->addCompilerPass(new WidgetTypePass());
+        $container->addCompilerPass(new WidgetPackPass());
 
         $entityDir = __DIR__ . '/Entity';
         if (is_dir($entityDir)) {

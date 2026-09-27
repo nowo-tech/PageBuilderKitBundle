@@ -9,14 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [[Unreleased]](#unreleased)
 
+- [[1.1.0] - 2026-09-27](#110---2026-09-27)
+
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
 
-### Changed
-
-- **Doctrine ORM SortDirection:** replace string `'ASC'`/`'DESC'` in `#[ORM\OrderBy]` and QueryBuilder `orderBy`/`addOrderBy` with `SortDirection::Ascending`/`Descending` (doctrine/orm deprecation, https://github.com/doctrine/orm/issues/11313); require `doctrine/orm` `^3.7` where applicable.
-
+## [1.1.0] - 2026-09-27
 
 ### Added
 
@@ -26,11 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate page**, JSON **export/import** (`DocumentImportExportService`, `formatVersion: 1`).
 - **Page templates** library (`BuilderPageTemplate`, admin `/templates`).
 - **Widget packs** (`WidgetPackInterface`, `WidgetPackRegistry`) + [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
-- **REQ-DEMO-013:** Playwright e2e under `demo/symfony8/e2e/` (`make test-e2e`), `demo-screenshots` target, and README gallery cropped to GrapesJS canvas / public compounds (`docs/images/demo/overview.png`, `interaction.png`).
+- Admin SEO / create forms: Bootstrap 5 form theme + card sections for clearer layout.
+- **REQ-DEMO-013:** Playwright e2e; demo screenshots capture full viewport context including the Symfony Web Profiler toolbar (`docs/images/demo/overview.png`, `interaction.png`).
 
 ### Changed
 
+- **Doctrine ORM SortDirection:** replace string `'ASC'`/`'DESC'` in `#[ORM\OrderBy]` and QueryBuilder ordering with `SortDirection` instances; require `doctrine/orm` `^3.7`.
 - Spec Kit roadmap aligned with shipped Phase 3/4 and DX collector ([SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md)).
+
+### Notes
+
+- Hosts upgrading from 1.0.0 need a Doctrine schema update for `pb_page_template`. See [UPGRADING.md](UPGRADING.md#110).
 
 ## [1.0.0] - 2026-09-27
 

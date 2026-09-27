@@ -4,7 +4,22 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+
+## 1.1.0
+
+From **1.0.0**:
+
+1. Bump the package constraint to `^1.1` and run `composer update nowo-tech/page-builder-kit-bundle`.
+2. Ensure `doctrine/orm` is `^3.7` (required for `SortDirection` in association `OrderBy` / QueryBuilder).
+3. Run Doctrine schema update / migration for new table `pb_page_template` (`BuilderPageTemplate`).
+4. `/p/{pageKey}` now renders **drafts** for users who pass the access checker (sticky banner). Anonymous visitors still receive 404 for drafts — review if you relied on “always 404 while draft” for logged-in editors.
+5. Optional: keep `debug.collector: true` (default) in `dev` for the Web Profiler **PBK** panel; set `false` to disable.
+6. New admin routes: templates, duplicate, export/import, revision diff — no breaking route renames.
+7. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#110---2026-09-27) and [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
 
 ## 1.0.0 — first release
 
@@ -37,6 +52,8 @@ nowo_page_builder_kit:
         table_prefix: ''          # e.g. 'app_' in shared DBs
     revisions:
         enabled: false            # set true to keep document history
+    debug:
+        collector: true           # Web Profiler PBK panel when kernel.debug
     grapesjs:
         enabled: true
         allow_scripts: false
@@ -48,7 +65,7 @@ nowo_page_builder_kit:
 
 ### Public pages and i18n routes
 
-- Bundle convenience route: `/p/{pageKey}` (published only; locale from the request).
+- Bundle convenience route: `/p/{pageKey}` (published for everyone; draft preview for editors since 1.1.0 — see above).
 - Production sites should map host routes → `pageKey` + locale (same path + locale **or** different paths per language). See [USAGE.md](USAGE.md#associating-pages-with-public-routes-i18n).
 
 ### Optional demo

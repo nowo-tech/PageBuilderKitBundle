@@ -6,6 +6,10 @@ namespace Nowo\PageBuilderKitBundle\DependencyInjection;
 
 use Doctrine\ORM\Events;
 use LogicException;
+use Nowo\PageBuilderKitBundle\DataCollector\PageBuilderKitDataCollector;
+use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
@@ -26,6 +30,7 @@ use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
+use Nowo\PageBuilderKitBundle\Widget\WidgetPackInterface;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -117,6 +122,11 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.revisions.on_save', $config['revisions']['on_save']);
         $container->setParameter('nowo_page_builder_kit.revisions.on_publish', $config['revisions']['on_publish']);
 
+        $kernelDebug      = $container->hasParameter('kernel.debug') && (bool) $container->getParameter('kernel.debug');
+        $collectorEnabled = $kernelDebug && (bool) $config['debug']['collector'];
+        $container->setParameter('nowo_page_builder_kit.debug.collector', $collectorEnabled);
+        $this->registerDebugCollector($container, $collectorEnabled, $config);
+
         $container->getDefinition(BuilderLocales::class)
             ->setArgument('$defaultLocale', $config['default_locale'])
             ->setArgument('$locales', $config['locales']);
@@ -169,11 +179,15 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
         if ($container->hasDefinition(PageRenderProvider::class)) {
             $container->getDefinition(PageRenderProvider::class)
-                ->setArgument('$twigContextProviders', new TaggedIteratorArgument('nowo_page_builder_kit.grapes_twig_context'));
+                ->setArgument('$twigContextProviders', new TaggedIteratorArgument('nowo_page_builder_kit.grapes_twig_context'))
+                ->setArgument('$trace', new Reference(PageBuilderKitTraceInterface::class));
         }
 
         $container->registerForAutoconfiguration(GrapesTwigContextProviderInterface::class)
             ->addTag('nowo_page_builder_kit.grapes_twig_context');
+
+        $container->registerForAutoconfiguration(WidgetPackInterface::class)
+            ->addTag('nowo_page_builder_kit.widget_pack');
 
         if (
             !$config['security']['allow_unauthenticated']
@@ -332,6 +346,38 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             ->setArguments([
                 new Reference(PageBuilderProtectionConfig::class),
                 $customSanitizer !== null ? new Reference($customSanitizer) : null,
+            ]);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function registerDebugCollector(ContainerBuilder $container, bool $enabled, array $config): void
+    {
+        if (!$enabled) {
+            $container->setAlias(PageBuilderKitTraceInterface::class, NullPageBuilderKitTrace::class);
+
+            return;
+        }
+
+        $container->register(PageBuilderKitTrace::class)
+            ->setAutowired(true)
+            ->setAutoconfigured(true)
+            ->addTag('kernel.reset', ['method' => 'reset']);
+
+        $container->setAlias(PageBuilderKitTraceInterface::class, PageBuilderKitTrace::class);
+
+        $container->register(PageBuilderKitDataCollector::class)
+            ->setAutowired(false)
+            ->setArguments([
+                new Reference(PageBuilderKitTraceInterface::class),
+                (string) $config['web_ui']['path_prefix'],
+                (bool) $config['revisions']['enabled'],
+            ])
+            ->addTag('data_collector', [
+                'template' => '@NowoPageBuilderKitBundle/Collector/page_builder.html.twig',
+                'id'       => PageBuilderKitDataCollector::NAME,
+                'priority' => 250,
             ]);
     }
 

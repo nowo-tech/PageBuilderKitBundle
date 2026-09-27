@@ -6,6 +6,8 @@ services:
     Nowo\PageBuilderKitBundle\:
         resource: '../../*'
         exclude:
+            - '../../DataCollector/'
+            - '../../Debug/'
             - '../../DependencyInjection/'
             - '../../Entity/'
             - '../../Media/LocalFilesystemAssetStorage.php'
@@ -15,6 +17,18 @@ services:
             - '../../Security/PageBuilderProtection.php'
             - '../../Security/PageBuilderProtectionConfig.php'
             - '../../Security/Html/'
+
+    Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace: ~
+
+    Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface:
+        alias: Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace
+
+    Nowo\PageBuilderKitBundle\Widget\WidgetPackRegistry:
+        arguments:
+            $packs: []
+
+    Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface:
+        alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepository
 
     Nowo\PageBuilderKitBundle\Controller\:
         resource: '../../Controller/'

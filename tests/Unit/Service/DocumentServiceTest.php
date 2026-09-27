@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
@@ -99,6 +100,75 @@ final class DocumentServiceTest extends TestCase
         $page = (new BuilderPage())->setPageKey('home');
 
         self::assertSame($page, $this->createService($page)->loadPageByKey('home'));
+    }
+
+    #[Test]
+    public function duplicatePageCreatesDraftCopy(): void
+    {
+        $source = (new BuilderPage())->setPageKey('home')->setUuid('11111111-1111-4111-8111-111111111111');
+        $source->addTranslation(
+            (new BuilderPageTranslation())
+                ->setLocale('es')
+                ->setTitle('Inicio')
+                ->setSlug('inicio'),
+        );
+        $document = (new BuilderDocument())
+            ->setPage($source)
+            ->setStructure([
+                'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'          => '<p>Hi</p>',
+                'css'           => '',
+                'grapes'        => [],
+                'localeContent' => [],
+            ]);
+        $source->setDocument($document);
+
+        $pages = ['home' => $source];
+        $repo  = new class($pages) implements BuilderPageRepositoryInterface {
+            /** @param array<string, BuilderPage> $pages */
+            public function __construct(private array &$pages)
+            {
+            }
+
+            public function findOneByPageKey(string $pageKey): ?BuilderPage
+            {
+                return $this->pages[$pageKey] ?? null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return array_values($this->pages);
+            }
+
+            public function put(BuilderPage $page): void
+            {
+                $this->pages[$page->getPageKey()] = $page;
+            }
+        };
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(static function (object $entity) use ($repo): void {
+            if ($entity instanceof BuilderPage) {
+                $repo->put($entity);
+            }
+        });
+
+        $service = new DocumentService(
+            $repo,
+            $em,
+            new BuilderLocales('es', ['es', 'en']),
+            new DocumentNormalizer(),
+            WidgetTypesFixture::registry(),
+            new PageBuilderProtection(new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null)),
+            new WidgetPropsMerger(),
+        );
+
+        $clone = $service->duplicatePage($source, 'home-copy');
+
+        self::assertSame('home-copy', $clone->getPageKey());
+        self::assertSame(PageStatus::Draft, $clone->getStatus());
+        self::assertStringContainsString('copy', $clone->getTranslation('es')?->getTitle() ?? '');
     }
 
     #[Test]

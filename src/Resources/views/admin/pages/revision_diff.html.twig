@@ -1,0 +1,31 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.revisions.diff_title'|trans({'%key%': page_key, '%id%': revisionId}) }}{% endblock %}
+
+{% block header_actions %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">
+        {{ 'admin.pages.revisions'|trans }}
+    </a>
+{% endblock %}
+
+{% block admin %}
+    {% if diff.identical %}
+        <p class="text-muted">{{ 'admin.revisions.diff_identical'|trans }}</p>
+    {% else %}
+        <p>{{ 'admin.revisions.diff_hint'|trans }}</p>
+        <ul>
+            {% for line in diff.summary %}
+                <li>{{ line }}</li>
+            {% endfor %}
+        </ul>
+        {% if diff.changedPaths is not empty %}
+            <h2 class="h5">{{ 'admin.revisions.diff_paths'|trans }}</h2>
+            <ul class="small">
+                {% for path in diff.changedPaths|slice(0, 80) %}
+                    <li><code>{{ path }}</code></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endif %}
+{% endblock %}

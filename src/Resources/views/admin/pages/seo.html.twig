@@ -1,10 +1,15 @@
 {% extends nowo_page_builder_layout_template() %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
+{% set _css_fw = nowo_page_builder_css_framework() %}
+{% if _css_fw starts with 'bootstrap' or _css_fw == 'tabler' %}
+    {% form_theme form 'bootstrap_5_layout.html.twig' %}
+{% endif %}
+
 {% block page_title %}{{ 'admin.seo.title'|trans({'%key%': page_key}) }}{% endblock %}
 
 {% block header_actions %}
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
         {% if nowo_page_builder_revisions_enabled() %}
             <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
@@ -23,20 +28,44 @@
         {% endfor %}
     </ul>
 
-    <p class="text-muted small">{{ 'admin.seo.hint'|trans }}</p>
+    <p class="text-muted small mb-4">{{ 'admin.seo.hint'|trans }}</p>
 
-    {{ form_start(form) }}
-        <div class="row g-3">
-            <div class="col-md-6">{{ form_row(form.title) }}</div>
-            <div class="col-md-6">{{ form_row(form.slug) }}</div>
-            <div class="col-md-6">{{ form_row(form.metaTitle) }}</div>
-            <div class="col-md-6">{{ form_row(form.robots) }}</div>
-            <div class="col-12">{{ form_row(form.metaDescription) }}</div>
-            <div class="col-md-6">{{ form_row(form.ogTitle) }}</div>
-            <div class="col-md-6">{{ form_row(form.ogImage) }}</div>
-            <div class="col-12">{{ form_row(form.ogDescription) }}</div>
-            <div class="col-12">{{ form_row(form.canonicalUrl) }}</div>
+    {{ form_start(form, { attr: { class: 'pbk-seo-form' } }) }}
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">{{ 'admin.seo.section_page'|trans }}</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form_row(form.title) }}</div>
+                    <div class="col-md-6">{{ form_row(form.slug) }}</div>
+                </div>
+            </div>
         </div>
-        <button type="submit" class="btn btn-success mt-3">{{ 'admin.seo.save'|trans }}</button>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">{{ 'admin.seo.section_meta'|trans }}</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">{{ form_row(form.metaTitle) }}</div>
+                    <div class="col-md-4">{{ form_row(form.robots) }}</div>
+                    <div class="col-12">{{ form_row(form.metaDescription) }}</div>
+                    <div class="col-12">{{ form_row(form.canonicalUrl) }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">{{ 'admin.seo.section_social'|trans }}</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form_row(form.ogTitle) }}</div>
+                    <div class="col-md-6">{{ form_row(form.ogImage) }}</div>
+                    <div class="col-12">{{ form_row(form.ogDescription) }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-success">{{ 'admin.seo.save'|trans }}</button>
+        </div>
     {{ form_end(form) }}
 {% endblock %}

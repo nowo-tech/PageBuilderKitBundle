@@ -4,9 +4,8 @@
 
 - [Three layers](#three-layers)
 - [User stories](#user-stories)
-- [Functional scope (Phase 1)](#functional-scope-phase-1)
-- [Non-goals and planned phases](#non-goals-and-planned-phases)
-- [Roadmap (Phases 2–4)](#roadmap-phases-2-4)
+- [Functional scope (shipped)](#functional-scope-shipped)
+- [Roadmap](#roadmap)
 - [Validating the spec](#validating-the-spec)
 - [Requirement identifiers (`REQ-*`)](#requirement-identifiers-req-)
 - [Suggested workflow for contributors](#suggested-workflow-for-contributors)
@@ -31,54 +30,48 @@ In this repository, spec-driven development has three layers that stay in sync:
 | US-04 | As an integrator, I configure locales, editor access, admin shell, and HTML sanitization |
 | US-05 | As a maintainer, I run the Symfony 8 FrankenPHP demo and QA checks to verify the bundle boots cleanly |
 | US-06 | As a maintainer, I understand the roadmap for nesting, revisions, and external widgets without surprise scope creep |
+| US-07 | As a developer, I inspect page-builder render/admin activity in the Web Profiler toolbar in `dev` |
 
-## Functional scope (Phase 1)
+## Functional scope (shipped)
 
-**In scope (shipped):**
+**Shipped in v1.0+:**
 
-- Document schema v1: sections, columns, widgets
-- Six core widget types and public Twig templates
-- Admin list, create form, canvas UI, JSON document API with CSRF
-- Publish status and public `/p/{pageKey}` rendering
-- Locale-aware widget props with default-locale fallback
-- Doctrine persistence, optional table prefix, widget type registry
-- Security access checker and HTML sanitize strategies
+- Document schema v1 (classic) and v2 (GrapesJS)
+- Core classic widget types + public Twig templates
+- Admin list, create, canvas, sections, SEO, document JSON API with CSRF
+- Publish / unpublish (draft), public `/p/{pageKey}`
+- Draft **preview** for users who pass `PageBuilderKitAccessCheckerInterface` (banner; anonymous visitors still get 404)
+- Revisions (`revisions.*`): list, create, restore, **diff preview**
+- Page **duplicate**, JSON **export/import**, **templates** library (`BuilderPageTemplate`)
+- Locale-aware props / Grapes `localeContent`, Doctrine optional table prefix
+- Security access checker, HTML sanitize strategies, Twig-in-Grapes sandbox
+- Web Profiler **DataCollector** (`debug.collector`, `kernel.debug` only)
+- External **widget packs** (`WidgetPackInterface` + docs)
 - FrankenPHP demo on port **8137**
 
-**Non-goals for Phase 1:** nested sections, revision UI, page templates library, third-party widget marketplace.
-
-## Non-goals and planned phases
-
-Phases 2–4 are **planned**, not part of the 1.0 contract. The `BuilderPageRevision` entity exists as a persistence hook for Phase 3 but is not exposed in the admin UI in Phase 1.
-
-## Roadmap (Phases 2–4)
+## Roadmap
 
 ### Phase 2 — GrapesJS canvas (shipped)
 
-- Admin canvas migrated to **GrapesJS** (CDN) with block manager, devices, style manager
-- Document schema **v2**: `engine: grapesjs`, `html`, `css`, `grapes`, `localeContent`
-- Public render of sanitized HTML/CSS; `grapesjs.allow_scripts` gated
-- Legacy schema **v1** (sections/columns/widgets) remains readable and renderable
-- Nesting, custom HTML, and Elementor-like style/advanced via GrapesJS native panels
+See ARCHITECTURE / USAGE. Success criteria met in v1.0.0.
 
-**Success criteria:** editors compose free-form layouts per locale; public `/p/{pageKey}` renders Grapes HTML/CSS; classic documents still render.
+### Phase 3 — Revisions and templates (shipped)
 
-### Phase 3 — Revisions and templates
+- Revision history UI + restore + diff preview
+- Duplicate page, import/export JSON (`formatVersion: 1`)
+- Named page templates (save from page → create draft from template)
 
-- User-facing revision history using `BuilderPageRevision` (list, restore; config `revisions.*`) — **implemented** (diff preview still planned)
-- Remaining: page templates library, duplicate/import
-- Named page templates (duplicate structure + starter props)
-- Import/export of documents between environments
+### Phase 4 — External widgets (shipped baseline)
 
-**Success criteria (draft):** editors can roll back to a prior revision; templates accelerate new page creation.
+- `WidgetPackInterface` + `WidgetPackRegistry` + compiler pass
+- Author guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md)
+- Classic widget types remain the extension point; Grapes custom blocks stay host/CDN-owned
 
-### Phase 4 — External widgets (planned)
+### Follow-ups (optional)
 
-- Formal widget pack registration (Composer packages or host modules)
-- Versioned widget metadata, capability flags, and sandboxed defaults
-- Documentation for third-party widget authors
-
-**Success criteria (draft):** a host can ship a custom widget type without forking the bundle core.
+- Richer visual HTML/CSS side-by-side in revision diff
+- Template marketplace / sharing across projects
+- Grapes block packs analogous to classic widget packs
 
 ## Validating the spec
 
@@ -104,10 +97,11 @@ make release-check
 | REQ-MAKE-004 | `Makefile` `validate-translations` | Translation parity validation hook |
 | REQ-GIT-001 | `docs/GITHUB_CI.md` | No Cursor co-author trailers in git history |
 | REQ-CS-007 | `docs/PSR.md` | PSR adoption evaluation |
+| REQ-DEBUG-001 | `docs/CONFIGURATION.md`, DataCollector | Web Profiler panel when `debug.collector` + `kernel.debug` |
 
 ## Suggested workflow for contributors
 
-1. Clarify the behavior change or bug (check roadmap: is it Phase 1 or a later phase?).
+1. Clarify the behavior change or bug (check roadmap: is it already shipped?).
 2. Update or create the relevant spec artifact.
 3. Implement with tests when production behavior changes.
 4. Update integrator docs when host applications must act.
@@ -126,6 +120,7 @@ See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.
 ## See also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Mermaid diagrams
+- [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md) — external classic widgets
 - [SPEC-KIT.md](SPEC-KIT.md)
 - [INSTALLATION.md](INSTALLATION.md)
 - [CONFIGURATION.md](CONFIGURATION.md)

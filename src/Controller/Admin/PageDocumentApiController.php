@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +21,7 @@ use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 use function is_array;
+use function is_string;
 use function str_contains;
 use function str_starts_with;
 
@@ -28,6 +32,8 @@ final class PageDocumentApiController extends AbstractController
         private readonly DocumentService $documentService,
         private readonly DocumentNormalizer $documentNormalizer,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
+        private readonly DocumentImportExportService $importExportService,
+        private readonly PageBuilderKitTraceInterface $trace = new NullPageBuilderKitTrace(),
     ) {
     }
 
@@ -80,6 +86,9 @@ final class PageDocumentApiController extends AbstractController
             return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('save', $pageKey);
+
         return new JsonResponse(['ok' => true]);
     }
 
@@ -96,6 +105,8 @@ final class PageDocumentApiController extends AbstractController
         }
 
         $this->documentService->publish($page);
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('publish', $pageKey);
 
         return $this->statusOk($request, $pageKey, $page->getStatus()->value, 'admin.canvas.published_flash');
     }
@@ -113,8 +124,105 @@ final class PageDocumentApiController extends AbstractController
         }
 
         $this->documentService->unpublish($page);
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('unpublish', $pageKey);
 
         return $this->statusOk($request, $pageKey, $page->getStatus()->value, 'admin.canvas.unpublished_flash');
+    }
+
+    #[Route('/pages/{pageKey}/duplicate', name: 'admin_page_builder_document_duplicate', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['POST'])]
+    public function duplicate(string $pageKey, Request $request): Response
+    {
+        if (!$this->validateDocumentCsrf($request)) {
+            return $this->statusError($request, 'invalid_csrf', Response::HTTP_FORBIDDEN);
+        }
+
+        $page = $this->pageRepository->findOneByPageKey($pageKey);
+        if (!$page instanceof BuilderPage) {
+            return $this->statusError($request, 'not_found', Response::HTTP_NOT_FOUND);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $newKey  = is_string($payload['pageKey'] ?? null)
+            ? $payload['pageKey']
+            : (string) $request->request->get('pageKey', $pageKey . '-copy');
+        $title = is_string($payload['title'] ?? null)
+            ? $payload['title']
+            : (is_string($request->request->get('title')) ? $request->request->get('title') : null);
+
+        try {
+            $clone = $this->documentService->duplicatePage($page, $newKey, $title);
+        } catch (InvalidArgumentException $exception) {
+            return $this->statusError($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('duplicate', $clone->getPageKey());
+
+        if ($this->wantsJson($request)) {
+            return new JsonResponse(['ok' => true, 'pageKey' => $clone->getPageKey()]);
+        }
+
+        $this->addFlash('success', 'admin.pages.duplicated');
+
+        return $this->redirectToRoute('admin_page_builder_canvas', ['pageKey' => $clone->getPageKey()]);
+    }
+
+    #[Route('/pages/{pageKey}/export', name: 'admin_page_builder_document_export', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['GET'])]
+    public function export(string $pageKey): JsonResponse
+    {
+        $page = $this->pageRepository->findOneByPageKey($pageKey);
+        if (!$page instanceof BuilderPage) {
+            return new JsonResponse(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $payload = $this->importExportService->export($page);
+        } catch (InvalidArgumentException $exception) {
+            return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('export', $pageKey);
+
+        return new JsonResponse($payload);
+    }
+
+    #[Route('/pages/import', name: 'admin_page_builder_document_import', methods: ['POST'])]
+    public function import(Request $request): Response
+    {
+        if (!$this->validateDocumentCsrf($request)) {
+            return $this->statusError($request, 'invalid_csrf', Response::HTTP_FORBIDDEN);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        if ($payload === [] && $request->request->has('payload')) {
+            $decoded = json_decode((string) $request->request->get('payload'), true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+
+        $targetKey = is_string($payload['targetPageKey'] ?? null) ? $payload['targetPageKey'] : null;
+        $publish   = (bool) ($payload['publish'] ?? false);
+        unset($payload['targetPageKey'], $payload['publish']);
+
+        try {
+            $page = $this->importExportService->import($payload, $targetKey, $publish);
+        } catch (InvalidArgumentException $exception) {
+            return $this->statusError($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
+
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('import', $page->getPageKey());
+
+        if ($this->wantsJson($request)) {
+            return new JsonResponse(['ok' => true, 'pageKey' => $page->getPageKey()]);
+        }
+
+        $this->addFlash('success', 'admin.pages.imported');
+
+        return $this->redirectToRoute('admin_page_builder_list');
     }
 
     private function validateDocumentCsrf(Request $request): bool

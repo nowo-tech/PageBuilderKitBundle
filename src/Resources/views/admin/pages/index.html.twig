@@ -1,7 +1,16 @@
 {% extends nowo_page_builder_layout_template() %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
+{% set _css_fw = nowo_page_builder_css_framework() %}
+{% if _css_fw starts with 'bootstrap' or _css_fw == 'tabler' %}
+    {% form_theme create_form 'bootstrap_5_layout.html.twig' %}
+{% endif %}
+
 {% block page_title %}{{ 'admin.pages.title'|trans }}{% endblock %}
+
+{% block header_actions %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates') }}">{{ 'admin.templates.title'|trans }}</a>
+{% endblock %}
 
 {% block admin %}
     <section class="pbk-pages mb-4">
@@ -11,15 +20,23 @@
         {% else %}
             <ul class="list-group">
                 {% for page in pages %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2 flex-wrap">
                         <span>
                             <strong>{{ page.pageKey }}</strong>
                             <span class="badge bg-secondary ms-2">{{ page.status.value }}</span>
                         </span>
-                        <span class="d-flex gap-2">
+                        <span class="d-flex gap-2 flex-wrap">
                         <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_seo', {pageKey: page.pageKey}) }}">
                             {{ 'admin.pages.seo'|trans }}
                         </a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_document_export', {pageKey: page.pageKey}) }}">
+                            {{ 'admin.pages.export'|trans }}
+                        </a>
+                        <form method="post" action="{{ path('admin_page_builder_document_duplicate', {pageKey: page.pageKey}) }}" class="d-inline">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
+                            <input type="hidden" name="pageKey" value="{{ page.pageKey }}-copy">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'admin.pages.duplicate'|trans }}</button>
+                        </form>
                         {% if nowo_page_builder_revisions_enabled() %}
                             <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_revisions', {pageKey: page.pageKey}) }}">
                                 {{ 'admin.pages.revisions'|trans }}
@@ -42,12 +59,16 @@
         {% endif %}
     </section>
 
-    <section class="pbk-create">
-        <h2 class="h4">{{ 'admin.pages.create'|trans }}</h2>
-        {{ form_start(create_form) }}
-            {{ form_row(create_form.pageKey) }}
-            {{ form_row(create_form.title) }}
-            <button type="submit" class="btn btn-success">{{ 'admin.pages.create_submit'|trans }}</button>
-        {{ form_end(create_form) }}
+    <section class="pbk-create card">
+        <div class="card-header fw-semibold">{{ 'admin.pages.create'|trans }}</div>
+        <div class="card-body">
+            {{ form_start(create_form, { attr: { class: 'pbk-create-form row g-3' } }) }}
+                <div class="col-md-4">{{ form_row(create_form.pageKey) }}</div>
+                <div class="col-md-5">{{ form_row(create_form.title) }}</div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success w-100">{{ 'admin.pages.create_submit'|trans }}</button>
+                </div>
+            {{ form_end(create_form) }}
+        </div>
     </section>
 {% endblock %}

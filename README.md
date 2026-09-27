@@ -16,12 +16,12 @@ This bundle is **FrankenPHP worker mode friendly**. Shared services stay request
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/images/demo/overview.png" alt="Public pricing page compounds rendered by Page Builder Kit" />
-      <br /><sub>Public pricing compounds</sub>
+      <img src="docs/images/demo/overview.png" alt="Public pricing page with demo chrome and Symfony Web Profiler toolbar" />
+      <br /><sub>Public pricing — full demo context + Web Profiler</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/images/demo/interaction.png" alt="GrapesJS admin canvas for a page" />
-      <br /><sub>Admin GrapesJS canvas</sub>
+      <img src="docs/images/demo/interaction.png" alt="GrapesJS admin canvas with Web Profiler toolbar" />
+      <br /><sub>Admin GrapesJS canvas — context + Web Profiler</sub>
     </td>
   </tr>
 </table>
@@ -39,9 +39,10 @@ Page Builder Kit Bundle gives Symfony applications a reusable visual page builde
 - Configurable admin mount: `web_ui.path_prefix` (default `/admin/page-builder`)
 - Optional `doctrine.table_prefix` for shared databases
 - JSON document API (GET/POST), **publish** / **unpublish**, public `/p/{pageKey}`
-- Optional **revisions** history (`revisions.enabled`) with restore UI
-- Public **edit pencil** via `nowo_page_builder_can_edit()` + access checker
+- Optional **revisions** history (`revisions.enabled`) with restore, diff, templates, duplicate, import/export
+- Public **edit pencil** via `nowo_page_builder_can_edit()` + access checker; **draft preview** for editors
 - Sandboxed Twig in Grapes HTML; page SEO / Open Graph; asset uploads (local / S3)
+- Dev **Web Profiler** panel (`debug.collector`); classic **widget packs** for host extensions
 - `DocumentService`, `PageRenderProvider`, Twig `nowo_page_builder_render()`
 - Configurable access guard and HTML sanitization
 - Symfony 8 FrankenPHP demo in `demo/symfony8` (default port **8137**)
@@ -94,9 +95,9 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | Phase | Status | Scope |
 | --- | --- | --- |
 | **Phase 1–2** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
-| **Phase 3** | **Shipped (unreleased)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
-| **Phase 4** | **Shipped baseline (unreleased)** | `WidgetPackInterface`, author guide; classic widget tags |
-| **DX** | **Shipped (unreleased)** | Web Profiler DataCollector (`debug.collector`) |
+| **Phase 3** | **Shipped (v1.1.0)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
+| **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
+| **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
 
 Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
 

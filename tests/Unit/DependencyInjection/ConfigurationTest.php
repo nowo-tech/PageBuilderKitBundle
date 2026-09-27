@@ -43,6 +43,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame(50, $config['revisions']['max_per_page']);
         self::assertTrue($config['revisions']['on_save']);
         self::assertTrue($config['revisions']['on_publish']);
+        self::assertTrue($config['debug']['collector']);
     }
 
     #[Test]

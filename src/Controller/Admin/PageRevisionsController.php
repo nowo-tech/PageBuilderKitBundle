@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
@@ -35,6 +37,7 @@ final class PageRevisionsController extends AbstractController
         private readonly PageRevisionStore $revisionStore,
         private readonly DocumentNormalizer $documentNormalizer,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
+        private readonly PageBuilderKitTraceInterface $trace = new NullPageBuilderKitTrace(),
     ) {
     }
 
@@ -131,6 +134,9 @@ final class PageRevisionsController extends AbstractController
             return $this->error($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
         }
 
+        // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
+        $this->trace->addAdminAction('restore', $pageKey, $revision->getId());
+
         if ($request->getPreferredFormat() === 'json' || $request->headers->get('Accept') === 'application/json') {
             return new JsonResponse([
                 'ok'         => true,
@@ -146,6 +152,37 @@ final class PageRevisionsController extends AbstractController
         }
 
         return $this->redirectToRoute('admin_page_builder_sections', ['pageKey' => $pageKey]);
+    }
+
+    #[Route(
+        '/pages/{pageKey}/revisions/{revisionId}/diff',
+        name: 'admin_page_builder_revisions_diff',
+        requirements: ['pageKey' => '[a-z0-9_-]+', 'revisionId' => '\d+'],
+        methods: ['GET'],
+    )]
+    public function diff(string $pageKey, int $revisionId, Request $request): Response
+    {
+        $page = $this->pageRepository->findOneByPageKey($pageKey);
+        if (!$page instanceof BuilderPage) {
+            return $this->notFound($request);
+        }
+
+        try {
+            $diff = $this->revisionService->diff($page, $revisionId);
+        } catch (InvalidArgumentException $exception) {
+            return $this->error($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($request->getPreferredFormat() === 'json' || $request->headers->get('Accept') === 'application/json') {
+            return new JsonResponse(['ok' => true, 'diff' => $diff]);
+        }
+
+        return $this->render('@NowoPageBuilderKitBundle/admin/pages/revision_diff.html.twig', [
+            'page'       => $page,
+            'page_key'   => $pageKey,
+            'revisionId' => $revisionId,
+            'diff'       => $diff,
+        ]);
     }
 
     #[Route(

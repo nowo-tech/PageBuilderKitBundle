@@ -17,9 +17,12 @@ final class BuilderPageCreateType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $row = ['class' => 'mb-0'];
+
         $builder
             ->add('pageKey', TextType::class, [
                 'label'       => 'form.page_key',
+                'row_attr'    => $row,
                 'constraints' => [
                     new Assert\NotBlank(),
                     new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
@@ -27,6 +30,7 @@ final class BuilderPageCreateType extends AbstractType
             ])
             ->add('title', TextType::class, [
                 'label'       => 'form.page_title',
+                'row_attr'    => $row,
                 'constraints' => [new Assert\NotBlank()],
             ]);
     }

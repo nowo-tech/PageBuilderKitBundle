@@ -1330,6 +1330,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         on_save?: bool|Param, // Snapshot the previous live document before each admin save. // Default: true
  *         on_publish?: bool|Param, // Snapshot the live document when publishing (labeled). // Default: true
  *     },
+ *     debug?: array{ // Developer tooling (Web Profiler DataCollector). Only active when kernel.debug is true.
+ *         collector?: bool|Param, // When true and kernel.debug is true, register the Page Builder Kit toolbar panel. // Default: true
+ *     },
  *     grapesjs?: array{
  *         enabled?: bool|Param, // Default: true
  *         cdn_version?: scalar|Param|null, // Default: "0.22.9"

@@ -18,6 +18,8 @@ final readonly class PageRevisionService
     public function __construct(
         private PageRevisionStore $store,
         private DocumentService $documentService,
+        private DocumentNormalizer $documentNormalizer = new DocumentNormalizer(),
+        private DocumentDiff $documentDiff = new DocumentDiff(),
     ) {
     }
 
@@ -64,5 +66,47 @@ final readonly class PageRevisionService
         $this->documentService->saveDocument($page, $revision->getStructure(), $props);
 
         return $revision;
+    }
+
+    /**
+     * @return array{
+     *     revisionId: int|null,
+     *     identical: bool,
+     *     leftEngine: string,
+     *     rightEngine: string,
+     *     structureChanged: bool,
+     *     propsChanged: bool,
+     *     summary: list<string>,
+     *     changedPaths: list<string>
+     * }
+     */
+    public function diff(BuilderPage $page, int $revisionId): array
+    {
+        if (!$this->store->isEnabled()) {
+            throw new InvalidArgumentException('Page revisions are disabled.');
+        }
+
+        $revision = $this->store->findForPage($page, $revisionId);
+        if (!$revision instanceof BuilderPageRevision) {
+            throw new InvalidArgumentException(sprintf('Revision %d not found for page "%s".', $revisionId, $page->getPageKey()));
+        }
+
+        $liveStructure = $this->documentNormalizer->normalize($page->getDocument()?->getStructure() ?? []);
+        $liveProps     = [];
+        foreach ($page->getDocument()?->getLocales() ?? [] as $localeDocument) {
+            $liveProps[$localeDocument->getLocale()] = $localeDocument->getWidgetProps();
+        }
+
+        $diff = $this->documentDiff->compare(
+            $liveStructure,
+            $this->documentNormalizer->normalize($revision->getStructure()),
+            $liveProps,
+            $revision->getWidgetPropsByLocale(),
+        );
+
+        return [
+            'revisionId' => $revision->getId(),
+            ...$diff,
+        ];
     }
 }

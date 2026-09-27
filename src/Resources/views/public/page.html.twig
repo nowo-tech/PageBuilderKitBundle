@@ -11,7 +11,10 @@
         <style id="pbk-grapes-css">{{ page_tree.css|raw }}</style>
     {% endif %}
 </head>
-<body class="pbk-public">
+<body class="pbk-public{% if draft_preview|default(false) %} pbk-public--draft-preview{% endif %}">
+    {% if draft_preview|default(false) %}
+        <div class="pbk-draft-banner" role="status">{{ 'public.draft_preview'|trans }}</div>
+    {% endif %}
     {% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
     <a class="pbk-skip-link" href="#pbk-main-content">{{ 'public.skip_to_content'|trans }}</a>
     <article class="pbk-page" id="pbk-main-content" tabindex="-1">
