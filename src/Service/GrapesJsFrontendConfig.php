@@ -9,7 +9,7 @@ use function array_key_exists;
 /**
  * Builds the GrapesJS frontend options consumed by the admin canvas.
  */
-final class GrapesJsFrontendConfig
+final readonly class GrapesJsFrontendConfig
 {
     /**
      * @param list<string> $canvasStyles
@@ -18,24 +18,24 @@ final class GrapesJsFrontendConfig
      * @param list<array{name: string, sample: string, label: string}> $twigVariables
      */
     public function __construct(
-        private readonly bool $enabled = true,
-        private readonly string $cdnVersion = '0.22.9',
-        private readonly string $height = 'calc(100vh - 220px)',
-        private readonly bool $allowScripts = false,
-        private readonly bool $allowCustomCode = true,
-        private readonly bool $compoundExamples = true,
-        private readonly bool $a11yHelpers = true,
-        private readonly bool $showDevices = true,
-        private readonly bool $noticeOnUnload = false,
-        private readonly string $cssFramework = 'bootstrap5',
-        private readonly array $canvasStyles = [],
-        private readonly array $plugins = [],
-        private readonly array $assets = [],
-        private readonly bool $assetEmbedAsBase64 = true,
-        private readonly bool $assetsUploadEnabled = false,
-        private readonly bool $twigEnabled = true,
-        private readonly bool $twigCanvasHelpers = true,
-        private readonly array $twigVariables = [],
+        private bool $enabled = true,
+        private string $cdnVersion = '0.22.9',
+        private string $height = 'calc(100vh - 220px)',
+        private bool $allowScripts = false,
+        private bool $allowCustomCode = true,
+        private bool $compoundExamples = true,
+        private bool $a11yHelpers = true,
+        private bool $showDevices = true,
+        private bool $noticeOnUnload = false,
+        private string $cssFramework = 'bootstrap5',
+        private array $canvasStyles = [],
+        private array $plugins = [],
+        private array $assets = [],
+        private bool $assetEmbedAsBase64 = true,
+        private bool $assetsUploadEnabled = false,
+        private bool $twigEnabled = true,
+        private bool $twigCanvasHelpers = true,
+        private array $twigVariables = [],
     ) {
     }
 

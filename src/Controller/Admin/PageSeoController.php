@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageSeoType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
@@ -27,7 +28,7 @@ final class PageSeoController extends AbstractController
     }
 
     #[Route(
-        '/admin/page-builder/pages/{pageKey}/seo',
+        '/pages/{pageKey}/seo',
         name: 'admin_page_builder_seo',
         requirements: ['pageKey' => '[a-z0-9_-]+'],
         methods: ['GET', 'POST'],
@@ -35,7 +36,7 @@ final class PageSeoController extends AbstractController
     public function edit(string $pageKey, Request $request): Response
     {
         $page = $this->pageRepository->findOneByPageKey($pageKey);
-        if ($page === null) {
+        if (!$page instanceof BuilderPage) {
             throw $this->createNotFoundException(sprintf('Unknown page "%s".', $pageKey));
         }
 
@@ -46,7 +47,7 @@ final class PageSeoController extends AbstractController
         }
 
         $translation = $page->getTranslation($locale);
-        if ($translation === null) {
+        if (!$translation instanceof BuilderPageTranslation) {
             $translation = (new BuilderPageTranslation())
                 ->setLocale($locale)
                 ->setTitle($pageKey)

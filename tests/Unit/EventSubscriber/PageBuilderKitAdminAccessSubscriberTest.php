@@ -58,7 +58,7 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
         $calls        = new stdClass();
         $calls->count = 0;
         $checker      = new class($calls) implements PageBuilderKitAccessCheckerInterface {
-            public function __construct(private stdClass $calls)
+            public function __construct(private readonly stdClass $calls)
             {
             }
 
@@ -85,6 +85,6 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
             $request->attributes->set('_route', $route);
         }
 
-        return new ControllerEvent($kernel, static fn () => null, $request, HttpKernelInterface::MAIN_REQUEST);
+        return new ControllerEvent($kernel, static fn (): null => null, $request, HttpKernelInterface::MAIN_REQUEST);
     }
 }

@@ -21,7 +21,7 @@ namespace App\Demo;
  */
 final class DemoUseCases
 {
-    public const int SEED_VERSION = 9;
+    public const int SEED_VERSION = 11;
 
     /**
      * @return list<UseCase>

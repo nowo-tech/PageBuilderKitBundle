@@ -29,5 +29,10 @@ final class BuilderPageRevisionTest extends TestCase
         self::assertSame(['es' => []], $revision->getWidgetPropsByLocale());
         self::assertSame('v1', $revision->getLabel());
         self::assertGreaterThan(0, $revision->getCreatedAt()->getTimestamp());
+
+        $page->addRevision($revision);
+        self::assertTrue($page->getRevisions()->contains($revision));
+        $page->removeRevision($revision);
+        self::assertFalse($page->getRevisions()->contains($revision));
     }
 }

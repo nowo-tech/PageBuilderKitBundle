@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
@@ -26,11 +27,11 @@ final class PageCanvasController extends AbstractController
     ) {
     }
 
-    #[Route('/admin/page-builder/pages/{pageKey}/canvas', name: 'admin_page_builder_canvas', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['GET'])]
+    #[Route('/pages/{pageKey}/canvas', name: 'admin_page_builder_canvas', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['GET'])]
     public function canvas(string $pageKey): Response
     {
         $page = $this->pageRepository->findOneByPageKey($pageKey);
-        if ($page === null) {
+        if (!$page instanceof BuilderPage) {
             throw $this->createNotFoundException(sprintf('Unknown page "%s".', $pageKey));
         }
 
@@ -47,18 +48,20 @@ final class PageCanvasController extends AbstractController
         }
 
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/canvas.html.twig', [
-            'page'                 => $page,
-            'page_key'             => $pageKey,
-            'locales'              => $this->builderLocales->getAll(),
-            'default_locale'       => $this->builderLocales->getDefault(),
-            'structure'            => $structure,
-            'grapesjs_config'      => $grapesConfig,
-            'grapesjs_cdn_version' => $grapesConfig['cdnVersion'],
-            'csrf_token'           => $this->csrfTokenManager->getToken('page_builder_document')->getValue(),
-            'document_api_url'     => $this->generateUrl('admin_page_builder_document_get', ['pageKey' => $pageKey]),
-            'document_save_url'    => $this->generateUrl('admin_page_builder_document_save', ['pageKey' => $pageKey]),
-            'document_publish_url' => $this->generateUrl('admin_page_builder_document_publish', ['pageKey' => $pageKey]),
-            'preview_url'          => $this->generateUrl('page_builder_public_render', ['pageKey' => $pageKey]),
+            'page'                   => $page,
+            'page_key'               => $pageKey,
+            'locales'                => $this->builderLocales->getAll(),
+            'default_locale'         => $this->builderLocales->getDefault(),
+            'structure'              => $structure,
+            'grapesjs_config'        => $grapesConfig,
+            'grapesjs_cdn_version'   => $grapesConfig['cdnVersion'],
+            'csrf_token'             => $this->csrfTokenManager->getToken('page_builder_document')->getValue(),
+            'document_api_url'       => $this->generateUrl('admin_page_builder_document_get', ['pageKey' => $pageKey]),
+            'document_save_url'      => $this->generateUrl('admin_page_builder_document_save', ['pageKey' => $pageKey]),
+            'document_publish_url'   => $this->generateUrl('admin_page_builder_document_publish', ['pageKey' => $pageKey]),
+            'document_unpublish_url' => $this->generateUrl('admin_page_builder_document_unpublish', ['pageKey' => $pageKey]),
+            'page_status'            => $page->getStatus()->value,
+            'preview_url'            => $this->generateUrl('page_builder_public_render', ['pageKey' => $pageKey]),
         ]);
     }
 }

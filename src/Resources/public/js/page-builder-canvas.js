@@ -119,6 +119,9 @@ async function boot() {
 
   const saveUrl = root.getAttribute('data-pbk-save-url');
   const publishUrl = root.getAttribute('data-pbk-publish-url');
+  const unpublishUrl = root.getAttribute('data-pbk-unpublish-url');
+  const labelDraft = root.getAttribute('data-pbk-label-draft') || 'draft';
+  const labelPublished = root.getAttribute('data-pbk-label-published') || 'published';
   const csrf = root.getAttribute('data-pbk-csrf');
   const defaultLocale = root.getAttribute('data-pbk-default-locale') || 'en';
   const config = parseJsonAttr(root, 'data-pbk-grapes-config', {});
@@ -897,14 +900,46 @@ async function boot() {
       });
     }
 
+    function setPageStatus(status) {
+      root.setAttribute('data-pbk-page-status', status);
+      var badge = document.querySelector('[data-pbk-status-badge]');
+      if (badge) {
+        badge.setAttribute('data-pbk-status-value', status);
+        badge.textContent = status === 'published' ? labelPublished : labelDraft;
+        badge.classList.toggle('text-bg-success', status === 'published');
+        badge.classList.toggle('text-bg-secondary', status !== 'published');
+      }
+      document.querySelectorAll('[data-pbk-action="publish"]').forEach(function (btn) {
+        btn.hidden = status === 'published';
+      });
+      document.querySelectorAll('[data-pbk-action="unpublish"]').forEach(function (btn) {
+        btn.hidden = status !== 'published';
+      });
+    }
+
     function publishDocument() {
       return saveDocument().then(function () {
         setStatus('Publishing…');
-        return postJson(publishUrl, {}).then(function () {
+        return postJson(publishUrl, {}).then(function (data) {
+          setPageStatus((data && data.status) || 'published');
           setStatus('Published.');
         });
       }).catch(function (err) {
         setStatus(err.message || 'Publish failed', true);
+      });
+    }
+
+    function unpublishDocument() {
+      if (!unpublishUrl) {
+        setStatus('Unpublish URL missing', true);
+        return Promise.resolve();
+      }
+      setStatus('Moving to draft…');
+      return postJson(unpublishUrl, {}).then(function (data) {
+        setPageStatus((data && data.status) || 'draft');
+        setStatus('Saved as draft. Public /p/… returns 404 until published again.');
+      }).catch(function (err) {
+        setStatus(err.message || 'Unpublish failed', true);
       });
     }
 
@@ -916,6 +951,11 @@ async function boot() {
     document.querySelectorAll('[data-pbk-action="publish"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         publishDocument();
+      });
+    });
+    document.querySelectorAll('[data-pbk-action="unpublish"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        unpublishDocument();
       });
     });
 }

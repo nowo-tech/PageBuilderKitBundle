@@ -19,6 +19,7 @@ use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 
@@ -30,7 +31,7 @@ final class NowoPageBuilderKitExtensionTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', [
-            'SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle',
+            'SecurityBundle' => SecurityBundle::class,
         ]);
 
         $extension = new NowoPageBuilderKitExtension();
@@ -59,6 +60,7 @@ final class NowoPageBuilderKitExtensionTest extends TestCase
         self::assertSame(['en', 'de'], $container->getParameter('nowo_page_builder_kit.locales'));
         self::assertSame('pb_', $container->getParameter('nowo_page_builder_kit.doctrine.table_prefix'));
         self::assertSame('bootstrap5', $container->getParameter('nowo_page_builder_kit.web_ui.css_framework'));
+        self::assertSame('/admin/page-builder', $container->getParameter('nowo_page_builder_kit.web_ui.path_prefix'));
 
         $localesDef = $container->getDefinition(BuilderLocales::class);
         self::assertSame('en', $localesDef->getArgument('$defaultLocale'));

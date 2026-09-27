@@ -27,7 +27,7 @@ final class PageAssetUploadController extends AbstractController
     ) {
     }
 
-    #[Route('/admin/page-builder/assets/upload', name: 'admin_page_builder_asset_upload', methods: ['POST'])]
+    #[Route('/assets/upload', name: 'admin_page_builder_asset_upload', methods: ['POST'])]
     public function upload(Request $request): JsonResponse
     {
         if (!$this->assetUploadHandler->isEnabled()) {

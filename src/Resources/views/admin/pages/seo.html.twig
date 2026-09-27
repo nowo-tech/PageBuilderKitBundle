@@ -6,6 +6,9 @@
 {% block header_actions %}
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+        {% if nowo_page_builder_revisions_enabled() %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
+        {% endif %}
         <a class="btn btn-primary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">{{ 'admin.pages.edit'|trans }}</a>
     </div>
 {% endblock %}

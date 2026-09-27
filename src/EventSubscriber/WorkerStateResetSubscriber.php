@@ -12,10 +12,10 @@ use Symfony\Component\HttpKernel\KernelEvents;
 /**
  * Clears optional bound locale state after each request (FrankenPHP worker safety).
  */
-final class WorkerStateResetSubscriber implements EventSubscriberInterface
+final readonly class WorkerStateResetSubscriber implements EventSubscriberInterface
 {
     public function __construct(
-        private readonly BuilderLocalesLegacyBinding $legacyBinding,
+        private BuilderLocalesLegacyBinding $legacyBinding,
     ) {
     }
 

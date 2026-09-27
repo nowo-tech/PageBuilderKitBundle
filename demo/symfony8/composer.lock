@@ -1040,7 +1040,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "e2e7244e7cdfb4361b58516bbd4d39c31fe81220"
+                "reference": "bcf3f59f495a29bef4b078832aff58dc13aceceb"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",
@@ -1069,6 +1069,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",
+                "igor-php/igor-php": "^0.9.7",
                 "nowo-tech/phpstan-frankenphp": "^1.0",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.0",
@@ -1079,6 +1080,7 @@
                 "vincentlanglet/twig-cs-fixer": "^4.0"
             },
             "suggest": {
+                "core/aws-s3-bundle": "AWS S3 uploads for GrapesJS Asset Manager (grapesjs.assets_upload.storage=s3).",
                 "nowo-tech/ckeditor5-editor-bundle": "Alternative rich text editor for text widgets.",
                 "nowo-tech/tiptap-editor-bundle": "Rich text editing for text widgets in the canvas.",
                 "symfony/flex": "Automatic recipe installation"
@@ -1134,6 +1136,9 @@
                 ],
                 "twig:fix:check": [
                     "twig-cs-fixer lint --config=.twig-cs-fixer.php --fix"
+                ],
+                "igor": [
+                    "igor-php --no-agent ."
                 ]
             },
             "license": [
@@ -1151,15 +1156,17 @@
                     "homepage": "https://nowo.tech"
                 }
             ],
-            "description": "Visual Symfony page builder: section/column/widget canvas with translatable content, admin DnD, and Twig public rendering.",
+            "description": "Visual Symfony page builder powered by GrapesJS, with Doctrine persistence, locale-aware content, revisions, SEO, and Twig public rendering. Classic section/column/widget documents remain supported.",
             "homepage": "https://github.com/nowo-tech/PageBuilderKitBundle",
             "keywords": [
                 "admin",
                 "cms",
                 "elementor",
+                "grapesjs",
                 "i18n",
                 "nowo",
                 "page-builder",
+                "seo",
                 "symfony",
                 "symfony-bundle",
                 "widgets"

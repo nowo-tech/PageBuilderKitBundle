@@ -17,7 +17,7 @@ class BuilderDocument
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\OneToOne(inversedBy: 'document', targetEntity: BuilderPage::class)]
+    #[ORM\OneToOne(targetEntity: BuilderPage::class, inversedBy: 'document')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private BuilderPage $page;
 
@@ -26,7 +26,7 @@ class BuilderDocument
     private array $structure = [];
 
     /** @var Collection<int, BuilderDocumentLocale> */
-    #[ORM\OneToMany(mappedBy: 'document', targetEntity: BuilderDocumentLocale::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: BuilderDocumentLocale::class, mappedBy: 'document', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $locales;
 
     public function __construct()

@@ -9,6 +9,10 @@ use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
+use function is_string;
+use function str_ends_with;
+use function str_starts_with;
+
 final class Configuration implements ConfigurationInterface
 {
     public const string ALIAS = 'nowo_page_builder_kit';
@@ -51,6 +55,17 @@ final class Configuration implements ConfigurationInterface
                 ->arrayNode('web_ui')
                     ->addDefaultsIfNotSet()
                     ->children()
+                        ->scalarNode('path_prefix')
+                            ->defaultValue('/admin/page-builder')
+                            ->info('URL prefix for all admin UI and document API routes. Public /p/{pageKey} is unaffected. Host should firewall this path.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => !is_string($v)
+                                    || $v === ''
+                                    || !str_starts_with($v, '/')
+                                    || str_ends_with($v, '/'))
+                                ->thenInvalid('web_ui.path_prefix must be a non-empty path starting with "/" and without a trailing slash (e.g. /admin/page-builder).')
+                            ->end()
+                        ->end()
                         ->scalarNode('layout_template')
                             ->defaultValue('@NowoPageBuilderKitBundle/admin/layout.html.twig')
                         ->end()
@@ -95,6 +110,29 @@ final class Configuration implements ConfigurationInterface
                                     ->info('Service id implementing PageBuilderHtmlSanitizerInterface when strategy=service.')
                                 ->end()
                             ->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('revisions')
+                    ->addDefaultsIfNotSet()
+                    ->info('Optional document version history (BuilderPageRevision snapshots).')
+                    ->children()
+                        ->booleanNode('enabled')
+                            ->defaultFalse()
+                            ->info('When true, page saves/publishes can create revision snapshots.')
+                        ->end()
+                        ->integerNode('max_per_page')
+                            ->defaultValue(50)
+                            ->min(1)
+                            ->info('Oldest revisions are pruned when this limit is exceeded.')
+                        ->end()
+                        ->booleanNode('on_save')
+                            ->defaultTrue()
+                            ->info('Snapshot the previous live document before each admin save.')
+                        ->end()
+                        ->booleanNode('on_publish')
+                            ->defaultTrue()
+                            ->info('Snapshot the live document when publishing (labeled).')
                         ->end()
                     ->end()
                 ->end()

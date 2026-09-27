@@ -1,0 +1,14 @@
+{# Floating edit affordance when PageBuilderKitAccessCheckerInterface allows. #}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+{% if page_tree.pageKey|default('') and nowo_page_builder_can_edit() %}
+    {% set edit_route = page_tree.engine|default('classic') == 'grapesjs'
+        ? 'admin_page_builder_canvas'
+        : 'admin_page_builder_sections' %}
+    <a class="pbk-edit-button"
+       href="{{ path(edit_route, {pageKey: page_tree.pageKey}) }}"
+       title="{{ 'public.edit_page'|trans }}"
+       aria-label="{{ 'public.edit_page'|trans }}">
+        {{ include('@NowoPageBuilderKitBundle/public/_icon_pencil.svg.twig') }}
+        <span class="pbk-edit-button__label">{{ 'public.edit_page'|trans }}</span>
+    </a>
+{% endif %}

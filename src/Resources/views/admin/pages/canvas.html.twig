@@ -4,11 +4,26 @@
 {% block page_title %}{{ 'admin.canvas.title'|trans({'%key%': page_key}) }}{% endblock %}
 
 {% block header_actions %}
-    <div class="pbk-canvas-actions d-flex gap-2">
+    <div class="pbk-canvas-actions d-flex gap-2 flex-wrap align-items-center">
+        <span class="badge {% if page_status == 'published' %}text-bg-success{% else %}text-bg-secondary{% endif %}"
+              data-pbk-status-badge
+              data-pbk-status-value="{{ page_status }}">
+            {{ page_status == 'published' ? 'admin.status.published'|trans : 'admin.status.draft'|trans }}
+        </span>
         <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_seo', {pageKey: page_key}) }}">{{ 'admin.pages.seo'|trans }}</a>
+        {% if nowo_page_builder_revisions_enabled() %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
+        {% endif %}
         <a class="btn btn-outline-secondary btn-sm" href="{{ preview_url }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
         <button type="button" class="btn btn-primary btn-sm" data-pbk-action="save">{{ 'admin.canvas.save'|trans }}</button>
-        <button type="button" class="btn btn-success btn-sm" data-pbk-action="publish">{{ 'admin.canvas.publish'|trans }}</button>
+        <button type="button"
+                class="btn btn-success btn-sm"
+                data-pbk-action="publish"
+                {% if page_status == 'published' %}hidden{% endif %}>{{ 'admin.canvas.publish'|trans }}</button>
+        <button type="button"
+                class="btn btn-outline-warning btn-sm"
+                data-pbk-action="unpublish"
+                {% if page_status != 'published' %}hidden{% endif %}>{{ 'admin.canvas.unpublish'|trans }}</button>
     </div>
 {% endblock %}
 
@@ -18,6 +33,10 @@
          data-pbk-engine="grapesjs"
          data-pbk-save-url="{{ document_save_url }}"
          data-pbk-publish-url="{{ document_publish_url }}"
+         data-pbk-unpublish-url="{{ document_unpublish_url }}"
+         data-pbk-page-status="{{ page_status }}"
+         data-pbk-label-draft="{{ 'admin.status.draft'|trans|e('html_attr') }}"
+         data-pbk-label-published="{{ 'admin.status.published'|trans|e('html_attr') }}"
          data-pbk-csrf="{{ csrf_token }}"
          data-pbk-default-locale="{{ default_locale }}"
          data-pbk-grapes-config="{{ grapesjs_config|json_encode|e('html_attr') }}"

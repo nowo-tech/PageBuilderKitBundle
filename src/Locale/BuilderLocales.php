@@ -11,14 +11,14 @@ namespace Nowo\PageBuilderKitBundle\Locale;
  * {@see BuilderLocalesLegacyBinding} (bound in {@see NowoPageBuilderKitBundle::boot()},
  * cleared via {@see BuilderLocalesLegacyBinding::reset()} / {@see NowoPageBuilderKitBundle\EventSubscriber\WorkerStateResetSubscriber}).
  */
-final class BuilderLocales
+final readonly class BuilderLocales
 {
     /**
      * @param list<string> $locales
      */
     public function __construct(
-        private readonly string $defaultLocale,
-        private readonly array $locales,
+        private string $defaultLocale,
+        private array $locales,
     ) {
     }
 

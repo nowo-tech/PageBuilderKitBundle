@@ -13,13 +13,13 @@ use function trim;
 /**
  * Builds page-level SEO / Open Graph payload for public render.
  */
-final class PageSeoBuilder
+final readonly class PageSeoBuilder
 {
     public function __construct(
-        private readonly string $siteName = '',
-        private readonly string $defaultOgImage = '',
-        private readonly string $canonicalBaseUrl = '',
-        private readonly string $defaultRobots = 'index,follow',
+        private string $siteName = '',
+        private string $defaultOgImage = '',
+        private string $canonicalBaseUrl = '',
+        private string $defaultRobots = 'index,follow',
     ) {
     }
 

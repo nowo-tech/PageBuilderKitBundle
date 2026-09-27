@@ -590,7 +590,7 @@ final class DocumentServiceTest extends TestCase
 
             public function findOneByPageKey(string $pageKey): ?BuilderPage
             {
-                if ($this->page === null) {
+                if (!$this->page instanceof BuilderPage) {
                     return null;
                 }
 

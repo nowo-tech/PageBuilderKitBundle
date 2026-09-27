@@ -41,6 +41,9 @@ services:
     Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository
 
+    Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface:
+        alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepository
+
     Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface:
         alias: Nowo\PageBuilderKitBundle\Service\PageRenderProvider
 
@@ -48,6 +51,14 @@ services:
         arguments:
             $protection: '@Nowo\PageBuilderKitBundle\Security\PageBuilderProtection'
             $grapesDocumentSanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
+            $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
+
+    Nowo\PageBuilderKitBundle\Service\PageRevisionStore:
+        arguments:
+            $enabled: '%nowo_page_builder_kit.revisions.enabled%'
+            $maxPerPage: '%nowo_page_builder_kit.revisions.max_per_page%'
+            $onSave: '%nowo_page_builder_kit.revisions.on_save%'
+            $onPublish: '%nowo_page_builder_kit.revisions.on_publish%'
 
     Nowo\PageBuilderKitBundle\Service\PageRenderProvider:
         arguments:
@@ -78,4 +89,6 @@ services:
         arguments:
             $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
             $cssFramework: '%nowo_page_builder_kit.web_ui.css_framework%'
+            $accessChecker: '@Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface'
+            $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
         tags: ['twig.extension']

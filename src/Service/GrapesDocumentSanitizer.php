@@ -9,24 +9,29 @@ use DOMElement;
 use DOMNode;
 use DOMXPath;
 
+use function html_entity_decode;
 use function in_array;
 use function is_array;
 use function is_string;
 use function libxml_clear_errors;
 use function libxml_use_internal_errors;
 use function preg_replace;
+use function preg_replace_callback;
+use function rawurldecode;
 use function trim;
 
+use const ENT_HTML5;
+use const ENT_QUOTES;
 use const LIBXML_HTML_NODEFDTD;
 use const LIBXML_HTML_NOIMPLIED;
 
 /**
  * Sanitizes GrapesJS-exported HTML/CSS for public render.
  */
-final class GrapesDocumentSanitizer
+final readonly class GrapesDocumentSanitizer
 {
     public function __construct(
-        private readonly bool $allowScripts = false,
+        private bool $allowScripts = false,
     ) {
     }
 
@@ -102,7 +107,27 @@ final class GrapesDocumentSanitizer
             $out .= $dom->saveHTML($child) ?: '';
         }
 
-        return $out;
+        // DOMDocument URL-encodes spaces inside attribute values ("{{ p.url }}" → "{{%20p.url%20}}"),
+        // which breaks Twig lexing. Restore Twig delimiters after serialization.
+        return $this->restoreTwigDelimiters($out);
+    }
+
+    /**
+     * Decode HTML/URL encoding that libxml applies inside {{ }}, {% %} and {# #} tokens.
+     */
+    private function restoreTwigDelimiters(string $html): string
+    {
+        $restored = preg_replace_callback(
+            '/\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}/s',
+            static function (array $matches): string {
+                $token = html_entity_decode($matches[0], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                return rawurldecode($token);
+            },
+            $html,
+        );
+
+        return is_string($restored) ? $restored : $html;
     }
 
     public function sanitizeCss(string $css): string

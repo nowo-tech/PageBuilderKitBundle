@@ -12,10 +12,39 @@ This bundle uses [GitHub Spec Kit](https://github.com/github/spec-kit) with **Cu
 | `.specify/` | Templates and constitution (after `specify init`) |
 | `.cursor/skills/speckit-*/` | Cursor slash commands |
 
+## How the layers fit together
+
+```mermaid
+flowchart TB
+    subgraph docs [docs/]
+        SDD[SPEC-DRIVEN-DEVELOPMENT.md]
+        SK[SPEC-KIT.md]
+        ARCH[ARCHITECTURE.md]
+        USAGE[USAGE.md / CONFIGURATION.md]
+    end
+    subgraph speckit [Spec Kit artifacts]
+        SPECIFY[.specify/]
+        SKILLS[.cursor/skills/speckit-*]
+        BASE[specs/001-baseline/]
+        FEAT[specs/002+ feature dirs]
+    end
+    subgraph proof [Mechanical proof]
+        TESTS[PHPUnit / PHPStan]
+    end
+    SK --> SPECIFY
+    SK --> SKILLS
+    SDD --> BASE
+    SDD --> USAGE
+    ARCH --> USAGE
+    BASE --> TESTS
+    FEAT --> TESTS
+    SKILLS --> FEAT
+```
+
 ## Maintainer workflow
 
 1. Change code → update baseline spec + inventory when behavior or files change.
-2. Change integrator-visible behavior → update `docs/USAGE.md` / `docs/CONFIGURATION.md`.
+2. Change integrator-visible behavior → update `docs/USAGE.md` / `docs/CONFIGURATION.md` / `docs/ARCHITECTURE.md`.
 3. Run `make test`, `make phpstan`, `make release-check` before merge.
 
 ## Initialize (once per repo)
@@ -29,5 +58,6 @@ Full tooling manual: upstream [Spec Kit documentation](https://github.github.io/
 
 ## See also
 
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Mermaid system / ORM / lifecycle diagrams
 - [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md)
 - [specs/001-baseline/spec.md](../specs/001-baseline/spec.md)

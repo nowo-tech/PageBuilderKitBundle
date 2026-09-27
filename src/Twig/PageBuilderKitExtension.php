@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Twig;
 
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use Twig\Extension\AbstractExtension;
@@ -17,6 +19,8 @@ final class PageBuilderKitExtension extends AbstractExtension
         private readonly string $cssFramework,
         private readonly PageRenderProviderInterface $pageRenderProvider,
         private readonly WidgetTypeRegistry $widgetTypeRegistry,
+        private readonly PageBuilderKitAccessCheckerInterface $accessChecker,
+        private readonly ?PageRevisionStore $pageRevisionStore = null,
     ) {
     }
 
@@ -27,6 +31,8 @@ final class PageBuilderKitExtension extends AbstractExtension
             new TwigFunction('nowo_page_builder_css_framework', $this->cssFramework(...)),
             new TwigFunction('nowo_page_builder_render', $this->renderPage(...)),
             new TwigFunction('nowo_page_builder_widget_types', $this->widgetTypes(...)),
+            new TwigFunction('nowo_page_builder_can_edit', $this->canEdit(...)),
+            new TwigFunction('nowo_page_builder_revisions_enabled', $this->revisionsEnabled(...)),
         ];
     }
 
@@ -38,6 +44,20 @@ final class PageBuilderKitExtension extends AbstractExtension
     public function cssFramework(): string
     {
         return $this->cssFramework;
+    }
+
+    /**
+     * Whether the current request may open the page builder admin (pencil).
+     * Prefer this function over storing the flag in Twig globals (FrankenPHP workers).
+     */
+    public function canEdit(): bool
+    {
+        return $this->accessChecker->canAccess();
+    }
+
+    public function revisionsEnabled(): bool
+    {
+        return $this->pageRevisionStore?->isEnabled() === true;
     }
 
     /**

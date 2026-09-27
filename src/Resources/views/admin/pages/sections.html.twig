@@ -4,10 +4,29 @@
 {% block page_title %}{{ 'admin.sections.title'|trans({'%key%': page_key}) }}{% endblock %}
 
 {% block header_actions %}
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span class="badge {% if page.status.value == 'published' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+            {{ page.status.value == 'published' ? 'admin.status.published'|trans : 'admin.status.draft'|trans }}
+        </span>
         <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
         <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_seo', {pageKey: page_key}) }}">{{ 'admin.pages.seo'|trans }}</a>
+        {% if nowo_page_builder_revisions_enabled() %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
+        {% endif %}
         <a class="btn btn-outline-primary btn-sm" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
+        {% if page.status.value != 'published' %}
+            <form method="post" action="{{ path('admin_page_builder_document_publish', {pageKey: page_key}) }}" class="d-inline">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
+                <input type="hidden" name="_redirect" value="{{ path('admin_page_builder_sections', {pageKey: page_key, locale: locale}) }}">
+                <button type="submit" class="btn btn-success btn-sm">{{ 'admin.canvas.publish'|trans }}</button>
+            </form>
+        {% else %}
+            <form method="post" action="{{ path('admin_page_builder_document_unpublish', {pageKey: page_key}) }}" class="d-inline">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
+                <input type="hidden" name="_redirect" value="{{ path('admin_page_builder_sections', {pageKey: page_key, locale: locale}) }}">
+                <button type="submit" class="btn btn-outline-warning btn-sm">{{ 'admin.canvas.unpublish'|trans }}</button>
+            </form>
+        {% endif %}
     </div>
 {% endblock %}
 

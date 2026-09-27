@@ -24,17 +24,18 @@ use function sprintf;
 use function strtolower;
 use function trim;
 
-final class DocumentService
+final readonly class DocumentService
 {
     public function __construct(
-        private readonly BuilderPageRepositoryInterface $pageRepository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly BuilderLocales $builderLocales,
-        private readonly DocumentNormalizer $documentNormalizer,
-        private readonly WidgetTypeRegistry $widgetTypeRegistry,
-        private readonly PageBuilderProtection $protection,
-        private readonly WidgetPropsMerger $widgetPropsMerger,
-        private readonly GrapesDocumentSanitizer $grapesDocumentSanitizer = new GrapesDocumentSanitizer(),
+        private BuilderPageRepositoryInterface $pageRepository,
+        private EntityManagerInterface $entityManager,
+        private BuilderLocales $builderLocales,
+        private DocumentNormalizer $documentNormalizer,
+        private WidgetTypeRegistry $widgetTypeRegistry,
+        private PageBuilderProtection $protection,
+        private WidgetPropsMerger $widgetPropsMerger,
+        private GrapesDocumentSanitizer $grapesDocumentSanitizer = new GrapesDocumentSanitizer(),
+        private ?PageRevisionStore $pageRevisionStore = null,
     ) {
     }
 
@@ -55,6 +56,10 @@ final class DocumentService
             $normalizedStructure = $this->sanitizeGrapesLocaleContent($normalizedStructure);
         }
         $this->validateStructure($normalizedStructure);
+
+        if ($this->pageRevisionStore?->isOnSave() === true) {
+            $this->pageRevisionStore->snapshot($page, null, skipIfUnchanged: true);
+        }
 
         $document = $page->getDocument();
         if (!$document instanceof BuilderDocument) {
@@ -127,6 +132,14 @@ final class DocumentService
 
     public function publish(BuilderPage $page): void
     {
+        if ($this->pageRevisionStore?->isOnPublish() === true) {
+            $this->pageRevisionStore->snapshot(
+                $page,
+                $this->pageRevisionStore->defaultPublishLabel(),
+                skipIfUnchanged: true,
+            );
+        }
+
         $page->setStatus(PageStatus::Published);
         $page->setPublishedAt(new DateTimeImmutable());
         $this->entityManager->flush();

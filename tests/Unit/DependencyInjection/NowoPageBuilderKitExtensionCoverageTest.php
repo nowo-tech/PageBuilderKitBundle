@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 
@@ -67,7 +68,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
     public function loadRegistersConfigurableAccessCheckerAndAssetUploadVariants(): void
     {
         $container = new ContainerBuilder();
-        $container->setParameter('kernel.bundles', ['SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle']);
+        $container->setParameter('kernel.bundles', ['SecurityBundle' => SecurityBundle::class]);
         $container->register('security.authorization_checker', stdClass::class);
         $container->register('core_aws_s3.service.helper', stdClass::class);
         $container->register('app.storage', stdClass::class);

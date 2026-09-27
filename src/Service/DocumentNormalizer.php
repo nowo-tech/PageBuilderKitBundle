@@ -9,7 +9,7 @@ use Symfony\Component\Uid\Uuid;
 use function is_array;
 use function is_string;
 
-final class DocumentNormalizer
+final readonly class DocumentNormalizer
 {
     /** Classic section/column/widget tree (legacy). */
     public const int SCHEMA_VERSION = 1;
@@ -22,7 +22,7 @@ final class DocumentNormalizer
     public const int MAX_NESTING_DEPTH = 12;
 
     public function __construct(
-        private readonly ElementAppearanceNormalizer $appearanceNormalizer = new ElementAppearanceNormalizer(),
+        private ElementAppearanceNormalizer $appearanceNormalizer = new ElementAppearanceNormalizer(),
     ) {
     }
 
@@ -149,9 +149,7 @@ final class DocumentNormalizer
                 $columnSettings = $this->appearanceNormalizer->normalize(
                     is_array($column['settings'] ?? null) ? $column['settings'] : [],
                 );
-                if (!isset($columnSettings['width'])) {
-                    $columnSettings['width'] = 12;
-                }
+                $columnSettings['width'] ??= 12;
 
                 $widgets = $column['widgets'] ?? [];
                 if (!is_array($widgets)) {

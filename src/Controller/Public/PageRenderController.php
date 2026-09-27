@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Controller\Public;
 
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
@@ -24,7 +25,7 @@ final class PageRenderController extends AbstractController
     public function renderPage(string $pageKey, Request $request): Response
     {
         $page = $this->pageRepository->findOneByPageKey($pageKey);
-        if ($page === null) {
+        if (!$page instanceof BuilderPage) {
             throw $this->createNotFoundException();
         }
 

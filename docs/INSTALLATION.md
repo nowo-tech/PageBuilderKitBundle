@@ -70,10 +70,11 @@ nowo_page_builder_kit:
         access_roles: [ROLE_EDITOR]
         allow_unauthenticated: false
     web_ui:
+        path_prefix: /admin/page-builder   # change to remount admin URLs
         layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
         css_framework: tailwind
     doctrine:
-        table_prefix: ''
+        table_prefix: ''                   # e.g. 'app_' → app_pb_page
         connection: default
 ```
 
@@ -87,11 +88,13 @@ nowo_page_builder_kit:
     resource: '@NowoPageBuilderKitBundle/Resources/config/routing.yaml'
 ```
 
-This exposes admin list/canvas routes, the document JSON API, publish endpoint, and optional public page render route.
+This exposes admin routes under `web_ui.path_prefix` (default `/admin/page-builder`), the document JSON API, publish/unpublish, and the optional public renderer `/p/{pageKey}`.
+
+Do **not** add a Symfony import `prefix:` unless you intentionally want to nest further; use `web_ui.path_prefix` instead.
 
 ## Database schema
 
-The bundle registers Doctrine mappings for pages, translations, documents, locale-specific widget props, and revision snapshots (`BuilderPageRevision` entity reserved for Phase 3).
+The bundle registers Doctrine mappings for pages, translations, documents, locale-specific widget props, and revision snapshots. Table names default to `pb_*`; set `doctrine.table_prefix` to avoid collisions in a shared schema.
 
 Generate and run a migration:
 

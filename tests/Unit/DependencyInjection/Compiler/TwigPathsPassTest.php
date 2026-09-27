@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
+use Twig\Loader\FilesystemLoader;
 
 use function dirname;
 
@@ -21,7 +22,7 @@ final class TwigPathsPassTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', sys_get_temp_dir());
-        $loader = new Definition('Twig\Loader\FilesystemLoader');
+        $loader = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native_filesystem', $loader);
 
         (new TwigPathsPass())->process($container);
@@ -37,7 +38,7 @@ final class TwigPathsPassTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', sys_get_temp_dir());
-        $target = new Definition('Twig\Loader\FilesystemLoader');
+        $target = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native_filesystem', $target);
         $container->setAlias('twig.loader.native', 'twig.loader.native_filesystem');
 
@@ -55,7 +56,7 @@ final class TwigPathsPassTest extends TestCase
 
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', $projectDir);
-        $loader = new Definition('Twig\Loader\FilesystemLoader');
+        $loader = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.filesystem', $loader);
 
         try {
@@ -88,7 +89,7 @@ final class TwigPathsPassTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', sys_get_temp_dir());
-        $loader = new Definition('Twig\Loader\FilesystemLoader');
+        $loader = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native', $loader);
 
         (new TwigPathsPass())->process($container);
@@ -101,7 +102,7 @@ final class TwigPathsPassTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', sys_get_temp_dir());
-        $target = new Definition('Twig\Loader\FilesystemLoader');
+        $target = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native_filesystem', $target);
         $container->setAlias('twig.loader.native', 'twig.loader.native_filesystem');
         $container->setAlias('twig.loader.alias', 'twig.loader.native');

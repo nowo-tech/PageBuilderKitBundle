@@ -16,8 +16,8 @@ final class GrapesJsFrontendConfigTest extends TestCase
     public function toArrayUsesDefaultsAndCatalogTwigVariables(): void
     {
         $config = new GrapesJsFrontendConfig(
-            cssFramework: 'bootstrap5',
             allowCustomCode: false,
+            cssFramework: 'bootstrap5',
             assetsUploadEnabled: true,
         );
 
@@ -54,9 +54,9 @@ final class GrapesJsFrontendConfigTest extends TestCase
             canvasStyles: ['https://cdn.example/app.css'],
             plugins: ['forms' => false, 'export' => true],
             assets: [['type' => 'image', 'src' => 'https://cdn.example/a.png']],
-            twigVariables: [['name' => 'title', 'sample' => 'Hello', 'label' => 'Title']],
             twigEnabled: false,
             twigCanvasHelpers: false,
+            twigVariables: [['name' => 'title', 'sample' => 'Hello', 'label' => 'Title']],
         );
 
         $array = $config->toArray();

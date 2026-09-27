@@ -114,7 +114,7 @@ final class AwsS3AssetStorageTest extends TestCase
     public function rejectsOversizedAndInvalidUploads(): void
     {
         $helper = new class {
-            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): object
+            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): stdClass
             {
                 return new stdClass();
             }

@@ -15,23 +15,21 @@ This bundle is **FrankenPHP worker mode friendly**. Shared services stay request
 
 ## What is this?
 
-Page Builder Kit Bundle gives Symfony applications a reusable visual page builder backed by Doctrine. Editors create pages with stable keys, compose layouts on an admin canvas (sections, columns, widgets), save locale-specific widget content, publish pages, and expose them on public routes or through Twig helpers. It complements [Page Layout Kit Bundle](https://github.com/nowo-tech/PageLayoutKitBundle) when you need a free-form canvas instead of fixed typed blocks.
+Page Builder Kit Bundle gives Symfony applications a reusable visual page builder backed by Doctrine. Editors create pages with stable keys, compose layouts on a GrapesJS canvas (or classic sections), save locale-specific content, publish or leave as draft, and expose pages on host routes or through Twig helpers. It complements [Page Layout Kit Bundle](https://github.com/nowo-tech/PageLayoutKitBundle) when you need a free-form canvas instead of fixed typed blocks.
 
 ## Features
 
-- GrapesJS admin canvas with **preset-webpage** + official plugins (forms, navbar, countdown, export, tabs, custom-code, style-bg, typed, image editor, …), Asset Manager, devices, and PBK compound blocks
-- Legacy schema v1 still supported: sections → columns → widgets
-- Built-in GrapesJS blocks: section, heading, text, image, button, spacer, container, **compound examples** (Hero, Feature grid, CTA, Testimonial, Pricing, Media split, Stats, FAQ), optional custom HTML/script
-- Locale tabs on the canvas with default-locale fallback for public render
-- Admin page list and create form at `/admin/page-builder/pages`
-- Visual canvas at `/admin/page-builder/pages/{pageKey}/canvas`
-- JSON document API (GET/POST) and publish endpoint with CSRF headers
-- Public route `/p/{pageKey}` for published pages (Grapes HTML/CSS or classic widget tree)
-- `DocumentService`, `PageRenderProvider`, and Twig function `nowo_page_builder_render()`
-- Configurable access guard: roles, custom checker, or demo-only unauthenticated mode
-- Optional HTML sanitization (`html.sanitize` + `GrapesDocumentSanitizer`; `grapesjs.allow_scripts` gated)
-- Twig namespace `NowoPageBuilderKitBundle` with host override precedence
-- Extensible widget registry for classic documents (`WidgetTypeInterface` + compiler pass)
+- GrapesJS admin canvas with **preset-webpage** + official plugins, Asset Manager, devices, a11y helpers, and PBK compound blocks
+- Legacy schema v1 still supported: sections → columns → widgets (+ Sections editor)
+- Locale tabs / `localeContent` with default-locale fallback for public render
+- Configurable admin mount: `web_ui.path_prefix` (default `/admin/page-builder`)
+- Optional `doctrine.table_prefix` for shared databases
+- JSON document API (GET/POST), **publish** / **unpublish**, public `/p/{pageKey}`
+- Optional **revisions** history (`revisions.enabled`) with restore UI
+- Public **edit pencil** via `nowo_page_builder_can_edit()` + access checker
+- Sandboxed Twig in Grapes HTML; page SEO / Open Graph; asset uploads (local / S3)
+- `DocumentService`, `PageRenderProvider`, Twig `nowo_page_builder_render()`
+- Configurable access guard and HTML sanitization
 - Symfony 8 FrankenPHP demo in `demo/symfony8` (default port **8137**)
 
 ## Quick start
@@ -81,9 +79,9 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 
 | Phase | Status | Scope |
 | --- | --- | --- |
-| **Phase 1** | **Shipped (1.0)** | Canvas admin, document API, six widgets, i18n props, publish flow, public render, security + sanitize hooks, FrankenPHP demo |
+| **Phase 1** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
 | **Phase 2** | Planned | Nested sections/widgets, responsive column settings, design tokens / per-widget style presets |
-| **Phase 3** | Planned | Revision history UI on `BuilderPageRevision`, page templates, duplicate/import |
+| **Phase 3** | Partial in 1.0.0 | Revision history (`revisions.enabled`); templates / duplicate still planned |
 | **Phase 4** | Planned | External widget bundles, marketplace-style registration, host-defined widget packs |
 
 Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap-phases-2-4).
@@ -102,6 +100,7 @@ Demo default URL: `http://localhost:8137`.
 
 ## Documentation
 
+- [Architecture (Mermaid)](docs/ARCHITECTURE.md)
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)

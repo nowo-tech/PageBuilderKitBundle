@@ -74,6 +74,17 @@ final class GrapesDocumentSanitizerTest extends TestCase
     }
 
     #[Test]
+    public function restoresTwigTokensInsideHtmlAttributes(): void
+    {
+        $input = '<a href="{{ p.url }}">{{ p.name }}</a>';
+        $html  = (new GrapesDocumentSanitizer())->sanitizeHtml($input);
+
+        self::assertStringContainsString('href="{{ p.url }}"', $html);
+        self::assertStringContainsString('{{ p.name }}', $html);
+        self::assertStringNotContainsString('%20', $html);
+    }
+
+    #[Test]
     public function sanitizeHtmlStripsDisallowedTags(): void
     {
         $html = (new GrapesDocumentSanitizer())->sanitizeHtml('<iframe src="x"></iframe><p>Ok</p>');

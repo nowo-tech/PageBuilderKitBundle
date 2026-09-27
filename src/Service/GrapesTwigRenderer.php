@@ -16,12 +16,12 @@ use function str_contains;
 /**
  * Renders GrapesJS HTML as a sandboxed Twig template so editors can use {{ variables }}.
  */
-final class GrapesTwigRenderer
+final readonly class GrapesTwigRenderer
 {
     public function __construct(
-        private readonly bool $enabled = true,
-        private readonly bool $strictVariables = false,
-        private readonly GrapesDocumentSanitizer $sanitizer = new GrapesDocumentSanitizer(),
+        private bool $enabled = true,
+        private bool $strictVariables = false,
+        private GrapesDocumentSanitizer $sanitizer = new GrapesDocumentSanitizer(),
     ) {
     }
 
@@ -86,6 +86,8 @@ final class GrapesTwigRenderer
             ['name' => 'status', 'sample' => '{{ status }}', 'label' => 'Status'],
             ['name' => 'page.title', 'sample' => '{{ page.title }}', 'label' => 'page.title'],
             ['name' => 'page.locale', 'sample' => '{{ page.locale }}', 'label' => 'page.locale'],
+            ['name' => 'products.loop', 'sample' => '{% for p in products %}<li>{{ p.name }} — {{ p.price }}</li>{% endfor %}', 'label' => 'for products'],
+            ['name' => 'highlights.loop', 'sample' => '{% for item in highlights %}<span>{{ item }}</span>{% endfor %}', 'label' => 'for highlights'],
         ];
     }
 

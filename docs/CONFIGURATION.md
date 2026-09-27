@@ -10,6 +10,7 @@ All options live under the root key `nowo_page_builder_kit`.
 - [web_ui](#web_ui)
 - [doctrine](#doctrine)
 - [html.sanitize](#htmlsanitize)
+- [revisions](#revisions)
 - [grapesjs](#grapesjs)
 - [Twig integration](#twig-integration)
 - [Examples](#examples)
@@ -25,6 +26,7 @@ nowo_page_builder_kit:
         access_checker: null
         allow_unauthenticated: false
     web_ui:
+        path_prefix: /admin/page-builder
         layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
         css_framework: tailwind
     seo:
@@ -39,6 +41,11 @@ nowo_page_builder_kit:
         sanitize:
             strategy: none      # none | strip | allowlist | service
             service: null
+    revisions:
+        enabled: false
+        max_per_page: 50
+        on_save: true
+        on_publish: true
     grapesjs:
         enabled: true
         cdn_version: '0.22.9'
@@ -94,7 +101,19 @@ Production hosts should prefer `html.sanitize.strategy: allowlist` when untruste
 | `seo` | map | see YAML | Defaults for page-level meta / Open Graph / robots. |
 | `doctrine` | map | see YAML | Table prefixing and connection name for host alignment. |
 | `html` | map | see YAML | Rich-text sanitization for widgets that store HTML. |
+| `revisions` | map | see YAML | Optional document version history (`BuilderPageRevision`). |
 | `grapesjs` | map | see YAML | GrapesJS canvas engine options. |
+
+## revisions
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Master switch for version snapshots and the admin Versions UI. |
+| `max_per_page` | `50` | Oldest revisions are pruned when exceeded. |
+| `on_save` | `true` | Snapshot the previous live document before each admin save. |
+| `on_publish` | `true` | Snapshot the live document when publishing (labeled `Published …`). |
+
+Admin: `/admin/page-builder/pages/{pageKey}/revisions` · JSON: `…/revisions.json`. Twig: `nowo_page_builder_revisions_enabled()`.
 
 ## security
 
@@ -110,23 +129,36 @@ The bundle enforces access on route names beginning with `admin_page_builder_`.
 
 | Key | Default | Description |
 | --- | --- | --- |
+| `path_prefix` | `/admin/page-builder` | URL prefix for **all admin** routes (list, canvas, sections, SEO, versions, document API, asset upload). Must start with `/` and must **not** end with `/`. Public `/p/{pageKey}` is unchanged. |
 | `layout_template` | `@NowoPageBuilderKitBundle/admin/layout.html.twig` | Base layout for admin screens. |
 | `css_framework` | `tailwind` | Styling hint for admin and widget templates. Allowed: `bootstrap`, `bootstrap4`, `bootstrap5`, `tabler`, `tailwind`, `foundation`, `custom`, `none`. |
+
+Example — mount admin under `/cms`:
+
+```yaml
+nowo_page_builder_kit:
+    web_ui:
+        path_prefix: /cms
+```
+
+Then list is `/cms/pages`, canvas `/cms/pages/{pageKey}/canvas`, upload `/cms/assets/upload`. Prefer this over adding a second `prefix:` on the Symfony route import (which would stack). Firewall the same path in `security.access_control`.
 
 ## doctrine
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `table_prefix` | `''` | Prefix applied to bundle entity tables through `TablePrefixListener`. |
+| `table_prefix` | `''` | Prefix applied to bundle entity tables (`pb_page`, `pb_document`, …) through `TablePrefixListener`. Use when several apps/tenants share one database. |
 | `connection` | `default` | Connection name recorded for host alignment. |
 
-Example:
+Example — tables become `tenant_a_pb_page`, etc.:
 
 ```yaml
 nowo_page_builder_kit:
     doctrine:
         table_prefix: 'tenant_a_'
 ```
+
+After changing `table_prefix`, generate a new migration (or `doctrine:schema:update` in dev). Existing data is **not** renamed automatically.
 
 ## html.sanitize
 

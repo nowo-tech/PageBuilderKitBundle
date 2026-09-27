@@ -63,9 +63,10 @@ Phases 2–4 are **planned**, not part of the 1.0 contract. The `BuilderPageRevi
 
 **Success criteria:** editors compose free-form layouts per locale; public `/p/{pageKey}` renders Grapes HTML/CSS; classic documents still render.
 
-### Phase 3 — Revisions and templates (planned)
+### Phase 3 — Revisions and templates
 
-- User-facing revision history using `BuilderPageRevision` (list, diff preview, restore)
+- User-facing revision history using `BuilderPageRevision` (list, restore; config `revisions.*`) — **implemented** (diff preview still planned)
+- Remaining: page templates library, duplicate/import
 - Named page templates (duplicate structure + starter props)
 - Import/export of documents between environments
 
@@ -124,6 +125,7 @@ See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.
 
 ## See also
 
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Mermaid diagrams
 - [SPEC-KIT.md](SPEC-KIT.md)
 - [INSTALLATION.md](INSTALLATION.md)
 - [CONFIGURATION.md](CONFIGURATION.md)

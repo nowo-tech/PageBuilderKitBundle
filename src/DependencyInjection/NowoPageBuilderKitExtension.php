@@ -18,11 +18,13 @@ use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
+use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
+use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
@@ -97,6 +99,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.security.access_roles', $config['security']['access_roles']);
         $container->setParameter('nowo_page_builder_kit.security.access_checker', $config['security']['access_checker']);
         $container->setParameter('nowo_page_builder_kit.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);
+        $container->setParameter('nowo_page_builder_kit.web_ui.path_prefix', $config['web_ui']['path_prefix']);
         $container->setParameter('nowo_page_builder_kit.web_ui.layout_template', $config['web_ui']['layout_template']);
         $container->setParameter('nowo_page_builder_kit.web_ui.css_framework', $config['web_ui']['css_framework']);
         $container->setParameter('nowo_page_builder_kit.seo.site_name', $config['seo']['site_name']);
@@ -109,10 +112,25 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.grapesjs.compound_examples', $config['grapesjs']['compound_examples']);
         $container->setParameter('nowo_page_builder_kit.grapesjs.a11y_helpers', $config['grapesjs']['a11y_helpers']);
         $container->setParameter('nowo_page_builder_kit.grapesjs.config', $config['grapesjs']);
+        $container->setParameter('nowo_page_builder_kit.revisions.enabled', $config['revisions']['enabled']);
+        $container->setParameter('nowo_page_builder_kit.revisions.max_per_page', $config['revisions']['max_per_page']);
+        $container->setParameter('nowo_page_builder_kit.revisions.on_save', $config['revisions']['on_save']);
+        $container->setParameter('nowo_page_builder_kit.revisions.on_publish', $config['revisions']['on_publish']);
 
         $container->getDefinition(BuilderLocales::class)
             ->setArgument('$defaultLocale', $config['default_locale'])
             ->setArgument('$locales', $config['locales']);
+
+        $container->getDefinition(PageRevisionStore::class)
+            ->setArgument('$enabled', (bool) $config['revisions']['enabled'])
+            ->setArgument('$maxPerPage', (int) $config['revisions']['max_per_page'])
+            ->setArgument('$onSave', (bool) $config['revisions']['on_save'])
+            ->setArgument('$onPublish', (bool) $config['revisions']['on_publish']);
+
+        if ($container->hasDefinition(DocumentService::class)) {
+            $container->getDefinition(DocumentService::class)
+                ->setArgument('$pageRevisionStore', new Reference(PageRevisionStore::class));
+        }
 
         $container->getDefinition(PageSeoBuilder::class)
             ->setArgument('$siteName', (string) $config['seo']['site_name'])

@@ -37,7 +37,7 @@ final class PageSectionsController extends AbstractController
     }
 
     #[Route(
-        '/admin/page-builder/pages/{pageKey}/sections',
+        '/pages/{pageKey}/sections',
         name: 'admin_page_builder_sections',
         requirements: ['pageKey' => '[a-z0-9_-]+'],
         methods: ['GET', 'POST'],
@@ -45,7 +45,7 @@ final class PageSectionsController extends AbstractController
     public function edit(string $pageKey, Request $request): Response
     {
         $page = $this->pageRepository->findOneByPageKey($pageKey);
-        if ($page === null) {
+        if (!$page instanceof BuilderPage) {
             throw $this->createNotFoundException(sprintf('Unknown page "%s".', $pageKey));
         }
 

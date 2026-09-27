@@ -1,3 +1,10 @@
-nowo_page_builder_kit:
-    resource: ../../Controller/
+# Admin UI + document API under configurable web_ui.path_prefix (default /admin/page-builder).
+nowo_page_builder_kit_admin:
+    resource: ../../Controller/Admin/
+    type: attribute
+    prefix: '%nowo_page_builder_kit.web_ui.path_prefix%'
+
+# Public convenience renderer (not under admin prefix).
+nowo_page_builder_kit_public:
+    resource: ../../Controller/Public/
     type: attribute

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Twig;
 
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
 use Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension;
@@ -17,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 final class PageBuilderKitExtensionTest extends TestCase
 {
     #[Test]
-    public function exposesLayoutCssAndWidgetTypes(): void
+    public function exposesLayoutCssWidgetTypesAndCanEdit(): void
     {
         $heading = new class implements WidgetTypeInterface {
             public function getType(): string
@@ -58,12 +59,19 @@ final class PageBuilderKitExtensionTest extends TestCase
                 return ['pageKey' => $pageKey, 'sections' => [], 'context' => $context];
             }
         };
+        $accessChecker = new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+        };
 
         $extension = new PageBuilderKitExtension(
             '@NowoPageBuilderKitBundle/admin/layout.html.twig',
             'tailwind',
             $renderProvider,
             $registry,
+            $accessChecker,
         );
 
         self::assertSame(
@@ -71,6 +79,8 @@ final class PageBuilderKitExtensionTest extends TestCase
             $extension->layoutTemplate(),
         );
         self::assertSame('tailwind', $extension->cssFramework());
+        self::assertTrue($extension->canEdit());
+        self::assertFalse($extension->revisionsEnabled());
         self::assertSame(
             [
                 [
@@ -81,7 +91,7 @@ final class PageBuilderKitExtensionTest extends TestCase
             ],
             $extension->widgetTypes(),
         );
-        self::assertCount(4, $extension->getFunctions());
+        self::assertCount(6, $extension->getFunctions());
 
         self::assertSame(
             ['pageKey' => 'home', 'sections' => [], 'context' => ['x' => 1]],

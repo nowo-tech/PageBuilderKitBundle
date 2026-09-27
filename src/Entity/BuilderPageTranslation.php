@@ -46,7 +46,7 @@ class BuilderPageTranslation
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $robots = null;
 
-    #[ORM\ManyToOne(inversedBy: 'translations', targetEntity: BuilderPage::class)]
+    #[ORM\ManyToOne(targetEntity: BuilderPage::class, inversedBy: 'translations')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private BuilderPage $page;
 

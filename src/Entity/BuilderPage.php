@@ -40,14 +40,15 @@ class BuilderPage
     private DateTimeImmutable $updatedAt;
 
     /** @var Collection<int, BuilderPageTranslation> */
-    #[ORM\OneToMany(mappedBy: 'page', targetEntity: BuilderPageTranslation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: BuilderPageTranslation::class, mappedBy: 'page', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $translations;
 
-    #[ORM\OneToOne(mappedBy: 'page', targetEntity: BuilderDocument::class, cascade: ['persist', 'remove'])]
+    #[ORM\OneToOne(targetEntity: BuilderDocument::class, mappedBy: 'page', cascade: ['persist', 'remove'])]
     private ?BuilderDocument $document = null;
 
     /** @var Collection<int, BuilderPageRevision> */
-    #[ORM\OneToMany(mappedBy: 'page', targetEntity: BuilderPageRevision::class)]
+    #[ORM\OneToMany(targetEntity: BuilderPageRevision::class, mappedBy: 'page', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $revisions;
 
     public function __construct()
@@ -167,7 +168,7 @@ class BuilderPage
 
     public function setDocument(?BuilderDocument $document): self
     {
-        if ($document !== null && $document->getPage() !== $this) {
+        if ($document instanceof BuilderDocument && $document->getPage() !== $this) {
             $document->setPage($this);
         }
 
@@ -181,5 +182,24 @@ class BuilderPage
     public function getRevisions(): Collection
     {
         return $this->revisions;
+    }
+
+    public function addRevision(BuilderPageRevision $revision): self
+    {
+        if (!$this->revisions->contains($revision)) {
+            $this->revisions->add($revision);
+            $revision->setPage($this);
+        }
+
+        return $this;
+    }
+
+    public function removeRevision(BuilderPageRevision $revision): self
+    {
+        if ($this->revisions->removeElement($revision) && $revision->getPage() === $this) {
+            // Owning side keeps the association until Doctrine removes the row.
+        }
+
+        return $this;
     }
 }

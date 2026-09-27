@@ -6,8 +6,9 @@ namespace Nowo\PageBuilderKitBundle\Entity;
 
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
+use Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepository;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: BuilderPageRevisionRepository::class)]
 #[ORM\Table(name: 'pb_page_revision')]
 class BuilderPageRevision
 {
@@ -16,7 +17,7 @@ class BuilderPageRevision
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(inversedBy: 'revisions', targetEntity: BuilderPage::class)]
+    #[ORM\ManyToOne(targetEntity: BuilderPage::class, inversedBy: 'revisions')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private BuilderPage $page;
 

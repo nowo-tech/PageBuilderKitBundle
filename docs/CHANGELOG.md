@@ -7,38 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Table of contents
 
-- [[Unreleased]](#unreleased)
-- [[1.0.0] - TBD](#100---tbd)
+- [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
-## [Unreleased]
+## [1.0.0] - 2026-09-27
 
-### Changed
-
-- Admin canvas migrated to **GrapesJS** (CDN/ESM) with **preset-webpage** and official plugins (forms, navbar, countdown, export, tabs, custom-code, touch, postcss, tooltip, style-bg, typed, tui-image-editor).
-- Document schema **v2**: `engine: grapesjs`, `html`/`css`/`grapes`/`localeContent`.
-- Configurable `grapesjs.plugins.*`, `canvas_styles`, Asset Manager stock assets, devices, compound examples.
-- Demo **use-case matrix** (`/showcase`, seed v9): marketing, content, commerce, forms, i18n, classic sections, Grapes sections≠locale, Twig, SEO/a11y, unpublished draft.
-- Classic **Sections editor** (`/admin/page-builder/pages/{pageKey}/sections`) for per-locale widget props on a shared section tree.
-- GrapesJS HTML can embed sandboxed **Twig variables** (`{{ title }}`, host context providers).
-- Page-level **SEO / Open Graph / robots** on `BuilderPageTranslation` → `page_tree.seo` + admin SEO screen.
-- GrapesJS **A11y** helpers (landmarks, skip link, alt/aria traits).
-- GrapesJS Asset Manager **uploads** via `grapesjs.assets_upload` (local filesystem or AWS S3 through `core/aws-s3-bundle`).
-
-### Deprecated
-
-- Classic Stimulus/SortableJS canvas client (replaced by GrapesJS). Schema v1 Appearance helpers remain for legacy documents.
-
-## [1.0.0] - TBD
-
-Initial release — Phase 1 page builder.
+First public release of **Page Builder Kit Bundle**.
 
 ### Added
 
-- Visual admin canvas with section/column/widget document model (schema v1).
-- Widget types: `heading`, `text`, `html`, `image`, `button`, `spacer`.
-- Locale-aware widget props with default-locale fallback.
-- `DocumentService`, document JSON API, publish flow, and public `/p/{pageKey}` route.
-- Twig helpers: `nowo_page_builder_render()`, layout/CSS framework functions.
-- Configurable editor access, HTML sanitization strategies, optional table prefix.
-- Symfony 8 FrankenPHP demo on port **8137**.
-- Spec Kit baseline under `specs/001-baseline/` and REQ-DOCS documentation set.
+- GrapesJS admin canvas (CDN/ESM) with preset-webpage and official plugins (forms, navbar, countdown, export, tabs, custom-code, touch, postcss, tooltip, style-bg, typed, tui-image-editor).
+- Document schema **v2** (`engine: grapesjs`, `html` / `css` / `grapes` / `localeContent`) plus legacy classic schema **v1** (sections → columns → widgets).
+- Classic **Sections editor** for per-locale widget props on a shared section tree.
+- Widget types (classic): `heading`, `text`, `html`, `image`, `button`, `spacer`, nesting via `container`.
+- `DocumentService`, CSRF-protected document JSON API, **publish** / **unpublish** (draft), public `/p/{pageKey}`.
+- Configurable admin URL prefix: `web_ui.path_prefix` (default `/admin/page-builder`).
+- Optional `doctrine.table_prefix` for shared databases.
+- Optional **page revisions** (`revisions.*`): snapshots on save/publish, Versions admin UI, restore + JSON API.
+- Public **edit pencil** when `PageBuilderKitAccessCheckerInterface` allows (`nowo_page_builder_can_edit()`).
+- Sandboxed **Twig in Grapes HTML** (`{{ }}`, `{% if %}`, `{% for %}`, `{% set %}`) + host `GrapesTwigContextProviderInterface`.
+- Page-level **SEO / Open Graph / robots** + admin SEO screen; GrapesJS **a11y** helpers.
+- GrapesJS Asset Manager **uploads** (`grapesjs.assets_upload`: local or AWS S3).
+- Twig helpers: `nowo_page_builder_render()`, layout/CSS framework, revisions-enabled flag.
+- Security: access roles / custom checker / allow-unauthenticated (demo), HTML sanitize strategies.
+- Symfony 8 FrankenPHP demo (port **8137**) with use-case matrix (`/showcase`).
+- Docs: INSTALLATION, CONFIGURATION, USAGE (incl. i18n routing patterns), ARCHITECTURE (Mermaid), SECURITY, SPEC Kit baseline.
+
+### Notes
+
+- Classic Stimulus/SortableJS canvas client is not shipped; schema v1 remains readable/renderable and editable via Sections.
+- Host apps own pretty multilingual URLs; `/p/{pageKey}` is a convenience renderer (see USAGE).

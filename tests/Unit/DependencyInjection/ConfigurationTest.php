@@ -9,6 +9,7 @@ use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 
 #[CoversClass(Configuration::class)]
@@ -30,6 +31,7 @@ final class ConfigurationTest extends TestCase
             $config['web_ui']['layout_template'],
         );
         self::assertSame('tailwind', $config['web_ui']['css_framework']);
+        self::assertSame('/admin/page-builder', $config['web_ui']['path_prefix']);
         self::assertSame('', $config['doctrine']['table_prefix']);
         self::assertSame('default', $config['doctrine']['connection']);
         self::assertSame(
@@ -37,5 +39,29 @@ final class ConfigurationTest extends TestCase
             $config['html']['sanitize']['strategy'],
         );
         self::assertNull($config['html']['sanitize']['service']);
+        self::assertFalse($config['revisions']['enabled']);
+        self::assertSame(50, $config['revisions']['max_per_page']);
+        self::assertTrue($config['revisions']['on_save']);
+        self::assertTrue($config['revisions']['on_publish']);
+    }
+
+    #[Test]
+    public function pathPrefixRejectsTrailingSlash(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new Processor())->processConfiguration(new Configuration(), [[
+            'web_ui' => ['path_prefix' => '/cms/'],
+        ]]);
+    }
+
+    #[Test]
+    public function pathPrefixAcceptsCustomAdminRoot(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'web_ui' => ['path_prefix' => '/cms/pages'],
+        ]]);
+
+        self::assertSame('/cms/pages', $config['web_ui']['path_prefix']);
     }
 }

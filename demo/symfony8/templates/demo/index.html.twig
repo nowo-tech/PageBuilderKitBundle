@@ -41,6 +41,7 @@
 {% endblock %}
 
 {% block body %}
+{% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
 {% if page_tree.engine|default('classic') == 'grapesjs' %}
     {% if page_tree.html|default('') is empty %}
         <div class="container py-5">

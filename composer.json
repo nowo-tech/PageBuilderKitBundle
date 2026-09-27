@@ -1,6 +1,6 @@
 {
     "name": "nowo-tech/page-builder-kit-bundle",
-    "description": "Visual Symfony page builder: section/column/widget canvas with translatable content, admin DnD, and Twig public rendering.",
+    "description": "Visual Symfony page builder powered by GrapesJS, with Doctrine persistence, locale-aware content, revisions, SEO, and Twig public rendering. Classic section/column/widget documents remain supported.",
     "type": "symfony-bundle",
     "license": "MIT",
     "keywords": [
@@ -8,10 +8,12 @@
         "symfony-bundle",
         "cms",
         "page-builder",
+        "grapesjs",
         "elementor",
         "widgets",
         "i18n",
         "admin",
+        "seo",
         "nowo"
     ],
     "homepage": "https://github.com/nowo-tech/PageBuilderKitBundle",

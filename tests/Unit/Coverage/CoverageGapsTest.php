@@ -43,6 +43,7 @@ use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Twig\Loader\FilesystemLoader;
 
 use function array_column;
 use function base64_decode;
@@ -122,7 +123,7 @@ final class CoverageGapsTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', sys_get_temp_dir());
-        $target = new Definition('Twig\Loader\FilesystemLoader');
+        $target = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native_filesystem', $target);
         $container->setAlias('twig.loader.chain', 'twig.loader.native_filesystem');
         $container->setAlias('twig.loader.native', 'twig.loader.chain');
@@ -136,7 +137,6 @@ final class CoverageGapsTest extends TestCase
     public function securityBundleUnavailableWithoutBundlesParameter(): void
     {
         $method = new ReflectionMethod(NowoPageBuilderKitExtension::class, 'isSecurityBundleAvailable');
-        $method->setAccessible(true);
 
         self::assertFalse($method->invoke(new NowoPageBuilderKitExtension(), new ContainerBuilder()));
     }
@@ -256,7 +256,6 @@ final class CoverageGapsTest extends TestCase
         self::assertArrayNotHasKey('marginTop', $safe['style'] ?? []);
 
         $m = new ReflectionMethod(ElementAppearanceNormalizer::class, 'sanitizeCssValue');
-        $m->setAccessible(true);
         self::assertSame('', $m->invoke($n, 'url(http://x.com/$)'));
     }
 
@@ -383,8 +382,7 @@ final class CoverageGapsTest extends TestCase
     {
         $service         = $this->documentService();
         $sanitizeLocales = new ReflectionMethod(DocumentService::class, 'sanitizeGrapesLocaleContent');
-        $sanitizeLocales->setAccessible(true);
-        $out = $sanitizeLocales->invoke($service, ['localeContent' => 'bad']);
+        $out             = $sanitizeLocales->invoke($service, ['localeContent' => 'bad']);
         self::assertSame([], $out['localeContent']);
         $out = $sanitizeLocales->invoke($service, [
             'localeContent' => [
@@ -396,7 +394,6 @@ final class CoverageGapsTest extends TestCase
         self::assertArrayHasKey('en', $out['localeContent']);
 
         $resolve = new ReflectionMethod(DocumentService::class, 'resolveWidgetTypeForId');
-        $resolve->setAccessible(true);
         self::assertNull($resolve->invoke($service, ['sections' => 'x'], 'w'));
         self::assertNull($resolve->invoke($service, [
             'sections' => [
@@ -424,8 +421,7 @@ final class CoverageGapsTest extends TestCase
         $dir          = sys_get_temp_dir() . '/pbk-lf-' . uniqid('', true);
         $local        = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png', 'text/plain']);
         $resolveLocal = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'resolveMimeType');
-        $resolveLocal->setAccessible(true);
-        $tmp2 = sys_get_temp_dir() . '/pbk-lf2-' . uniqid('', true);
+        $tmp2         = sys_get_temp_dir() . '/pbk-lf2-' . uniqid('', true);
         file_put_contents($tmp2, 'x');
         $fallbackUpload = new class($tmp2, 'a.txt', 'text/plain', null, true) extends UploadedFile {
             public function getPathname(): string
@@ -535,7 +531,7 @@ final class CoverageGapsTest extends TestCase
         self::assertStringStartsWith('https://fallback/', $r2->src);
 
         $helper3 = new class {
-            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): object
+            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): stdClass
             {
                 return new stdClass();
             }
@@ -616,8 +612,7 @@ final class CoverageGapsTest extends TestCase
         $result = $storage->store($upload);
         self::assertStringEndsWith('.png', (string) $result->storageKey);
 
-        $method = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'extensionFromMime');
-        $method->setAccessible(true);
+        $method     = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'extensionFromMime');
         $storageRef = new LocalFilesystemAssetStorage($dir, '/u');
         self::assertSame('jpg', $method->invoke($storageRef, 'image/jpeg'));
         self::assertSame('gif', $method->invoke($storageRef, 'image/gif'));
@@ -794,7 +789,7 @@ final class CoverageGapsTest extends TestCase
 
                 public function findOneByPageKey(string $pageKey): ?BuilderPage
                 {
-                    if ($this->page === null || $this->page->getPageKey() !== $pageKey) {
+                    if (!$this->page instanceof BuilderPage || $this->page->getPageKey() !== $pageKey) {
                         return null;
                     }
 

@@ -23,7 +23,7 @@ class BuilderDocumentLocale
     #[ORM\Column(type: 'json')]
     private array $widgetProps = [];
 
-    #[ORM\ManyToOne(inversedBy: 'locales', targetEntity: BuilderDocument::class)]
+    #[ORM\ManyToOne(targetEntity: BuilderDocument::class, inversedBy: 'locales')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private BuilderDocument $document;
 

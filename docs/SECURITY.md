@@ -34,13 +34,15 @@ nowo_page_builder_kit:
         allow_unauthenticated: false
 ```
 
-Recommended host access control:
+Recommended host access control (match `web_ui.path_prefix`, default `/admin/page-builder`):
 
 ```yaml
 # config/packages/security.yaml
 security:
     access_control:
-        - { path: ^/admin/page-builder/, roles: ROLE_EDITOR }
+        - { path: ^/admin/page-builder, roles: ROLE_EDITOR }
+        # if you customized web_ui.path_prefix: /cms →
+        # - { path: ^/cms, roles: ROLE_EDITOR }
 ```
 
 For context-aware rules, implement `PageBuilderKitAccessCheckerInterface` and set `security.access_checker`.

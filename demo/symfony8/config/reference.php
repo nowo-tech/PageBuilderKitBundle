@@ -1304,6 +1304,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         allow_unauthenticated?: bool|Param, // Default: false
  *     },
  *     web_ui?: array{
+ *         path_prefix?: scalar|Param|null, // URL prefix for all admin UI and document API routes. Public /p/{pageKey} is unaffected. Host should firewall this path. // Default: "/admin/page-builder"
  *         layout_template?: scalar|Param|null, // Default: "@NowoPageBuilderKitBundle/admin/layout.html.twig"
  *         css_framework?: "bootstrap"|"bootstrap4"|"bootstrap5"|"tabler"|"tailwind"|"foundation"|"custom"|"none"|Param, // Default: "tailwind"
  *     },
@@ -1322,6 +1323,12 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             strategy?: "none"|"strip"|"allowlist"|"service"|Param, // Default: "none"
  *             service?: scalar|Param|null, // Service id implementing PageBuilderHtmlSanitizerInterface when strategy=service. // Default: null
  *         },
+ *     },
+ *     revisions?: array{ // Optional document version history (BuilderPageRevision snapshots).
+ *         enabled?: bool|Param, // When true, page saves/publishes can create revision snapshots. // Default: false
+ *         max_per_page?: int|Param, // Oldest revisions are pruned when this limit is exceeded. // Default: 50
+ *         on_save?: bool|Param, // Snapshot the previous live document before each admin save. // Default: true
+ *         on_publish?: bool|Param, // Snapshot the live document when publishing (labeled). // Default: true
  *     },
  *     grapesjs?: array{
  *         enabled?: bool|Param, // Default: true

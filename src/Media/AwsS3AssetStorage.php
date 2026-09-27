@@ -38,24 +38,24 @@ use const PATHINFO_BASENAME;
  *
  * Expects an object exposing uploadFile() + getFileURL() (AwsS3Helper).
  */
-final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
+final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
      */
     public function __construct(
-        private readonly object $s3Helper,
-        private readonly string $folder = 'page-builder',
-        private readonly bool $private = false,
-        private readonly int $maxBytes = 5_242_880,
-        private readonly array $allowedMimeTypes = [
+        private object $s3Helper,
+        private string $folder = 'page-builder',
+        private bool $private = false,
+        private int $maxBytes = 5_242_880,
+        private array $allowedMimeTypes = [
             'image/jpeg',
             'image/png',
             'image/gif',
             'image/webp',
             'image/svg+xml',
         ],
-        private readonly ?string $publicBaseUrl = null,
+        private ?string $publicBaseUrl = null,
     ) {
         if (!method_exists($this->s3Helper, 'uploadFile') || !method_exists($this->s3Helper, 'getFileURL')) {
             throw new InvalidArgumentException('S3 helper must expose uploadFile() and getFileURL().');
@@ -67,7 +67,7 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
         $this->assertValidUpload($file);
 
         $mime      = $this->resolveMimeType($file) ?: 'application/octet-stream';
-        $extension = strtolower((string) ($file->getClientOriginalExtension() ?: match ($mime) {
+        $extension = strtolower($file->getClientOriginalExtension() ?: match ($mime) {
             // @codeCoverageIgnoreStart — finfo usually supplies png/jpeg from bytes before these arms
             'image/jpeg'    => 'jpg',
             'image/png'     => 'png',
@@ -76,7 +76,7 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
             'image/svg+xml' => 'svg',
             default         => 'bin',
             // @codeCoverageIgnoreEnd
-        }));
+        });
         $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
         $folder    = trim($this->folder, '/');
         $key       = ($folder !== '' ? $folder . '/' : '') . bin2hex(random_bytes(16)) . '.' . $extension;
@@ -187,14 +187,14 @@ final class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
             }
         }
 
-        $client = (string) $file->getClientMimeType();
+        $client = $file->getClientMimeType();
         if ($client !== '') {
             return $client;
         }
 
         // @codeCoverageIgnoreStart
         try {
-            return (string) ($file->getMimeType() ?: '');
+            return $file->getMimeType() ?: '';
         } catch (Throwable) {
             return '';
         }

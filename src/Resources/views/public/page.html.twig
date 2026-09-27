@@ -12,6 +12,7 @@
     {% endif %}
 </head>
 <body class="pbk-public">
+    {% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
     <a class="pbk-skip-link" href="#pbk-main-content">{{ 'public.skip_to_content'|trans }}</a>
     <article class="pbk-page" id="pbk-main-content" tabindex="-1">
         <header class="pbk-page__header">

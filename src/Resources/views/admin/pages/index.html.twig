@@ -20,6 +20,11 @@
                         <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_seo', {pageKey: page.pageKey}) }}">
                             {{ 'admin.pages.seo'|trans }}
                         </a>
+                        {% if nowo_page_builder_revisions_enabled() %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_revisions', {pageKey: page.pageKey}) }}">
+                                {{ 'admin.pages.revisions'|trans }}
+                            </a>
+                        {% endif %}
                         {% set _engine = page.document and page.document.structure.engine|default('classic') %}
                         {% if _engine == 'grapesjs' %}
                             <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page.pageKey}) }}">

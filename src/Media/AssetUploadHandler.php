@@ -14,11 +14,11 @@ use function is_array;
 /**
  * Orchestrates multi-file uploads for the GrapesJS Asset Manager.
  */
-final class AssetUploadHandler
+final readonly class AssetUploadHandler
 {
     public function __construct(
-        private readonly PageBuilderAssetStorageInterface $storage,
-        private readonly bool $enabled = false,
+        private PageBuilderAssetStorageInterface $storage,
+        private bool $enabled = false,
     ) {
     }
 

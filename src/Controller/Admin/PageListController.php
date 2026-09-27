@@ -23,7 +23,7 @@ final class PageListController extends AbstractController
     ) {
     }
 
-    #[Route('/admin/page-builder/pages', name: 'admin_page_builder_list', methods: ['GET', 'POST'])]
+    #[Route('/pages', name: 'admin_page_builder_list', methods: ['GET', 'POST'])]
     public function index(Request $request): Response
     {
         $createForm = $this->createForm(BuilderPageCreateType::class);

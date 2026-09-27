@@ -2,12 +2,15 @@
 
 How to manage builder pages, save documents, and render them publicly.
 
+Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Table of contents
 
 - [Admin routes](#admin-routes)
 - [DocumentService](#documentservice)
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
+- [Associating pages with public routes i18n](#associating-pages-with-public-routes-i18n)
 - [Widget types](#widget-types)
 - [Elementor-like Style and Advanced](#elementor-like-style-and-advanced)
 - [i18n: structure and props model](#i18n-structure-and-props-model)
@@ -17,13 +20,16 @@ How to manage builder pages, save documents, and render them publicly.
 
 ## Admin routes
 
-| Route name | Method | Path | Purpose |
+Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the prefix in config to remount the whole admin UI (route **names** stay the same — prefer `path()` / `generateUrl()`).
+
+| Route name | Method | Path (default prefix) | Purpose |
 | --- | --- | --- | --- |
-| `admin_page_builder_list` | GET, POST | `/admin/page-builder/pages` | List pages; create new page (form) |
-| `admin_page_builder_canvas` | GET | `/admin/page-builder/pages/{pageKey}/canvas` | Visual editor shell |
-| `admin_page_builder_document_get` | GET | `/admin/page-builder/pages/{pageKey}/document` | Load structure + props JSON |
-| `admin_page_builder_document_save` | POST | `/admin/page-builder/pages/{pageKey}/document` | Persist document |
-| `admin_page_builder_document_publish` | POST | `/admin/page-builder/pages/{pageKey}/publish` | Set page status to published |
+| `admin_page_builder_list` | GET, POST | `{prefix}/pages` | List pages; create new page (form) |
+| `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell |
+| `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON |
+| `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document |
+| `admin_page_builder_document_publish` | POST | `{prefix}/pages/{pageKey}/publish` | Set page status to published |
+| `admin_page_builder_document_unpublish` | POST | `{prefix}/pages/{pageKey}/unpublish` | Set page status back to draft |
 
 Public bundle route (optional for hosts that do not use custom controllers):
 
@@ -49,6 +55,8 @@ $documentService->saveDocument($page, $structure, $widgetPropsByLocale);
 
 // Publish
 $documentService->publish($page);
+// …
+$documentService->unpublish($page); // back to draft — public /p/{pageKey} returns 404
 ```
 
 `saveDocument()` normalizes structure through `DocumentNormalizer`. For GrapesJS documents it sanitizes HTML/CSS via `GrapesDocumentSanitizer`. Classic v1 documents still validate widget types and sanitize props per locale.
@@ -110,7 +118,73 @@ return $this->render('site/page.html.twig', ['page_tree' => $tree]);
 
 **Option C — bundle public controller:**
 
-Published pages are available at `/p/{pageKey}` when routes are imported.
+Published pages are available at `/p/{pageKey}` when routes are imported. Locale comes from `$request->getLocale()` (Symfony), not from the path segment.
+
+## Associating pages with public routes (i18n)
+
+The bundle stores **one page entity per logical page**, not one page per language.
+
+| Concept | Role |
+| --- | --- |
+| **`pageKey`** | Stable technical id (`about`, `pricing`). Used by admin, API, `/p/{pageKey}`, and `nowo_page_builder_render()`. **Not** locale-specific. |
+| **`BuilderPageTranslation.slug`** | Per-locale SEO slug / Twig `{{ slug }}` / suggested canonical. **Does not** resolve HTTP routes by itself (no `findBySlug`). |
+| **Locale content** | Classic: `widgetPropsByLocale`. Grapes: `localeContent[locale]`. Chosen at render time from the request locale (+ `default_locale` fallback). |
+
+**The host app owns pretty URLs.** Map each marketing path → `(pageKey, locale)` and call `PageRenderProvider` / Twig. The optional `/p/{pageKey}` route is a convenience preview, not a CMS router.
+
+### Pattern A — Same path, locale changes
+
+One route; language via Symfony `{_locale}` prefix, subdomain, or query (`?_locale=es` like the demo).
+
+```php
+#[Route('/about', name: 'about')]
+// or: #[Route('/{_locale}/about', name: 'about', requirements: ['_locale' => 'en|es'])]
+public function about(Request $request, PageRenderProvider $pages): Response
+{
+    $tree = $pages->getRenderedTree('about', $request->getLocale());
+
+    return $this->render('site/page.html.twig', ['page_tree' => $tree]);
+}
+```
+
+```twig
+{# same pageKey, different locale #}
+{% set page_tree = nowo_page_builder_render('about', app.request.locale) %}
+```
+
+Examples: `/about` + `?_locale=es`, or `/en/about` ↔ `/es/about` with the same `pageKey=about`.
+
+### Pattern B — Totally different paths per locale
+
+Declare **two (or more) host routes** that point to the **same** `pageKey` but force the locale:
+
+```php
+#[Route('/about', name: 'about_en', defaults: ['_locale' => 'en'])]
+public function aboutEn(PageRenderProvider $pages): Response
+{
+    return $this->render('site/page.html.twig', [
+        'page_tree' => $pages->getRenderedTree('about', 'en'),
+    ]);
+}
+
+#[Route('/sobre-nosotros', name: 'about_es', defaults: ['_locale' => 'es'])]
+public function aboutEs(PageRenderProvider $pages): Response
+{
+    return $this->render('site/page.html.twig', [
+        'page_tree' => $pages->getRenderedTree('about', 'es'),
+    ]);
+}
+```
+
+Keep `BuilderPageTranslation.slug` aligned with the pretty path when you care about SEO (`about` vs `sobre-nosotros`), and set `canonicalUrl` per locale in Admin → SEO if needed.
+
+### What the bundle does *not* do
+
+- No automatic routing table from slugs.
+- No built-in “one different URL per locale” generator.
+- `/p/{pageKey}` always uses the **key**, not the translation slug (if `slug !== pageKey`, they can diverge — prefer host routes for production).
+
+See also [ARCHITECTURE.md](ARCHITECTURE.md#public-routing--i18n) and the demo (`DemoController`: fixed paths + `?_locale=`).
 
 ## Widget types
 
@@ -145,6 +219,89 @@ Optional blocks: Custom HTML (`grapesjs.allow_custom_code`), Script (`grapesjs.a
 4. Host vars: implement `GrapesTwigContextProviderInterface` or pass `$context` to `getRenderedTree()` / `nowo_page_builder_render()`.
 
 Demo: `/twig` and `/p/twig`.
+
+### Draft vs published
+
+- New pages start as **draft**. `Save` only persists the document; it does **not** change status.
+- **Publish** → `status=published` (public `/p/{pageKey}` works).
+- **Save as draft** / **Unpublish** → `status=draft` again (public route 404 until republished).
+- Canvas and classic Sections editors expose both actions; API: `POST …/publish` and `POST …/unpublish`.
+
+### Page versions (revisions)
+
+Optional history of document snapshots (`BuilderPageRevision`):
+
+```yaml
+nowo_page_builder_kit:
+    revisions:
+        enabled: true
+        max_per_page: 50
+        on_save: true      # snapshot before each save
+        on_publish: true   # labeled snapshot on publish
+```
+
+- Admin **Versions** screen: list, manual “Save version”, restore (rolls back structure + locale props).
+- Autosave revisions skip when content is unchanged vs the latest snapshot; restore creates a “Before restore” safety snapshot when `on_save` is on.
+- API: `GET …/revisions.json`, `POST …/revisions`, `POST …/revisions/{id}/restore` (CSRF `page_builder_document`).
+
+Demo: enable in `nowo_page_builder_kit.yaml`, open Admin → Versions on any page.
+
+### Edit pencil on public pages
+
+When `PageBuilderKitAccessCheckerInterface::canAccess()` is true (logged-in editor / custom guard), public templates show a floating pencil:
+
+```twig
+{% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
+```
+
+- Twig function: `nowo_page_builder_can_edit()` (do **not** cache this in a Twig global — FrankenPHP workers).
+- Grapes pages → canvas; classic pages → Sections editor.
+- Host custom guard:
+
+```yaml
+nowo_page_builder_kit:
+    security:
+        access_checker: App\Security\PageBuilderAccessChecker
+```
+
+```php
+final class PageBuilderAccessChecker implements PageBuilderKitAccessCheckerInterface
+{
+    public function canAccess(): bool
+    {
+        return $this->auth->isGranted('ROLE_EDITOR');
+    }
+}
+```
+
+### Twig lists / products in Grapes HTML
+
+Provide array context from the host (Doctrine → plain arrays/scalars — sandbox cannot call entity methods):
+
+```php
+#[AutoconfigureTag('nowo_page_builder_kit.grapes_twig_context')]
+final class ProductsTwigContext implements GrapesTwigContextProviderInterface
+{
+    public function getContext(BuilderPage $page, string $locale): array
+    {
+        return [
+            'products' => [
+                ['name' => 'Starter', 'price' => '19 €', 'url' => '/pricing'],
+            ],
+        ];
+    }
+}
+```
+
+In GrapesJS (or seed HTML):
+
+```twig
+{% for p in products %}
+  <li><a href="{{ p.url }}">{{ p.name }}</a> — {{ p.price }}</li>
+{% endfor %}
+```
+
+Allowed tags: `if`, `for`, `set`. Demo: `/twig` (products + highlights loops).
 
 ### SEO & accessibility
 

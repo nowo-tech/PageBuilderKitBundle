@@ -13,6 +13,7 @@ use Nowo\PageBuilderKitBundle\NowoPageBuilderKitBundle;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 #[CoversClass(NowoPageBuilderKitBundle::class)]
@@ -36,7 +37,7 @@ final class NowoPageBuilderKitBundleTest extends TestCase
         (new NowoPageBuilderKitBundle())->build($container);
 
         $passClasses = array_map(
-            static fn ($pass) => $pass::class,
+            static fn (CompilerPassInterface $pass): string => $pass::class,
             $container->getCompilerPassConfig()->getBeforeOptimizationPasses(),
         );
         self::assertContains(TwigPathsPass::class, $passClasses);

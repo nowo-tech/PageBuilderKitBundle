@@ -18,24 +18,24 @@ use function is_string;
 use function iterator_to_array;
 use function sprintf;
 
-final class PageRenderProvider implements PageRenderProviderInterface
+final readonly class PageRenderProvider implements PageRenderProviderInterface
 {
     /** @var list<GrapesTwigContextProviderInterface> */
-    private readonly array $twigContextProviders;
+    private array $twigContextProviders;
 
     /**
      * @param iterable<GrapesTwigContextProviderInterface> $twigContextProviders
      */
     public function __construct(
-        private readonly BuilderPageRepositoryInterface $pageRepository,
-        private readonly DocumentNormalizer $documentNormalizer,
-        private readonly BuilderLocales $builderLocales,
-        private readonly WidgetTypeRegistry $widgetTypeRegistry,
-        private readonly PageBuilderProtection $protection,
-        private readonly WidgetPropsMerger $widgetPropsMerger,
-        private readonly GrapesDocumentSanitizer $grapesDocumentSanitizer = new GrapesDocumentSanitizer(),
-        private readonly GrapesTwigRenderer $grapesTwigRenderer = new GrapesTwigRenderer(),
-        private readonly PageSeoBuilder $pageSeoBuilder = new PageSeoBuilder(),
+        private BuilderPageRepositoryInterface $pageRepository,
+        private DocumentNormalizer $documentNormalizer,
+        private BuilderLocales $builderLocales,
+        private WidgetTypeRegistry $widgetTypeRegistry,
+        private PageBuilderProtection $protection,
+        private WidgetPropsMerger $widgetPropsMerger,
+        private GrapesDocumentSanitizer $grapesDocumentSanitizer = new GrapesDocumentSanitizer(),
+        private GrapesTwigRenderer $grapesTwigRenderer = new GrapesTwigRenderer(),
+        private PageSeoBuilder $pageSeoBuilder = new PageSeoBuilder(),
         iterable $twigContextProviders = [],
     ) {
         $providers = $twigContextProviders instanceof Traversable
@@ -56,7 +56,7 @@ final class PageRenderProvider implements PageRenderProviderInterface
             throw new RuntimeException(sprintf('Unknown page "%s".', $pageKey));
         }
 
-        $locale         = $locale ?? $this->builderLocales->getDefault();
+        $locale ??= $this->builderLocales->getDefault();
         $fallbackLocale = $this->builderLocales->getDefault();
 
         $document = $page->getDocument();

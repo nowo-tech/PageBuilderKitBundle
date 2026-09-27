@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Service;
 
 use function array_key_exists;
+use function in_array;
 use function is_array;
 use function is_int;
 use function is_numeric;
@@ -154,7 +155,7 @@ final class ElementAppearanceNormalizer
                 if (!is_string($name) || $name === '' || !is_string($value)) {
                     continue;
                 }
-                if (array_key_exists($name, $attrs) && ($name === 'id' || $name === 'class' || $name === 'style')) {
+                if (array_key_exists($name, $attrs) && in_array($name, ['id', 'class', 'style'], true)) {
                     continue;
                 }
                 $attrs[$name] = $value;

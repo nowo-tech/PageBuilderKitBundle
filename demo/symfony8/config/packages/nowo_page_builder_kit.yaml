@@ -5,6 +5,7 @@ nowo_page_builder_kit:
         access_roles: [ROLE_ADMIN]
         allow_unauthenticated: false
     web_ui:
+        path_prefix: /admin/page-builder
         layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
         css_framework: bootstrap5
     doctrine:
@@ -17,6 +18,11 @@ nowo_page_builder_kit:
         default_og_image: 'https://picsum.photos/seed/pbk-default-og/1200/630'
         canonical_base_url: 'http://localhost:8137'
         default_robots: 'index,follow'
+    revisions:
+        enabled: true
+        max_per_page: 30
+        on_save: true
+        on_publish: true
     grapesjs:
         enabled: true
         cdn_version: '0.22.9'

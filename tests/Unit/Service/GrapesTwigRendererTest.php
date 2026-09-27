@@ -45,6 +45,26 @@ final class GrapesTwigRendererTest extends TestCase
     }
 
     #[Test]
+    public function loopsOverHostProductLists(): void
+    {
+        $renderer = new GrapesTwigRenderer();
+        $result   = $renderer->render(
+            '<ul>{% for p in products %}<li>{{ p.name }} — {{ p.price }}</li>{% endfor %}</ul>',
+            [
+                'products' => [
+                    ['name' => 'Starter', 'price' => '$19'],
+                    ['name' => 'Pro', 'price' => '$49'],
+                ],
+            ],
+        );
+
+        self::assertTrue($result['twigApplied']);
+        self::assertNull($result['twigError']);
+        self::assertStringContainsString('Starter — $19', $result['html']);
+        self::assertStringContainsString('Pro — $49', $result['html']);
+    }
+
+    #[Test]
     public function skipsWhenDisabled(): void
     {
         $renderer = new GrapesTwigRenderer(false);

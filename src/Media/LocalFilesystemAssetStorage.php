@@ -34,16 +34,16 @@ use const FILEINFO_MIME_TYPE;
 /**
  * Validates and stores uploads on the local public filesystem.
  */
-final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterface
+final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
      */
     public function __construct(
-        private readonly string $directory,
-        private readonly string $publicPrefix,
-        private readonly int $maxBytes = 5_242_880,
-        private readonly array $allowedMimeTypes = [
+        private string $directory,
+        private string $publicPrefix,
+        private int $maxBytes = 5_242_880,
+        private array $allowedMimeTypes = [
             'image/jpeg',
             'image/png',
             'image/gif',
@@ -64,7 +64,7 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
         }
 
         $mime      = $this->resolveMimeType($file);
-        $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $this->extensionFromMime($mime) ?: 'bin'));
+        $extension = strtolower($file->getClientOriginalExtension() ?: $this->extensionFromMime($mime) ?: 'bin');
         $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
         $basename  = bin2hex(random_bytes(16)) . '.' . $extension;
         $file->move($this->directory, $basename);
@@ -128,13 +128,13 @@ final class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterf
             }
         }
 
-        $client = (string) $file->getClientMimeType();
+        $client = $file->getClientMimeType();
         if ($client !== '') {
             return $client;
         }
 
         try {
-            return (string) ($file->getMimeType() ?: '');
+            return $file->getMimeType() ?: '';
         } catch (Throwable) {
             return '';
         }
