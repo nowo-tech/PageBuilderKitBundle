@@ -35,7 +35,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame('', $config['doctrine']['table_prefix']);
         self::assertSame('default', $config['doctrine']['connection']);
         self::assertSame(
-            HtmlSanitizeStrategy::None->value,
+            HtmlSanitizeStrategy::Allowlist->value,
             $config['html']['sanitize']['strategy'],
         );
         self::assertNull($config['html']['sanitize']['service']);

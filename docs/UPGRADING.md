@@ -4,10 +4,21 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [Unreleased](#unreleased)
+- [1.3.0](#130)
 - [1.2.0](#120)
 - [1.1.1](#111)
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+
+## Unreleased
+
+## 1.3.0
+
+From **1.2.0**:
+
+1. Default `html.sanitize.strategy` is **`allowlist`**. Existing installs that relied on unsanitized Grapes/widget HTML must set `strategy: none` explicitly (trusted editors only).
+2. Clear Symfony cache after deploy.
 
 ## 1.2.0
 

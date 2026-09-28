@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.3.0] - 2026-09-28](#130---2026-09-28)
 
 - [[1.2.0] - 2026-09-27](#120---2026-09-27)
 
@@ -18,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.3.0] - 2026-09-28
+
+### Security
+
+- Default `html.sanitize.strategy` is **`allowlist`** (was `none`). Set `none` only for fully trusted staff editors. See [SECURITY.md](SECURITY.md) and [UPGRADING.md](UPGRADING.md#130).
 
 ## [1.2.0] - 2026-09-27
 

@@ -40,7 +40,7 @@ nowo_page_builder_kit:
         connection: default
     html:
         sanitize:
-            strategy: none      # none | strip | allowlist | service
+            strategy: allowlist # none | strip | allowlist | service
             service: null
     revisions:
         enabled: false
@@ -91,7 +91,7 @@ nowo_page_builder_kit:
             tui_image_editor: true
 ```
 
-Production hosts should prefer `html.sanitize.strategy: allowlist` when untrusted HTML is possible. Keep `grapesjs.allow_scripts: false` unless editors are fully trusted (XSS risk).
+PHP default and Flex recipe use `html.sanitize.strategy: allowlist`. Set `none` only when every editor is fully trusted. Keep `grapesjs.allow_scripts: false` unless editors are fully trusted (XSS risk).
 
 ## Top-level options
 
@@ -176,7 +176,7 @@ After changing `table_prefix`, generate a new migration (or `doctrine:schema:upd
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `strategy` | `none` | `none`, `strip`, `allowlist`, or `service` |
+| `strategy` | `allowlist` | `allowlist` (default), `strip`, `service`, or `none` (trusted editors only) |
 | `service` | `null` | Host service implementing `PageBuilderHtmlSanitizerInterface` when `strategy: service` |
 
 Sanitization runs when `DocumentService` saves widget props and when widgets sanitize merged props for public render.

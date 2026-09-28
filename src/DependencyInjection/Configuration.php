@@ -103,7 +103,7 @@ final class Configuration implements ConfigurationInterface
                             ->children()
                                 ->enumNode('strategy')
                                     ->values(HtmlSanitizeStrategy::values())
-                                    ->defaultValue(HtmlSanitizeStrategy::None->value)
+                                    ->defaultValue(HtmlSanitizeStrategy::Allowlist->value)
                                 ->end()
                                 ->scalarNode('service')
                                     ->defaultNull()

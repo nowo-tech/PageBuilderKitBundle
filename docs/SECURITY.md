@@ -10,6 +10,7 @@ Security considerations for page builder admin, document API, and public renderi
 - [Rich text and HTML widgets](#rich-text-and-html-widgets)
 - [Operational guidance](#operational-guidance)
 - [Release security checklist](#release-security-checklist)
+- [REQ-SEC-004 (AI security audit)](#req-sec-004-ai-security-audit)
 
 ## Threat model
 
@@ -59,19 +60,19 @@ Recommendations:
 
 ## Rich text and HTML widgets
 
-Widgets `text` and `html` may store editor-authored HTML. Configure sanitization explicitly in production:
+Widgets `text` and `html` may store editor-authored HTML. The **default** strategy is `allowlist`. Opt out only for fully trusted staff editors:
 
 ```yaml
 nowo_page_builder_kit:
     html:
         sanitize:
-            strategy: allowlist   # or strip | service
+            strategy: none   # trusted editors only
 ```
 
 | Strategy | Behaviour |
 | --- | --- |
-| `none` (default) | Trusted editors only; HTML stored/rendered as-is |
-| `allowlist` | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer` |
+| `none` | Trusted editors only; HTML stored/rendered as-is (opt-in; not the default) |
+| `allowlist` (default) | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer` |
 | `strip` | Remove all tags |
 | `service` | Host `PageBuilderHtmlSanitizerInterface` |
 
@@ -97,6 +98,18 @@ Only trusted editors should receive roles covered by the access checker.
 | Dependencies | `composer audit` reviewed with QA |
 
 See also [CONFIGURATION.md](CONFIGURATION.md) and [USAGE.md](USAGE.md).
+
+## REQ-SEC-004 (AI security audit)
+
+| Field | Value |
+|-------|--------|
+| **Date** | 2026-09-27 |
+| **Method** | Cursor agent static pass (`src/`, Flex recipe, demo, this doc + `.github/SECURITY.md`) |
+| **Overall risk** | **Low** |
+| **Grade** | **Pass (good)** |
+| **Record** | This document (in-package). Monorepo catalog: `BUNDLES_SECURITY_ANALYSIS.md` §4 / §7.2 / Appendix Z |
+
+No Critical/High findings. Residuals: do not set `html.sanitize.strategy: none` for UGC or broad editor roles; host firewall on admin path prefix; keep CSRF on document API.
 
 ## Secrets
 
