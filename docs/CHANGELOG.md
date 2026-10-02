@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.1] - 2026-10-02](#141---2026-10-02)
 - [[1.4.0] - 2026-10-02](#140---2026-10-02)
 - [[1.3.0] - 2026-09-28](#130---2026-09-28)
 
@@ -21,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-02
+
+### Added
+
+- **Cookbook:** [docs/COOKBOOK.md](COOKBOOK.md) — Grapes block packs + template sharing recipes (linked from README / USAGE / WIDGET_AUTHORS).
+- **Admin UX:** list badges Grapes vs legacy; Sections editor warning banner (`admin.sections.legacy_*`).
+- **Engine extraction:** `DocumentStructureValidator`, `ClassicPageTreeBuilder`; Grapes locale sanitize via `GrapesDocumentSanitizer::sanitizeLocaleContent()`.
+- **Frontend types:** `grapes-types.ts` for canvas config/structure helpers (canvas editor surface still `@ts-nocheck`).
+
+### Notes
+
+- Backward compatible for hosts on `^1.4`. **No** Doctrine schema changes. Optional: rebuild canvas assets if vendoring bundle JS. See [UPGRADING.md](UPGRADING.md#141).
 ## [1.4.0] - 2026-10-02
 
 ### Added

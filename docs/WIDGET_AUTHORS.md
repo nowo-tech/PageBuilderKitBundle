@@ -134,6 +134,8 @@ Always sanitize user-controlled HTML through `PageBuilderProtection` in `sanitiz
 
 Free-form GrapesJS pages (schema v2) do **not** use classic widget types. Ship reusable BlockManager entries with `GrapesBlockPackInterface` (tag `nowo_page_builder_kit.grapes_block_pack`). Packs are serialized into the canvas config as `blockPacks` and registered client-side.
 
+Cookbook (Composer pack layout, icons, governance): [COOKBOOK.md § Ship a Grapes block pack](COOKBOOK.md#ship-a-grapes-block-pack).
+
 ```php
 use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
 

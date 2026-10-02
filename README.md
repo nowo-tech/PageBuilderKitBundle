@@ -129,6 +129,7 @@ Demo default URL: `http://localhost:8137`.
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Widget authors](docs/WIDGET_AUTHORS.md)
+- [Cookbook (packs + templates)](docs/COOKBOOK.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Usage](docs/USAGE.md)
 - [Builder manual](docs/BUILDER-MANUAL.md)

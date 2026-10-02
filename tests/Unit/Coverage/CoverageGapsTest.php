@@ -380,11 +380,11 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function coverRemainingPrivateBranchesViaReflection(): void
     {
-        $service         = $this->documentService();
-        $sanitizeLocales = new ReflectionMethod(DocumentService::class, 'sanitizeGrapesLocaleContent');
-        $out             = $sanitizeLocales->invoke($service, ['localeContent' => 'bad']);
+        $service          = $this->documentService();
+        $sanitizerLocales = new GrapesDocumentSanitizer(false);
+        $out              = $sanitizerLocales->sanitizeLocaleContent(['localeContent' => 'bad']);
         self::assertSame([], $out['localeContent']);
-        $out = $sanitizeLocales->invoke($service, [
+        $out = $sanitizerLocales->sanitizeLocaleContent([
             'localeContent' => [
                 0    => ['html' => 'x'],
                 'es' => 'bad',

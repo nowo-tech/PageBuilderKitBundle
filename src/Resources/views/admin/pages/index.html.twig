@@ -26,6 +26,12 @@
                         <span>
                             <strong>{{ page.pageKey }}</strong>
                             <span class="badge bg-secondary ms-2">{{ page.status.value }}</span>
+                            {% set _engine = page.document and page.document.structure.engine|default('classic') %}
+                            {% if _engine == 'grapesjs' %}
+                                <span class="badge text-bg-primary ms-1">Grapes</span>
+                            {% else %}
+                                <span class="badge text-bg-warning ms-1">{{ 'admin.pages.legacy'|trans }}</span>
+                            {% endif %}
                         </span>
                         <span class="d-flex gap-2 flex-wrap">
                         {% if nowo_page_builder_can('content') or nowo_page_builder_can('layout') %}
@@ -55,7 +61,6 @@
                                 {{ 'admin.pages.revisions'|trans }}
                             </a>
                         {% endif %}
-                        {% set _engine = page.document and page.document.structure.engine|default('classic') %}
                         {% if nowo_page_builder_can('layout') %}
                             {% if _engine == 'grapesjs' %}
                                 <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page.pageKey}) }}">

@@ -181,6 +181,36 @@ final readonly class GrapesDocumentSanitizer
             $structure['grapes'] = [];
         }
 
+        return $this->sanitizeLocaleContent($structure);
+    }
+
+    /**
+     * @param array<string, mixed> $structure
+     *
+     * @return array<string, mixed>
+     */
+    public function sanitizeLocaleContent(array $structure): array
+    {
+        $localeContent = $structure['localeContent'] ?? [];
+        if (!is_array($localeContent)) {
+            $structure['localeContent'] = [];
+
+            return $structure;
+        }
+
+        $sanitized = [];
+        foreach ($localeContent as $locale => $content) {
+            if (!is_string($locale) || !is_array($content)) {
+                continue;
+            }
+            $sanitized[$locale] = [
+                'html'   => $this->sanitizeHtml(is_string($content['html'] ?? null) ? $content['html'] : ''),
+                'css'    => $this->sanitizeCss(is_string($content['css'] ?? null) ? $content['css'] : ''),
+                'grapes' => is_array($content['grapes'] ?? null) ? $content['grapes'] : [],
+            ];
+        }
+        $structure['localeContent'] = $sanitized;
+
         return $structure;
     }
 }

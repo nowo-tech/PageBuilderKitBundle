@@ -651,11 +651,11 @@ Full guide: [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md).
 
 ## GrapesJS block packs
 
-For schema v2 (Grapes) canvases, implement `GrapesBlockPackInterface` (tag `nowo_page_builder_kit.grapes_block_pack`). Blocks appear in the BlockManager via canvas config `blockPacks`. See [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md#grapesjs-block-packs).
+For schema v2 (Grapes) canvases, implement `GrapesBlockPackInterface` (tag `nowo_page_builder_kit.grapes_block_pack`). Blocks appear in the BlockManager via canvas config `blockPacks`. See [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md#grapesjs-block-packs) and the [Cookbook](COOKBOOK.md#ship-a-grapes-block-pack).
 
 ## Template sharing
 
-Export/import template JSON (`admin_page_builder_templates_export` / `_export_all` / `_import`) to move reusable structures between projects. Format: `formatVersion: 1`, `kind: page_builder_template` (single) or `page_builder_templates` (bundle).
+Export/import template JSON (`admin_page_builder_templates_export` / `_export_all` / `_import`) to move reusable structures between projects. Format: `formatVersion: 1`, `kind: page_builder_template` (single) or `page_builder_templates` (bundle). Step-by-step: [Cookbook § Share templates](COOKBOOK.md#share-templates-across-projects).
 
 Apply options (form checkboxes / JSON body):
 

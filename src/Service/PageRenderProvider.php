@@ -36,6 +36,8 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
 
     private ContentFieldSlotReplacer $contentFieldSlotReplacer;
 
+    private ClassicPageTreeBuilder $classicPageTreeBuilder;
+
     /**
      * @param iterable<GrapesTwigContextProviderInterface> $twigContextProviders
      */
@@ -53,6 +55,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         ?PageBuilderKitTraceInterface $trace = null,
         ?ContentFieldsNormalizer $contentFieldsNormalizer = null,
         ?ContentFieldSlotReplacer $contentFieldSlotReplacer = null,
+        ?ClassicPageTreeBuilder $classicPageTreeBuilder = null,
     ) {
         $providers = $twigContextProviders instanceof Traversable
             ? iterator_to_array($twigContextProviders, false)
@@ -61,6 +64,11 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         $this->trace                    = $trace ?? new NullPageBuilderKitTrace();
         $this->contentFieldsNormalizer  = $contentFieldsNormalizer ?? new ContentFieldsNormalizer();
         $this->contentFieldSlotReplacer = $contentFieldSlotReplacer ?? new ContentFieldSlotReplacer();
+        $this->classicPageTreeBuilder   = $classicPageTreeBuilder ?? new ClassicPageTreeBuilder(
+            $widgetTypeRegistry,
+            $protection,
+            $widgetPropsMerger,
+        );
     }
 
     /**
@@ -110,7 +118,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             $result = $base + $this->renderGrapes($page, $structure, $locale, $fallbackLocale, $base, $context, $timings);
         } else {
             $tClassic            = hrtime(true);
-            $result              = $base + $this->renderClassic($document, $structure, $locale, $fallbackLocale);
+            $result              = $base + $this->classicPageTreeBuilder->build($document, $structure, $locale, $fallbackLocale);
             $timings['classic']  = $this->msSince($tClassic);
             $result['timingsMs'] = $timings;
         }
@@ -240,110 +248,6 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         }
 
         return [...$context, ...$extraContext];
-    }
-
-    /**
-     * @param array<string, mixed> $structure
-     *
-     * @return array<string, mixed>
-     */
-    private function renderClassic(
-        BuilderDocument $document,
-        array $structure,
-        string $locale,
-        string $fallbackLocale,
-    ): array {
-        $localeProps   = $document->getLocaleDocument($locale)?->getWidgetProps() ?? [];
-        $fallbackProps = $document->getLocaleDocument($fallbackLocale)?->getWidgetProps() ?? [];
-        $mergedProps   = $this->widgetPropsMerger->mergePropsWithFallbackLocale(
-            $localeProps,
-            $fallbackProps,
-            $locale,
-            $fallbackLocale,
-        );
-
-        $renderedSections = [];
-        foreach ($structure['sections'] as $section) {
-            if (!is_array($section)) {
-                continue; // @codeCoverageIgnore
-            }
-
-            $renderedColumns = [];
-            foreach ($section['columns'] ?? [] as $column) {
-                if (!is_array($column)) {
-                    continue; // @codeCoverageIgnore
-                }
-
-                $renderedWidgets = [];
-                foreach ($column['widgets'] ?? [] as $widget) {
-                    $rendered = $this->renderWidgetNode($widget, $mergedProps);
-                    if ($rendered !== null) {
-                        $renderedWidgets[] = $rendered;
-                    }
-                }
-
-                $renderedColumns[] = [
-                    'id'         => is_string($column['id'] ?? null) ? $column['id'] : '',
-                    'settings'   => is_array($column['settings'] ?? null) ? $column['settings'] : ['width' => 12],
-                    'appearance' => is_array($column['settings'] ?? null) ? $column['settings'] : ['width' => 12],
-                    'widgets'    => $renderedWidgets,
-                ];
-            }
-
-            $renderedSections[] = [
-                'id'         => $section['id'] ?? '',
-                'settings'   => is_array($section['settings'] ?? null) ? $section['settings'] : [],
-                'appearance' => is_array($section['settings'] ?? null) ? $section['settings'] : [],
-                'columns'    => $renderedColumns,
-            ];
-        }
-
-        return [
-            'engine'   => 'classic',
-            'sections' => $renderedSections,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $mergedProps
-     *
-     * @return array<string, mixed>|null
-     */
-    private function renderWidgetNode(mixed $widget, array $mergedProps): ?array
-    {
-        if (!is_array($widget)) {
-            return null; // @codeCoverageIgnore
-        }
-
-        $widgetId = $widget['id'] ?? null;
-        $typeName = $widget['type'] ?? null;
-        if (!is_string($widgetId) || !is_string($typeName) || !$this->widgetTypeRegistry->has($typeName)) {
-            return null;
-        }
-
-        $widgetType  = $this->widgetTypeRegistry->get($typeName);
-        $appearance  = is_array($widget['settings'] ?? null) ? $widget['settings'] : [];
-        $storedProps = is_array($mergedProps[$widgetId] ?? null) ? $mergedProps[$widgetId] : [];
-        $content     = $widgetType->sanitizeProps($storedProps, $this->protection);
-
-        $children = [];
-        if ($widgetType->allowsChildren()) {
-            foreach ($widget['children'] ?? [] as $child) {
-                $renderedChild = $this->renderWidgetNode($child, $mergedProps);
-                if ($renderedChild !== null) {
-                    $children[] = $renderedChild;
-                }
-            }
-        }
-
-        return [
-            'id'         => $widgetId,
-            'type'       => $typeName,
-            'settings'   => $content,
-            'appearance' => $appearance,
-            'template'   => $widgetType->getPublicTemplate(),
-            'children'   => $children,
-        ];
     }
 
     private function msSince(int $start, ?int $end = null): float

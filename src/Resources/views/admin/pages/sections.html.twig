@@ -31,6 +31,14 @@
 {% endblock %}
 
 {% block admin %}
+    <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2" role="status">
+        <div>
+            <strong>{{ 'admin.sections.legacy_badge'|trans }}</strong>
+            — {{ 'admin.sections.legacy_banner'|trans }}
+        </div>
+        <a class="btn btn-sm btn-outline-dark" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+    </div>
+
     <p class="text-muted">{{ 'admin.sections.hint'|trans }}</p>
 
     <ul class="nav nav-tabs mb-3" role="tablist">

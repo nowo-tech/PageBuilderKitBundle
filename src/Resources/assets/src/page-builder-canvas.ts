@@ -1,9 +1,21 @@
-// @ts-nocheck — GrapesJS canvas bootstraps plugins from esm.sh; tighten types incrementally.
+// @ts-nocheck — Grapes editor/plugins from esm.sh; config helpers typed in grapes-types.ts.
 /**
  * Page Builder Kit — GrapesJS canvas (ESM + official plugins).
  * Loads GrapesJS and community plugins from esm.sh; persists schema v2.
  * Built with Vite from this file → src/Resources/public/js/page-builder-canvas.js
  */
+import {
+  type GrapesDocumentStructure,
+  type GrapesFrontendConfig,
+  ensureLocaleContent,
+  parseJsonAttr,
+} from './grapes-types';
+
+
+/** Grapes editor instance — typed loosely until official GrapesJS types are vendored. */
+type GrapesEditor = any;
+type GrapesModule = any;
+
 const PLUGIN_SPECS = {
   blocks_basic: { pkg: 'grapesjs-blocks-basic@1.0.2', opts: { flexGrid: true, category: 'Basic' } },
   forms: { pkg: 'grapesjs-plugin-forms@2.0.6', opts: { category: 'Forms' } },
@@ -34,42 +46,12 @@ const PLUGIN_SPECS = {
   },
 };
 
-function parseJsonAttr(el, name, fallback) {
-  const raw = el.getAttribute(name);
-  if (!raw) return fallback;
-  try { return JSON.parse(raw); } catch (e) { return fallback; }
-}
-
-function emptyLocalePayload() {
-  return { html: '', css: '', grapes: {} };
-}
-
-function ensureLocaleContent(structure, locales, defaultLocale) {
-  if (!structure.localeContent || typeof structure.localeContent !== 'object') {
-    structure.localeContent = {};
-  }
-  locales.forEach((locale) => {
-    if (!structure.localeContent[locale]) {
-      if (locale === defaultLocale && (structure.html || structure.css || (structure.grapes && Object.keys(structure.grapes).length))) {
-        structure.localeContent[locale] = {
-          html: structure.html || '',
-          css: structure.css || '',
-          grapes: structure.grapes || {},
-        };
-      } else {
-        structure.localeContent[locale] = emptyLocalePayload();
-      }
-    }
-  });
-  return structure;
-}
-
 async function importDefault(url) {
   const mod = await import(url);
   return mod.default || mod;
 }
 
-async function loadGrapesStack(config) {
+async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{ grapesjs: GrapesModule; plugins: GrapesModule[]; pluginsOpts: Record<string, unknown> }> {
   const base = (config.pluginCdnBase || 'https://esm.sh').replace(/\/$/, '');
   const version = config.cdnVersion || '0.22.9';
   const grapesjs = await importDefault(`${base}/grapesjs@${version}`);
@@ -126,14 +108,14 @@ async function boot() {
   const labelPublished = root.getAttribute('data-pbk-label-published') || 'published';
   const csrf = root.getAttribute('data-pbk-csrf');
   const defaultLocale = root.getAttribute('data-pbk-default-locale') || 'en';
-  const config = parseJsonAttr(root, 'data-pbk-grapes-config', {});
+  const config = parseJsonAttr<GrapesFrontendConfig>(root, 'data-pbk-grapes-config', {});
   const allowScripts = !!config.allowScripts;
   const allowCustomCode = config.allowCustomCode !== false;
   const compoundExamples = config.compoundExamples !== false;
   const a11yHelpers = config.a11yHelpers !== false;
   const twigCfg = config.twig && typeof config.twig === 'object' ? config.twig : {};
 
-  let structure = parseJsonAttr(root, 'data-pbk-structure', {
+  let structure = parseJsonAttr<GrapesDocumentStructure>(root, 'data-pbk-structure', {
     version: 2, engine: 'grapesjs', html: '', css: '', grapes: {}, localeContent: {},
   });
 
