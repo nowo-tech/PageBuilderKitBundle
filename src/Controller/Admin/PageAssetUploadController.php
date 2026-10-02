@@ -27,6 +27,27 @@ final class PageAssetUploadController extends AbstractController
     ) {
     }
 
+    #[Route('/assets', name: 'admin_page_builder_assets_list', methods: ['GET'])]
+    public function list(Request $request): JsonResponse
+    {
+        if (!$this->assetUploadHandler->isEnabled()) {
+            return new JsonResponse(['error' => 'upload_disabled'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$this->assetUploadHandler->supportsLibrary()) {
+            return new JsonResponse(['data' => []]);
+        }
+
+        $limit = (int) $request->query->get('limit', 100);
+        if ($limit < 1) {
+            $limit = 1;
+        } elseif ($limit > 500) {
+            $limit = 500;
+        }
+
+        return new JsonResponse(['data' => $this->assetUploadHandler->listLibrary($limit)]);
+    }
+
     #[Route('/assets/upload', name: 'admin_page_builder_asset_upload', methods: ['POST'])]
     public function upload(Request $request): JsonResponse
     {

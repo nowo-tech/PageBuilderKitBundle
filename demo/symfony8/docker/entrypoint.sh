@@ -33,6 +33,15 @@ chmod -R 777 /app/var 2>/dev/null || true
 if [ -f /app/vendor/autoload.php ] && [ -f /app/bin/console ]; then
 	php /app/bin/console doctrine:database:create --if-not-exists --no-interaction 2>/dev/null || true
 	php /app/bin/console doctrine:schema:update --force --no-interaction || true
+	php /app/bin/console assets:install public --symlink --no-interaction 2>/dev/null || true
+fi
+
+if [ -f /app/package.json ]; then
+	echo "Building frontend assets (Vite + TypeScript / Pentatrion)..."
+	cd /app
+	CI=true pnpm install --frozen-lockfile || CI=true pnpm install
+	pnpm run build
+	echo "Vite build done."
 fi
 
 exec frankenphp run --config /etc/frankenphp/Caddyfile --adapter caddyfile

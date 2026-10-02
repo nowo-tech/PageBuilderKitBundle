@@ -1,0 +1,22 @@
+{
+  "name": "nowo-tech/page-builder-kit-bundle-assets",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.14.2",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "build": "pnpm run build:canvas && pnpm run build:inline-edit && pnpm run build:css",
+    "build:canvas": "VITE_ENTRY=canvas vite build",
+    "build:inline-edit": "VITE_ENTRY=inline-edit vite build",
+    "build:css": "mkdir -p src/Resources/public/css && cp src/Resources/assets/src/page-builder.css src/Resources/public/css/page-builder.css",
+    "typecheck": "tsc --noEmit",
+    "dev:canvas": "VITE_ENTRY=canvas vite build --watch",
+    "dev:inline-edit": "VITE_ENTRY=inline-edit vite build --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "only-allow": "^1.2.1",
+    "typescript": "~5.7.3",
+    "vite": "^6.4.1"
+  }
+}

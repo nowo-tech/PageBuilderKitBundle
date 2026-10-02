@@ -10,5 +10,14 @@ services:
     App\Demo\:
         resource: '../src/Demo/'
 
+    App\Demo\DemoS3Helper:
+        arguments:
+            $endpoint: '%env(S3_ENDPOINT)%'
+            $key: '%env(S3_ACCESS_KEY)%'
+            $secret: '%env(S3_SECRET_KEY)%'
+            $bucket: '%env(S3_BUCKET)%'
+            $publicBaseUrl: '%env(S3_PUBLIC_BASE_URL)%'
+            $region: '%env(S3_REGION)%'
+
     App\Demo\DemoGrapesTwigContextProvider:
         tags: ['nowo_page_builder_kit.grapes_twig_context']

@@ -37,6 +37,9 @@
     "nowo-tech/ui-kit-bundle": {
         "version": "v1.4.0"
     },
+    "pentatrion/vite-bundle": {
+        "version": "v8.2.4"
+    },
     "phpunit/phpunit": {
         "version": "11.5",
         "recipe": {

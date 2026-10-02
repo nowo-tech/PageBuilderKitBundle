@@ -24,6 +24,10 @@ nowo_page_builder_kit:
     locales: [es, en]
     security:
         access_roles: [ROLE_EDITOR]
+        layout_roles: [ROLE_EDITOR]
+        content_roles: [ROLE_EDITOR]
+        publish_roles: [ROLE_EDITOR]
+        templates_roles: [ROLE_EDITOR]
         access_checker: null
         allow_unauthenticated: false
     web_ui:
@@ -131,11 +135,37 @@ No HTML/CSS document dumps are collected (size / PII). FrankenPHP-safe via `kern
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `access_roles` | `[ROLE_EDITOR]` | Any matching role grants admin access when no custom checker is configured. |
-| `access_checker` | `null` | Optional service id implementing `PageBuilderKitAccessCheckerInterface`. |
-| `allow_unauthenticated` | `false` | When `true`, the bundle uses an allow-all checker. Intended only for trusted demos. |
+| `access_roles` | `[ROLE_EDITOR]` | Shortcut: any matching role grants **every** capability (`canLayout` / `canContent` / …). |
+| `layout_roles` | `[ROLE_EDITOR]` | Canvas, structure, revisions, field schema. Empty list → BlogKit emptyAllows (no extra gate). |
+| `content_roles` | `[ROLE_EDITOR]` | Content forms + SEO. Layout editors also pass. |
+| `publish_roles` | `[ROLE_EDITOR]` | Publish / unpublish. Layout editors also pass. |
+| `templates_roles` | `[ROLE_EDITOR]` | Templates admin. Layout editors also pass. |
+| `access_checker` | `null` | Optional service id implementing `PageBuilderKitAccessCheckerInterface` (**custom guard**). |
+| `allow_unauthenticated` | `false` | When `true`, registers allow-all checker + guard. Demos only. |
 
-The bundle enforces access on route names beginning with `admin_page_builder_`.
+Access is **roles by default** or a **custom guard** via `access_checker` (same pattern as BlogKit / MarketingKit / RoutingKit). Controllers can inject `PageBuilderKitAccessGuard` (`assertLayout()`, …). The admin subscriber maps routes to `canLayout()` / `canContent()` / `canPublish()` / `canTemplates()`.
+
+Example — content editors without canvas:
+
+```yaml
+nowo_page_builder_kit:
+    security:
+        access_roles: []
+        layout_roles: [ROLE_PBK_LAYOUT]
+        content_roles: [ROLE_PBK_CONTENT]
+        publish_roles: [ROLE_PBK_LAYOUT]
+        templates_roles: [ROLE_PBK_LAYOUT]
+```
+
+Custom guard:
+
+```yaml
+nowo_page_builder_kit:
+    security:
+        access_checker: App\Security\PageBuilderAccessChecker
+```
+
+Twig: `nowo_page_builder_can('content')`, `nowo_page_builder_can_edit()`.
 
 ## web_ui
 
@@ -265,7 +295,7 @@ With `grapesjs.a11y_helpers: true` (default), the canvas exposes category **A11y
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `assets_upload.enabled` | `false` | Enable `POST /admin/page-builder/assets/upload` for GrapesJS Asset Manager. |
+| `assets_upload.enabled` | `false` | Enable `POST …/assets/upload` and `GET …/assets` (library) for GrapesJS + content admin. |
 | `assets_upload.storage` | `local` | `local` \| `s3` \| `service`. |
 | `assets_upload.service` | `null` | Custom `PageBuilderAssetStorageInterface` id when `storage=service`. |
 | `assets_upload.max_bytes` | `5242880` | Max upload size. |
@@ -319,15 +349,20 @@ nowo_page_builder_kit:
 nowo_page_builder_kit:
     security:
         access_roles: [ROLE_EDITOR, ROLE_ADMIN]
+        # optional split (BlogKit-style):
+        # layout_roles: [ROLE_PBK_LAYOUT]
+        # content_roles: [ROLE_PBK_CONTENT]
 ```
 
-**Custom access checker:**
+**Custom access checker (guard):**
 
 ```yaml
 nowo_page_builder_kit:
     security:
         access_checker: App\Security\PageBuilderAccessChecker
 ```
+
+`App\Security\PageBuilderAccessChecker` must implement `PageBuilderKitAccessCheckerInterface` (`canAccess`, `canLayout`, `canContent`, `canPublish`, `canTemplates`, `can`). Controllers may inject `PageBuilderKitAccessGuard`.
 
 **Production HTML allowlist:**
 

@@ -15,6 +15,7 @@ Later phases (shipped):
 - Phase 2 — GrapesJS canvas / schema v2: [`specs/002-phase2-grapesjs/spec.md`](../002-phase2-grapesjs/spec.md)
 - Phase 3 — Revisions and templates: [`specs/003-phase3-revisions-templates/spec.md`](../003-phase3-revisions-templates/spec.md)
 - Phase 4 — External classic widget packs (baseline): [`specs/004-phase4-external-widgets/spec.md`](../004-phase4-external-widgets/spec.md)
+- Phase 5 — Content fields + capabilities (MVP): [`specs/005-content-fields-i18n/spec.md`](../005-content-fields-i18n/spec.md)
 
 Roadmap and optional follow-ups: [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
 
@@ -119,12 +120,14 @@ Historical Phase 1 non-goals that are **now shipped** elsewhere:
 - Nested classic widgets / Grapes free-form layout → Phase 2 (`002-phase2-grapesjs`)
 - Revision history UI, templates, duplicate, import/export → Phase 3 (`003-phase3-revisions-templates`)
 
-Still deferred (not Phase 1–4 baseline acceptance criteria):
+Still deferred (not Phase 1–5 MVP acceptance criteria):
 
-- External widget / template marketplace or sharing across projects
-- Grapes block packs (shipped follow-up)
+- External widget / template **marketplace** (governed sharing across orgs)
 - Full theme/site builder ownership for host applications
+- Phase 6 hardening (required-field validation on publish, field-aware template apply/SEO, repeater/reference types) → [`../005-content-fields-i18n/spec.md`](../005-content-fields-i18n/spec.md#non-goals-phase-5-mvp)
 - Optional follow-ups listed in [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#follow-ups-optional)
+
+> Note: Grapes **block packs**, template JSON export/import, and visual revision diff shipped in **v1.2.0**. Content fields + capabilities MVP shipped as Phase 5 (unreleased). Classic Sections remain **legacy**.
 
 ## Success criteria (`SC-*`)
 

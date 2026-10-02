@@ -25,6 +25,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Widget types](#widget-types)
 - [Elementor-like Style and Advanced](#elementor-like-style-and-advanced)
 - [i18n: structure and props model](#i18n-structure-and-props-model)
+- [Content fields (Phase 5)](#content-fields-phase-5)
 - [Custom access logic](#custom-access-logic)
 - [Twig overrides](#twig-overrides)
 - [Custom widgets](#custom-widgets)
@@ -41,7 +42,9 @@ Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the
 | `admin_page_builder_templates_export_all` | GET | `{prefix}/templates/export` | Export all templates JSON |
 | `admin_page_builder_templates_export` | GET | `{prefix}/templates/{templateKey}/export` | Export one template JSON |
 | `admin_page_builder_templates_import` | POST | `{prefix}/templates/import` | Import template JSON (single or bundle) |
-| `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell |
+| `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell (**layout**) |
+| `admin_page_builder_content` | GET, POST | `{prefix}/pages/{pageKey}/content` | Typed content fields (**content** / layout for schema) |
+| `admin_page_builder_content_schema` | POST | `{prefix}/pages/{pageKey}/content/schema` | Add/remove field defs (**layout**) |
 | `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON |
 | `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document |
 | `admin_page_builder_document_publish` | POST | `{prefix}/pages/{pageKey}/publish` | Set page status to published |
@@ -51,6 +54,8 @@ Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the
 | `admin_page_builder_document_import` | POST | `{prefix}/pages/import` | Import page JSON |
 | `admin_page_builder_revisions` | GET | `{prefix}/pages/{pageKey}/revisions` | Version list (when enabled) |
 | `admin_page_builder_revisions_diff` | GET | `{prefix}/pages/{pageKey}/revisions/{id}/diff` | Diff live vs revision |
+| `admin_page_builder_assets_list` | GET | `{prefix}/assets` | Media library list (when upload enabled) |
+| `admin_page_builder_asset_upload` | POST | `{prefix}/assets/upload` | Upload image (CSRF) |
 
 Public bundle route (optional for hosts that do not use custom controllers):
 
@@ -373,8 +378,11 @@ nowo_page_builder_kit:
 ```
 
 Custom backends: implement `PageBuilderAssetStorageInterface` and set `storage: service` + `service: app.my_storage`.
+For media library browsing, also implement `PageBuilderAssetLibraryInterface::list()`.
 
-Endpoint: `POST /admin/page-builder/assets/upload` (CSRF `page_builder_asset_upload`).
+Endpoints:
+- `POST /admin/page-builder/assets/upload` (CSRF `page_builder_asset_upload`)
+- `GET /admin/page-builder/assets` — library list for content picker + Grapes Asset Manager seed
 
 ### Compound example blocks (`grapesjs.compound_examples`)
 
@@ -423,7 +431,7 @@ editor.BlockManager.add('app-pricing-trio', {
 
 ### Classic documents (schema v1)
 
-Legacy section/column/widget trees remain readable. Their Appearance settings (`cssId`, `cssClasses`, `style`, `attributes`) still render via `nowo_pbk_element_attrs()` / `ElementAppearanceNormalizer`.
+**Legacy.** Prefer GrapesJS schema v2 + content fields for new pages. Classic section/column/widget trees remain readable and editable (Sections UI). Their Appearance settings (`cssId`, `cssClasses`, `style`, `attributes`) still render via `nowo_pbk_element_attrs()` / `ElementAppearanceNormalizer`. Demo routes `/classic` and `/sections` exist for regression only.
 
 ## i18n: structure and props model
 
@@ -456,24 +464,157 @@ widgetPropsByLocale:
 
 Public render merges props for the requested locale with fallback to `default_locale`. Page titles and slugs live on `BuilderPageTranslation` entities (separate from widget props).
 
+## Content fields (Phase 5)
+
+Prefer **shared Grapes layout** + typed values instead of duplicating HTML in `localeContent` for every string.
+
+### Host Twig component (inline edit)
+
+Declare a multilingual variable in any host template. Visitors see the stored value; users with **content** capability get a pencil that opens a modal.
+
+```twig
+{{ nowo_page_builder_field('home', 'hero_title', {
+  type: 'html',
+  labels: { es: 'Título hero', en: 'Hero title' },
+  locale: app.request.locale,
+  tag: 'h1',
+  class: 'hero__title',
+  default: 'Welcome'
+}) }}
+
+{# Singular `label` still works (BC); stored under the active locale on first save #}
+{{ nowo_page_builder_field('home', 'price', { type: 'number', label: 'Price' }) }}
+{{ nowo_page_builder_field('home', 'badge_icon', { type: 'icon', default: 'bi bi-star' }) }}
+{{ nowo_page_builder_field('home', 'disclaimer', { type: 'raw' }) }}
+```
+
+| Type | Display | Persist |
+| --- | --- | --- |
+| `string` / `text` / `number` / `url` / `image` / `icon` / `bool` / `select` | escaped (or semantic HTML) | as-is |
+| `html` / `richtext` | `|raw` after allowlist sanitize on save | sanitized |
+| `raw` | `|raw` trusted | **not** sanitized |
+
+- Field **labels** are multilingual: `labels[locale]` with fallback to `default_locale`, then singular `label`, then the field key.
+- First save from the modal **creates** the field definition on the page document (`structure.fields` + `fieldValues`).
+- API: `POST /admin/page-builder/pages/{pageKey}/fields/{fieldKey}` (CSRF `page_builder_content`, capability `content`).
+- Assets (`page-builder.css` + `page-builder-inline-edit.js`) load once per request when an editable field is rendered. Run `assets:install` so `/bundles/nowopagebuilderkit/...` is available.
+
+### Grapes HTML
+
+1. Layout editor opens `/admin/page-builder/pages/{pageKey}/content` and adds fields (`hero_title`, type `string`, …).
+2. Content editor fills values **and per-locale labels** via locale tabs (no canvas required).
+3. In Grapes HTML use Twig:
+
+```twig
+<h1>{{ fields.hero_title }}</h1>
+{% if fields.show_cta %}<a href="{{ fields.cta_url }}">…</a>{% endif %}
+```
+
+Stored shape (inside document `structure`):
+
+```json
+{
+  "fields": [
+    {
+      "key": "hero_title",
+      "type": "string",
+      "label": "Hero title",
+      "labels": { "es": "Título hero", "en": "Hero title" },
+      "required": true,
+      "options": [],
+      "default": null
+    }
+  ],
+  "fieldValues": {
+    "es": { "hero_title": "Hola" },
+    "en": { "hero_title": "Hello" }
+  }
+}
+```
+
+MVP types: `string`, `text`, `richtext`, `html`, `raw`, `number`, `url`, `image`, `icon`, `bool`, `select`. Spec: [`specs/005-content-fields-i18n/spec.md`](../specs/005-content-fields-i18n/spec.md).
+
+### Phase 6 composites
+
+Additional types: `repeater`, `group`, `reference`. Nesting is practically unlimited (safety cap **32**; deeper composites coerce to `string`).
+
+### Phase 7 media library + dynamic tags
+
+- Content admin image fields: **Library** picker (lists uploaded assets) + upload.
+- Canvas: `assetsLibraryUrl` seeds Grapes Asset Manager; Traits panel **Dynamic tag** binds text/link/image to `[[fields.key]]`.
+- Optional host storage: implement `PageBuilderAssetLibraryInterface::list()` alongside `PageBuilderAssetStorageInterface`.
+
+```twig
+{% for item in fields.faqs %}
+  <h3>{{ item.question }}</h3>
+  <p>{{ item.answer }}</p>
+{% endfor %}
+```
+
+```json
+{
+  "key": "faqs",
+  "type": "repeater",
+  "label": "FAQs",
+  "required": true,
+  "min": 1,
+  "fields": [
+    { "key": "question", "type": "string", "label": "Question" },
+    { "key": "answer", "type": "text", "label": "Answer" }
+  ]
+}
+```
+
+- Admin schema: subfields as `question:string,answer:text`; optional min/max for repeaters.
+- **Publish** rejects empty required fields (and repeater `min`) for every configured locale.
+- **Templates → apply**: checkboxes *Copy field schema* (default on) and *Copy field values* (default off).
+- Twig-free slots: `[[fields.hero_title]]`, `[[fields.hero.title]]`, `[[fields.faqs.0.question]]` (also `[[@fields…]]`).
+- Grapes category **Content fields** inserts bindings for the open page schema.
+- Content admin: page select for `reference`; image upload when assets upload is enabled.
+
+Spec: [`specs/006-phase6-content-hardening/spec.md`](../specs/006-phase6-content-hardening/spec.md) · [`specs/007-phase6b-content-wave2/spec.md`](../specs/007-phase6b-content-wave2/spec.md).
+
 ## Custom access logic
+
+**Option A — roles** (BlogKit-style):
 
 ```yaml
 nowo_page_builder_kit:
     security:
-        access_roles: [ROLE_EDITOR]
+        access_roles: []          # optional shortcut for every capability
+        layout_roles: [ROLE_PBK_LAYOUT]
+        content_roles: [ROLE_PBK_CONTENT]
+        publish_roles: [ROLE_PBK_LAYOUT]
+        templates_roles: [ROLE_PBK_LAYOUT]
 ```
 
-Custom checker:
+**Option B — custom guard** (`security.access_checker`):
 
 ```php
+use Nowo\PageBuilderKitBundle\Enum\PageBuilderCapability;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 
 final class CmsEditorAccessChecker implements PageBuilderKitAccessCheckerInterface
 {
-    public function canAccess(): bool
+    public function canAccess(): bool { /* … */ }
+
+    public function canLayout(): bool { /* … */ }
+
+    public function canContent(): bool { /* … */ }
+
+    public function canPublish(): bool { /* … */ }
+
+    public function canTemplates(): bool { /* … */ }
+
+    public function can(PageBuilderCapability|string $capability): bool
     {
-        return true; // project rules
+        return match ($capability instanceof PageBuilderCapability ? $capability->value : $capability) {
+            'layout' => $this->canLayout(),
+            'content' => $this->canContent(),
+            'publish' => $this->canPublish(),
+            'templates' => $this->canTemplates(),
+            default => false,
+        };
     }
 }
 ```
@@ -483,6 +624,8 @@ nowo_page_builder_kit:
     security:
         access_checker: App\Security\CmsEditorAccessChecker
 ```
+
+Controllers may inject `PageBuilderKitAccessGuard` (`assertLayout()`, …). Twig: `nowo_page_builder_can('content')`.
 
 ## Twig overrides
 
@@ -514,11 +657,18 @@ For schema v2 (Grapes) canvases, implement `GrapesBlockPackInterface` (tag `nowo
 
 Export/import template JSON (`admin_page_builder_templates_export` / `_export_all` / `_import`) to move reusable structures between projects. Format: `formatVersion: 1`, `kind: page_builder_template` (single) or `page_builder_templates` (bundle).
 
+Apply options (form checkboxes / JSON body):
+
+- `include_field_schema` (default **true**) — copy `structure.fields`
+- `include_field_values` (default **false**) — copy `structure.fieldValues`
+- `include_seo` (default **false**) — copy SEO meta from `templateSeoByLocale` into `BuilderPageTranslation` (meta/OG/canonical/robots). Snapshotted when saving a template from a page; stripped from live page structure by `DocumentNormalizer`.
+
 ## Web Profiler collector
 
 In `dev` (`kernel.debug=true`), the toolbar shows a **Page Builder** panel (layout icon) when `debug.collector` is true (default). It lists:
 
-- Renders: `pageKey`, locale, status, engine, Twig applied/error, context **key names**, timings (ms)
+- **Effective capabilities** for the current user: `access` / `layout` / `content` / `publish` / `templates`
+- Renders: `pageKey`, locale, status, engine, **field keys**, Twig applied/error, context **key names**, timings (ms)
 - Public outcomes: `published` / `draft_preview` / `not_found_draft` / `not_found_missing`
 - Admin actions: save, publish, unpublish, restore, duplicate, export, import, template_*
 

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\DataCollector;
 
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Throwable;
 
 use function count;
+use function is_array;
 
 /**
  * Web Profiler panel for Page Builder Kit render / public / admin activity.
@@ -19,6 +21,7 @@ use function count;
  *     renders: list<array<string, mixed>>,
  *     publicOutcomes: list<array{pageKey: string, outcome: string, locale: ?string}>,
  *     adminActions: list<array{action: string, pageKey: string, revisionId: ?int}>,
+ *     capabilities: array{access: bool, layout: bool, content: bool, publish: bool, templates: bool}|null,
  *     pathPrefix: string,
  *     revisionsEnabled: bool
  * }
@@ -31,6 +34,7 @@ final class PageBuilderKitDataCollector extends DataCollector
         private readonly PageBuilderKitTraceInterface $trace,
         private readonly string $pathPrefix = '/admin/page-builder',
         private readonly bool $revisionsEnabled = false,
+        private readonly ?PageBuilderKitAccessCheckerInterface $accessChecker = null,
     ) {
         $this->data = $this->emptyData();
     }
@@ -39,11 +43,23 @@ final class PageBuilderKitDataCollector extends DataCollector
     {
         unset($request, $response, $exception);
 
+        $capabilities = null;
+        if ($this->accessChecker instanceof PageBuilderKitAccessCheckerInterface) {
+            $capabilities = [
+                'access'    => $this->accessChecker->canAccess(),
+                'layout'    => $this->accessChecker->canLayout(),
+                'content'   => $this->accessChecker->canContent(),
+                'publish'   => $this->accessChecker->canPublish(),
+                'templates' => $this->accessChecker->canTemplates(),
+            ];
+        }
+
         // @igor-ignore - Symfony DataCollector snapshot; reset() clears between worker requests.
         $this->data = [
             'renders'          => $this->trace->getRenders(),
             'publicOutcomes'   => $this->trace->getPublicOutcomes(),
             'adminActions'     => $this->trace->getAdminActions(),
+            'capabilities'     => $capabilities,
             'pathPrefix'       => $this->pathPrefix,
             'revisionsEnabled' => $this->revisionsEnabled,
         ];
@@ -87,6 +103,25 @@ final class PageBuilderKitDataCollector extends DataCollector
         return $actions;
     }
 
+    /**
+     * @return array{access: bool, layout: bool, content: bool, publish: bool, templates: bool}|null
+     */
+    public function getCapabilities(): ?array
+    {
+        $capabilities = $this->data['capabilities'] ?? null;
+        if (!is_array($capabilities)) {
+            return null;
+        }
+
+        return [
+            'access'    => (bool) ($capabilities['access'] ?? false),
+            'layout'    => (bool) ($capabilities['layout'] ?? false),
+            'content'   => (bool) ($capabilities['content'] ?? false),
+            'publish'   => (bool) ($capabilities['publish'] ?? false),
+            'templates' => (bool) ($capabilities['templates'] ?? false),
+        ];
+    }
+
     public function getPathPrefix(): string
     {
         return (string) ($this->data['pathPrefix'] ?? '/admin/page-builder');
@@ -111,6 +146,7 @@ final class PageBuilderKitDataCollector extends DataCollector
             'renders'          => [],
             'publicOutcomes'   => [],
             'adminActions'     => [],
+            'capabilities'     => null,
             'pathPrefix'       => $this->pathPrefix,
             'revisionsEnabled' => $this->revisionsEnabled,
         ];

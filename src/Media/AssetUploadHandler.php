@@ -53,6 +53,26 @@ final readonly class AssetUploadHandler
         return $assets;
     }
 
+    public function supportsLibrary(): bool
+    {
+        return $this->enabled && $this->storage instanceof PageBuilderAssetLibraryInterface;
+    }
+
+    /**
+     * @return list<array{src: string, type: string, name: string, width?: int, height?: int, storageKey?: string}>
+     */
+    public function listLibrary(int $limit = 100): array
+    {
+        if (!$this->enabled) {
+            return [];
+        }
+        if (!$this->storage instanceof PageBuilderAssetLibraryInterface) {
+            return [];
+        }
+
+        return $this->storage->list($limit);
+    }
+
     /**
      * Normalize GrapesJS / browser multipart payloads into a flat file list.
      *

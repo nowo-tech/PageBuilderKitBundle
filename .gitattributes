@@ -1,0 +1,25 @@
+# Paths omitted from GitHub zipballs / Packagist dist (composer require).
+# Keep in sync with composer.json "archive.exclude".
+
+/demo                   export-ignore
+/.cursor                export-ignore
+/.specify               export-ignore
+/specs                  export-ignore
+/coverage               export-ignore
+/.phpunit.cache         export-ignore
+/.php-cs-fixer.cache    export-ignore
+/vendor                 export-ignore
+/node_modules           export-ignore
+
+# Dev-only tooling (not needed at runtime in host apps)
+/tests                  export-ignore
+/phpunit.xml.dist       export-ignore
+/phpstan.neon.dist      export-ignore
+/phpstan-baseline.neon  export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/.twig-cs-fixer.php     export-ignore
+/rector.php             export-ignore
+/Makefile               export-ignore
+/.githooks              export-ignore
+/.editorconfig          export-ignore
+/.gitignore             export-ignore

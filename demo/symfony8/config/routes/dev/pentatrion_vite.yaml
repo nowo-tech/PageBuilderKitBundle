@@ -1,0 +1,10 @@
+# Pentatrion Vite (dev): proxy assets under /build + profiler panel at /_profiler/vite
+# @see https://github.com/lhapaipai/vite-bundle/blob/main/install/config/routes/pentatrion_vite.yaml
+_pentatrion_vite:
+    prefix: /build
+    resource: '@PentatrionViteBundle/Resources/config/routing.yaml'
+
+_profiler_vite:
+    path: /_profiler/vite
+    defaults:
+        _controller: Pentatrion\ViteBundle\Controller\ProfilerController::info

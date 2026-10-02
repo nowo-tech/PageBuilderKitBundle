@@ -34,7 +34,7 @@ Page Builder Kit Bundle gives Symfony applications a reusable visual page builde
 ## Features
 
 - GrapesJS admin canvas with **preset-webpage** + official plugins, Asset Manager, devices, a11y helpers, and PBK compound blocks
-- Legacy schema v1 still supported: sections → columns → widgets (+ Sections editor)
+- Legacy schema v1 still supported (**legacy**): sections → columns → widgets (+ Sections editor). Prefer Grapes + content fields for new pages.
 - Locale tabs / `localeContent` with default-locale fallback for public render
 - Configurable admin mount: `web_ui.path_prefix` (default `/admin/page-builder`)
 - Optional `doctrine.table_prefix` for shared databases
@@ -99,12 +99,15 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
 | **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
 | **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
+| **Phase 5–7** | **Shipped (v1.4.0)** | Content fields + ACL capabilities, hardening/slots, media library + tags |
 
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`004` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**).
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`008` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**).
 
 ## Development
 
 ```bash
+make assets                         # pnpm + Vite: TS → src/Resources/public/
+make -C demo/symfony8 assets        # Pentatrion Vite: assets/app.ts → public/build/
 make -C demo/symfony8 test-e2e
 make -C demo/symfony8 demo-screenshots   # refreshes docs/images/demo/*.png
 ```
@@ -128,6 +131,7 @@ Demo default URL: `http://localhost:8137`.
 - [Widget authors](docs/WIDGET_AUTHORS.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Usage](docs/USAGE.md)
+- [Builder manual](docs/BUILDER-MANUAL.md)
 - [Contributing](docs/CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Changelog](docs/CHANGELOG.md)
@@ -143,6 +147,7 @@ Demo default URL: `http://localhost:8137`.
 - [GitHub Actions CI requirements](docs/GITHUB_CI.md)
 - [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
 - [Use cases matrix](docs/USE-CASES.md)
+- [Builder manual](docs/BUILDER-MANUAL.md)
 - [FrankenPHP worker mode audit](docs/FRANKENPHP-WORKER-AUDIT.md)
 
 ## Tests and coverage

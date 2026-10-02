@@ -86,6 +86,8 @@ final readonly class GrapesTwigRenderer
             ['name' => 'status', 'sample' => '{{ status }}', 'label' => 'Status'],
             ['name' => 'page.title', 'sample' => '{{ page.title }}', 'label' => 'page.title'],
             ['name' => 'page.locale', 'sample' => '{{ page.locale }}', 'label' => 'page.locale'],
+            ['name' => 'fields.slot', 'sample' => '[[fields.hero_title]]', 'label' => 'Field slot (no Twig)'],
+            ['name' => 'fields.twig', 'sample' => '{{ fields.hero_title }}', 'label' => 'Field (Twig)'],
             ['name' => 'products.loop', 'sample' => '{% for p in products %}<li>{{ p.name }} — {{ p.price }}</li>{% endfor %}', 'label' => 'for products'],
             ['name' => 'highlights.loop', 'sample' => '{% for item in highlights %}<span>{{ item }}</span>{% endfor %}', 'label' => 'for highlights'],
         ];

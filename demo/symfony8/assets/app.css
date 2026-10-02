@@ -1,0 +1,8 @@
+/* Demo shell polish — kept minimal; Bootstrap comes from CDN in base layout. */
+body.pbk-demo-shell {
+  min-height: 100vh;
+}
+
+.pbk-demo-shell main.pbk-demo-main {
+  min-height: calc(100vh - 3.5rem);
+}

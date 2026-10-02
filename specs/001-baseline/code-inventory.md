@@ -1,12 +1,12 @@
 # Code inventory — PageBuilderKitBundle (canonical)
 
-**Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md)  
+**Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-09-27
+**Last audited:** 2026-10-02
 
-Maps production files under `src/` to functional requirements across shipped phases (`FR-*` Phase 1, `FR-P2-*`, `FR-P3-*`, `FR-P4-*`, plus `REQ-DEBUG-001` where relevant).
+Maps production files under `src/` to functional requirements across shipped phases (`FR-*` Phase 1, `FR-P2-*`, `FR-P3-*`, `FR-P4-*`, `FR-P5-*`, plus `REQ-DEBUG-001` where relevant).
 
-**Total production sources:** 119 files (`find src -type f \( -name '*.php' -o -name '*.twig' -o -name '*.yaml' -o -name '*.js' -o -name '*.ts' -o -name '*.css' \) | wc -l`)
+**Total production sources:** 129 files (`find src -type f \( -name '*.php' -o -name '*.twig' -o -name '*.yaml' -o -name '*.js' -o -name '*.ts' -o -name '*.css' \) | wc -l`)
 
 ## Bundle entry
 
@@ -18,11 +18,12 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Controller/Admin/PageListController.php` | Page list and create form | FR-ADM-001 |
+| `Controller/Admin/PageListController.php` | Page list and create form | FR-ADM-001, FR-P5-ACL-004, FR-P5-UI-003 |
 | `Controller/Admin/PageCanvasController.php` | GrapesJS / canvas shell | FR-ADM-002, FR-P2-ADM-001 |
 | `Controller/Admin/PageDocumentApiController.php` | Document GET/POST, publish/unpublish, duplicate, import/export, CSRF | FR-ADM-003, FR-ADM-004, FR-ADM-005, FR-P3-IO-001, FR-P3-IO-002 |
-| `Controller/Admin/PageSectionsController.php` | Classic Sections editor | FR-P2-ADM-004 |
-| `Controller/Admin/PageSeoController.php` | Page SEO form | FR-ADM-001 |
+| `Controller/Admin/PageSectionsController.php` | Classic Sections editor (legacy) | FR-P2-ADM-004 |
+| `Controller/Admin/PageSeoController.php` | Page SEO form | FR-ADM-001, FR-P5-ACL-005 |
+| `Controller/Admin/PageContentController.php` | Content fields values + schema UI | FR-P5-UI-001, FR-P5-UI-002, FR-P5-SCH-004, FR-P5-VAL-001 |
 | `Controller/Admin/PageAssetUploadController.php` | Grapes Asset Manager uploads | FR-P2-ADM-005 |
 | `Controller/Admin/PageRevisionsController.php` | Revision list, restore, diff | FR-P3-REV-002, FR-P3-REV-003 |
 | `Controller/Admin/PageTemplatesController.php` | Templates library | FR-P3-TPL-002 |
@@ -65,6 +66,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 | --- | --- | --- |
 | `Enum/PageStatus.php` | Draft / published | FR-ADM-004, FR-REN-003 |
 | `Enum/HtmlSanitizeStrategy.php` | Sanitize strategy | FR-SEC-003 |
+| `Enum/PageBuilderCapability.php` | layout / content / publish / templates | FR-P5-ACL-001 |
+| `Enum/ContentFieldType.php` | Typed CMS field types | FR-P5-SCH-003 |
 | `Locale/BuilderLocales.php` | Config-backed locales | FR-I18N-001, FR-CFG-001, FR-WRK-001 |
 | `Locale/BuilderLocalesLegacyBinding.php` | Legacy static bind helper | FR-WRK-001 |
 
@@ -72,7 +75,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `EventSubscriber/PageBuilderKitAdminAccessSubscriber.php` | Admin route access | FR-SEC-001, REQ-UI-002 |
+| `EventSubscriber/PageBuilderKitAdminAccessSubscriber.php` | Admin route access + capabilities | FR-SEC-001, FR-P5-ACL-005, REQ-UI-002 |
 | `EventSubscriber/WorkerStateResetSubscriber.php` | Clears locale bind on terminate | FR-WRK-001 |
 
 ## Forms
@@ -107,12 +110,14 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Service/DocumentNormalizer.php` | Schema v1/v2 normalization | FR-DOC-004, FR-P2-DOC-002 |
+| `Service/DocumentNormalizer.php` | Schema v1/v2 + fields/fieldValues normalization | FR-DOC-004, FR-P2-DOC-002, FR-P5-SCH-001 |
 | `Service/DocumentService.php` | Create/save/publish/duplicate | FR-DOC-001, FR-ADM-004, FR-SEC-003, FR-P3-IO-001 |
 | `Service/DocumentDiff.php` | Structure/props comparison | FR-P3-REV-003 |
 | `Service/DocumentImportExportService.php` | JSON export/import `formatVersion: 1` | FR-P3-IO-002 |
-| `Service/PageRenderProvider.php` | Rendered page tree | FR-REN-001, FR-P2-REN-001, FR-I18N-001 |
+| `Service/PageRenderProvider.php` | Rendered page tree (+ `fields` inject) | FR-REN-001, FR-P2-REN-001, FR-I18N-001, FR-P5-VAL-003 |
 | `Service/PageRenderProviderInterface.php` | Render provider contract | FR-REN-001 |
+| `Service/ContentFieldsNormalizer.php` | Field schema/values normalize + locale resolve | FR-P5-SCH-001, FR-P5-VAL-001, FR-P5-VAL-002 |
+| `Service/ContentFieldsService.php` | Persist field schema/values | FR-P5-SCH-004, FR-P5-VAL-004 |
 | `Service/PageRevisionStore.php` | Snapshot/prune revisions | FR-P3-REV-001, FR-P3-REV-004 |
 | `Service/PageRevisionService.php` | List/create/restore/diff API | FR-P3-REV-002, FR-P3-REV-003 |
 | `Service/PageTemplateService.php` | Template save/apply/delete | FR-P3-TPL-001, FR-P3-TPL-002 |
@@ -128,21 +133,22 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Security/PageBuilderKitAccessCheckerInterface.php` | Access checker contract | FR-SEC-001 |
-| `Security/ConfigurablePageBuilderKitAccessChecker.php` | Role-based checker | FR-SEC-001 |
+| `Security/PageBuilderKitAccessCheckerInterface.php` | Access checker contract (roles or custom guard) | FR-SEC-001, FR-P5-ACL-001 |
+| `Security/ConfigurablePageBuilderKitAccessChecker.php` | Role-based checker (`*_roles`) | FR-SEC-001, FR-P5-ACL-002 |
 | `Security/AllowAllPageBuilderKitAccessChecker.php` | Demo unauthenticated checker | FR-SEC-002 |
+| `Security/PageBuilderKitAccessGuard.php` | Controller assert/deny helper | FR-P5-ACL-004 |
 | `Security/PageBuilderProtection.php` | HTML sanitizer wiring | FR-SEC-003 |
 | `Security/PageBuilderProtectionConfig.php` | Sanitize strategy VO | FR-SEC-003 |
 | `Security/Html/PageBuilderHtmlSanitizerInterface.php` | Sanitizer contract | FR-SEC-003 |
 | `Security/Html/NullPageBuilderHtmlSanitizer.php` | No-op sanitizer | FR-SEC-003 |
 | `Security/Html/StripPageBuilderHtmlSanitizer.php` | Strip-tags sanitizer | FR-SEC-003 |
-| `Security/Html/AllowlistPageBuilderHtmlSanitizer.php` | Allowlist sanitizer | FR-SEC-003 |
+| `Security/Html/AllowlistPageBuilderHtmlSanitizer.php` | DOM allowlist sanitizer | FR-SEC-003, FR-P5-VAL-004 |
 
 ## Twig
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Twig/PageBuilderKitExtension.php` | Render helpers, layout hints | FR-REN-002 |
+| `Twig/PageBuilderKitExtension.php` | Render helpers, `can` / `can_edit` | FR-REN-002, FR-P5-ACL-006 |
 | `Twig/ElementAppearanceExtension.php` | Appearance Twig helpers | FR-P2-WGT-002 |
 
 ## Widget system
@@ -174,10 +180,11 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
 | `Resources/views/admin/layout.html.twig` | Admin shell layout | FR-ADM-002, FR-CFG-002 |
-| `Resources/views/admin/pages/index.html.twig` | Page list UI | FR-ADM-001 |
+| `Resources/views/admin/pages/index.html.twig` | Page list UI (capability-gated links) | FR-ADM-001, FR-P5-UI-003 |
 | `Resources/views/admin/pages/canvas.html.twig` | Grapes canvas host | FR-ADM-002, FR-P2-ADM-001 |
-| `Resources/views/admin/pages/sections.html.twig` | Classic Sections UI | FR-P2-ADM-004 |
+| `Resources/views/admin/pages/sections.html.twig` | Classic Sections UI (legacy) | FR-P2-ADM-004 |
 | `Resources/views/admin/pages/seo.html.twig` | SEO admin screen | FR-ADM-001 |
+| `Resources/views/admin/pages/content.html.twig` | Content fields admin | FR-P5-UI-001, FR-P5-UI-002 |
 | `Resources/views/admin/pages/revisions.html.twig` | Revision history UI | FR-P3-REV-002 |
 | `Resources/views/admin/pages/revision_diff.html.twig` | Diff summary UI | FR-P3-REV-003 |
 | `Resources/views/admin/pages/templates.html.twig` | Templates library UI | FR-P3-TPL-002 |
@@ -221,8 +228,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Category | File count |
 | --- | ---: |
-| PHP (excluding Resources subtree) | 84 |
-| Twig views | 23 |
+| PHP (excluding Resources subtree) | ~93 |
+| Twig views | 24 |
 | YAML (config + translations) | 9 |
 | TS/JS/CSS assets | 3 |
-| **Total** | **119** |
+| **Total** | **129** |

@@ -17,6 +17,7 @@ use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
+use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
@@ -220,6 +221,30 @@ final class DocumentServiceTest extends TestCase
         $service->unpublish($page);
         self::assertSame(PageStatus::Draft, $page->getStatus());
         self::assertNull($page->getPublishedAt());
+    }
+
+    #[Test]
+    public function publishRejectsMissingRequiredContentFields(): void
+    {
+        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'    => '<h1>{{ fields.hero_title }}</h1>',
+            'css'     => '',
+            'grapes'  => [],
+            'fields'  => [
+                ['key' => 'hero_title', 'type' => 'string', 'label' => 'Hero', 'required' => true],
+            ],
+            'fieldValues' => [
+                'es' => ['hero_title' => 'Hola'],
+                'en' => ['hero_title' => ''],
+            ],
+        ]));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Required field "hero_title" is empty for locale "en".');
+        $this->createService()->publish($page);
     }
 
     #[Test]
@@ -708,6 +733,7 @@ final class DocumentServiceTest extends TestCase
             new WidgetPropsMerger(),
             new GrapesDocumentSanitizer(),
             $pageRevisionStore,
+            new ContentFieldsNormalizer(),
         );
     }
 

@@ -19,6 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
+use function array_key_exists;
 use function count;
 use function is_array;
 use function is_string;
@@ -106,12 +107,27 @@ final class PageTemplatesController extends AbstractController
             ? $payload['title']
             : (string) $request->request->get('title', $pageKey);
 
+        $includeFieldSchema = array_key_exists('include_field_schema', $payload)
+            ? (bool) $payload['include_field_schema']
+            : $request->request->getBoolean('include_field_schema', true);
+        $includeFieldValues = array_key_exists('include_field_values', $payload)
+            ? (bool) $payload['include_field_values']
+            : $request->request->getBoolean('include_field_values', false);
+        $includeSeo = array_key_exists('include_seo', $payload)
+            ? (bool) $payload['include_seo']
+            : $request->request->getBoolean('include_seo', false);
+
         try {
             $page = $this->templateService->createPageFromTemplate(
                 $templateKey,
                 $pageKey,
                 trim($title) !== '' ? $title : $pageKey,
                 $this->builderLocales->getDefault(),
+                [
+                    'include_field_schema' => $includeFieldSchema,
+                    'include_field_values' => $includeFieldValues,
+                    'include_seo'          => $includeSeo,
+                ],
             );
         } catch (InvalidArgumentException $exception) {
             return $this->error($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);

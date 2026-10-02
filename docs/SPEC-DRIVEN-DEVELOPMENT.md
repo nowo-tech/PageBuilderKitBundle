@@ -81,6 +81,24 @@ Shipped in **v1.2.0**:
 - Template JSON export/import for sharing across projects (`PageTemplateService::export` / `import`)
 - Grapes block packs analogous to classic widget packs (`GrapesBlockPackInterface` + canvas `blockPacks`)
 
+### Phase 5 — Content fields + capabilities (MVP shipped)
+
+Typed CMS fields on documents (`structure.fields` + `structure.fieldValues[locale]`), Twig `fields.*` inject, admin content forms, and fine-grained access via **roles** (`layout_roles`…) **or** a custom **`access_checker` guard** (`PageBuilderKitAccessCheckerInterface` / `PageBuilderKitAccessGuard`). Classic schema v1 remains **legacy**.
+
+Spec Kit: [`specs/005-content-fields-i18n/spec.md`](../specs/005-content-fields-i18n/spec.md).
+
+### Phase 6 — Content hardening (MVP shipped)
+
+Composite field types (`repeater` / `group` / `reference`), required validation on publish, and template apply options for field schema/values.
+
+Spec Kit: [`specs/006-phase6-content-hardening/spec.md`](../specs/006-phase6-content-hardening/spec.md).
+
+### Phase 6b — Content wave 2 (MVP shipped)
+
+Nesting depth 2, Twig-free `[[fields.*]]` slots, Grapes Content-fields blocks, image upload + page reference pickers.
+
+Spec Kit: [`specs/007-phase6b-content-wave2/spec.md`](../specs/007-phase6b-content-wave2/spec.md).
+
 ## Validating the spec
 
 ```bash
@@ -113,7 +131,7 @@ make release-check
 2. Update or create the relevant spec artifact.
 3. Implement with tests when production behavior changes.
 4. Update integrator docs when host applications must act.
-5. Keep phase specs (`001`–`004`) and `specs/001-baseline/code-inventory.md` aligned with `src/`.
+5. Keep phase specs (`001`–`005`) and `specs/001-baseline/code-inventory.md` aligned with `src/`.
 
 ## GitHub Spec Kit (summary)
 
@@ -124,6 +142,7 @@ make release-check
 | Phase 2 GrapesJS | `specs/002-phase2-grapesjs/spec.md` |
 | Phase 3 revisions/templates | `specs/003-phase3-revisions-templates/spec.md` |
 | Phase 4 external widgets | `specs/004-phase4-external-widgets/spec.md` |
+| Phase 5 content fields + ACL | `specs/005-content-fields-i18n/spec.md` |
 | Tooling manual | `docs/SPEC-KIT.md` |
 
 See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.

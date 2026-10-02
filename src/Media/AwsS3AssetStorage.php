@@ -12,6 +12,7 @@ use Throwable;
 
 use function bin2hex;
 use function class_exists;
+use function count;
 use function finfo_file;
 use function finfo_open;
 use function getimagesize;
@@ -37,8 +38,9 @@ use const PATHINFO_BASENAME;
  * Stores uploads via core/aws-s3-bundle AwsS3Helper (optional dependency).
  *
  * Expects an object exposing uploadFile() + getFileURL() (AwsS3Helper).
+ * Optional listFiles($prefix, $limit) enables the media library.
  */
-final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterface
+final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
@@ -110,6 +112,58 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
             mimeType: $mime,
             storageKey: $key,
         );
+    }
+
+    /**
+     * @return list<array{src: string, type: string, name: string, width?: int, height?: int, storageKey?: string}>
+     */
+    public function list(int $limit = 100): array
+    {
+        if ($limit < 1 || !method_exists($this->s3Helper, 'listFiles')) {
+            return [];
+        }
+
+        $folder = trim($this->folder, '/');
+        $prefix = $folder !== '' ? $folder . '/' : '';
+
+        /** @var mixed $raw */
+        $raw = $this->s3Helper->listFiles($prefix, $limit);
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $item) {
+            if (count($out) >= $limit) {
+                break;
+            }
+            $key = null;
+            if (is_string($item) && $item !== '') {
+                $key = $item;
+            } elseif (is_array($item) && is_string($item['key'] ?? null) && $item['key'] !== '') {
+                $key = $item['key'];
+            }
+            if ($key === null) {
+                continue;
+            }
+            $name = is_array($item) && is_string($item['name'] ?? null) && $item['name'] !== ''
+                ? $item['name']
+                : pathinfo($key, PATHINFO_BASENAME);
+            $src = is_string($this->publicBaseUrl) && $this->publicBaseUrl !== ''
+                ? rtrim($this->publicBaseUrl, '/') . '/' . ltrim($key, '/')
+                : (string) $this->s3Helper->getFileURL($this->resolveBucket(), $key);
+            if ($src === '') {
+                continue;
+            }
+            $out[] = [
+                'src'        => $src,
+                'type'       => 'image',
+                'name'       => $name,
+                'storageKey' => $key,
+            ];
+        }
+
+        return $out;
     }
 
     private function resolveBucket(): string

@@ -147,6 +147,12 @@ final class DemoController extends AbstractController
         return $this->renderDemoPage('twig', $request);
     }
 
+    #[Route('/fields', name: 'fields')]
+    public function fields(Request $request): Response
+    {
+        return $this->renderDemoPage('fields', $request);
+    }
+
     #[Route('/seo', name: 'seo')]
     public function seo(Request $request): Response
     {

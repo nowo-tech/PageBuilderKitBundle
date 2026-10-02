@@ -111,6 +111,65 @@ final class AwsS3AssetStorageTest extends TestCase
     }
 
     #[Test]
+    public function listUsesHelperListFilesWhenAvailable(): void
+    {
+        $helper = new class {
+            public string $_bucketName = 'demo-bucket';
+
+            /** @return array<string, mixed> */
+            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): array
+            {
+                return ['ObjectURL' => 'https://cdn.example/' . $c];
+            }
+
+            /** @param array<string, mixed> $config */
+            public function getFileURL(string $bucket, string $key, array $config = []): string
+            {
+                return 'https://cdn.example/' . $key;
+            }
+
+            /** @return list<array{key: string, name: string}|string> */
+            public function listFiles(string $prefix = '', int $limit = 100): array
+            {
+                return [
+                    ['key' => $prefix . 'b.png', 'name' => 'b.png'],
+                    $prefix . 'a.png',
+                ];
+            }
+        };
+
+        $storage = new AwsS3AssetStorage($helper, 'page-builder', false, 5_000_000, ['image/png'], 'https://cdn.example');
+        $listed  = $storage->list(10);
+
+        self::assertCount(2, $listed);
+        self::assertSame('https://cdn.example/page-builder/b.png', $listed[0]['src']);
+        self::assertSame('b.png', $listed[0]['name']);
+        self::assertSame([], $storage->list(0));
+    }
+
+    #[Test]
+    public function listReturnsEmptyWithoutListFilesHelper(): void
+    {
+        $helper = new class {
+            public string $_bucketName = 'b';
+
+            /** @return array<string, mixed> */
+            public function uploadFile(string $a, string $b, string $c, bool $d = false, string $e = 'inline', ?string $f = null): array
+            {
+                return [];
+            }
+
+            /** @param array<string, mixed> $config */
+            public function getFileURL(string $bucket, string $key, array $config = []): string
+            {
+                return 'https://x/' . $key;
+            }
+        };
+
+        self::assertSame([], (new AwsS3AssetStorage($helper))->list());
+    }
+
+    #[Test]
     public function rejectsOversizedAndInvalidUploads(): void
     {
         $helper = new class {

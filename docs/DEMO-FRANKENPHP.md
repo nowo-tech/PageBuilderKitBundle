@@ -33,11 +33,12 @@ The demo proves that:
 - Symfony 8 application under `demo/symfony8`
 - FrankenPHP + Docker Compose
 - MySQL 8 service (not published to the host)
+- **Adobe S3Mock** (`s3` service) for Grapes / content uploads — API `http://localhost:9190` (bucket `page-builder-kit`)
 - Path-mounted `PageBuilderKitBundle` from the repository root
 - `TwigExtraBundle`, `FormKitBundle`, `UiKitBundle`, and demo-only dev bundles
 - Form login: **`admin`** / **`admin`** (`ROLE_ADMIN`)
 - Bundle config: `config/packages/nowo_page_builder_kit.yaml`
-- **Pre-built GrapesJS + classic seeds** — see [USE-CASES.md](USE-CASES.md) and `/showcase` (seed v4):
+- **Pre-built GrapesJS + classic seeds** — see [USE-CASES.md](USE-CASES.md), [BUILDER-MANUAL.md](BUILDER-MANUAL.md) and `/showcase` (seed version = `DemoUseCases::SEED_VERSION`):
 
 | Route | Page key | Notes |
 | --- | --- | --- |

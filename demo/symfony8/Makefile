@@ -1,4 +1,4 @@
-.PHONY: help up down build install shell logs test test-coverage cache-clear link-bundle update update-bundle update-deps ensure-up restart release-check database test-e2e demo-screenshots
+.PHONY: help up down build install shell logs test test-coverage cache-clear link-bundle update update-bundle update-deps ensure-up restart release-check database test-e2e demo-screenshots assets
 
 DOCKER_BIN := $(shell command -v docker 2>/dev/null)
 ifeq ($(DOCKER_BIN),)
@@ -12,8 +12,10 @@ help:
 	@echo "Symfony 8 Demo - Page Builder Kit Bundle"
 	@echo "  URL:        http://localhost:8137"
 	@echo "  Login:      /login (admin/admin)"
+	@echo "  S3 mock:    http://localhost:9190 (Adobe S3Mock API, bucket page-builder-kit)"
 	@echo "  Admin canvas home: /admin/page-builder/pages/home/canvas"
 	@echo "  Admin canvas contact: /admin/page-builder/pages/contact/canvas"
+	@echo "  make assets         pnpm + Vite (app.ts → public/build/) via Pentatrion"
 	@echo "  make test-e2e       Playwright e2e (REQ-DEMO-013)"
 	@echo "  make demo-screenshots  Refresh docs/images/demo/*.png"
 
@@ -38,6 +40,7 @@ up:
 	@echo "Installing dependencies..."
 	@$(DOCKER_COMPOSE) exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer install --no-interaction
 	@$(MAKE) link-bundle
+	@$(MAKE) assets
 	@PORT=$$(grep "^PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 	[ -z "$$PORT" ] && PORT=$$(grep "^PORT=" .env.example 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 	echo "Demo started at: http://localhost:$$PORT"
@@ -58,6 +61,7 @@ ensure-up:
 
 install: ensure-up
 	$(DOCKER_COMPOSE) exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer install --no-interaction
+	@$(MAKE) assets
 
 shell: ensure-up
 	$(DOCKER_COMPOSE) exec php sh
@@ -80,6 +84,15 @@ cache-clear: ensure-up
 
 link-bundle: ensure-up
 	$(DOCKER_COMPOSE) exec php sh -c "rm -rf vendor/nowo-tech/page-builder-kit-bundle && ln -sf /var/page-builder-kit-bundle vendor/nowo-tech/page-builder-kit-bundle && php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:schema:update --force --no-interaction && php bin/console assets:install --symlink --relative --no-interaction && php bin/console cache:clear"
+
+assets: ensure-up
+	@# Prefer host pnpm when available (faster); fall back to container.
+	@if command -v pnpm >/dev/null 2>&1; then \
+		rm -rf public/build/.vite public/build/assets 2>/dev/null || true; \
+		CI=true pnpm install && pnpm run build; \
+	else \
+		$(DOCKER_COMPOSE) exec -T -e CI=true php sh -c 'pnpm install && pnpm run build'; \
+	fi
 
 update: ensure-up
 	$(DOCKER_COMPOSE) exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer update --no-interaction

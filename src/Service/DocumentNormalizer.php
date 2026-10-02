@@ -23,6 +23,7 @@ final readonly class DocumentNormalizer
 
     public function __construct(
         private ElementAppearanceNormalizer $appearanceNormalizer = new ElementAppearanceNormalizer(),
+        private ContentFieldsNormalizer $contentFieldsNormalizer = new ContentFieldsNormalizer(),
     ) {
     }
 
@@ -36,6 +37,8 @@ final readonly class DocumentNormalizer
             'css'           => '',
             'grapes'        => [],
             'localeContent' => [],
+            'fields'        => [],
+            'fieldValues'   => [],
             'sections'      => [],
         ];
     }
@@ -92,7 +95,7 @@ final readonly class DocumentNormalizer
             }
         }
 
-        return [
+        return $this->contentFieldsNormalizer->applyToStructure([
             'version'       => self::GRAPES_SCHEMA_VERSION,
             'engine'        => self::ENGINE_GRAPESJS,
             'html'          => $html,
@@ -100,7 +103,9 @@ final readonly class DocumentNormalizer
             'grapes'        => $grapes,
             'localeContent' => $localeContent,
             'sections'      => [],
-        ];
+            'fields'        => $structure['fields'] ?? [],
+            'fieldValues'   => $structure['fieldValues'] ?? [],
+        ]);
     }
 
     /**
@@ -186,10 +191,12 @@ final readonly class DocumentNormalizer
             ];
         }
 
-        return [
-            'version'  => self::SCHEMA_VERSION,
-            'sections' => $normalizedSections,
-        ];
+        return $this->contentFieldsNormalizer->applyToStructure([
+            'version'     => self::SCHEMA_VERSION,
+            'sections'    => $normalizedSections,
+            'fields'      => $structure['fields'] ?? [],
+            'fieldValues' => $structure['fieldValues'] ?? [],
+        ]);
     }
 
     /**

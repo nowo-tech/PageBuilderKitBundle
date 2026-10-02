@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.4.0](#140)
 - [1.3.0](#130)
 - [1.2.0](#120)
 - [1.1.1](#111)
@@ -12,6 +13,20 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.4.0
+
+From **1.3.0**:
+
+1. Optional — split editor roles with `layout_roles` / `content_roles` / `publish_roles` / `templates_roles` (BlogKit-style). `access_roles` remains a shortcut that grants every capability. Alternatively set `security.access_checker` to a custom `PageBuilderKitAccessCheckerInterface` (guard). Controllers can inject `PageBuilderKitAccessGuard`.
+2. Optional — define typed content fields on a page (`/admin/page-builder/pages/{pageKey}/content`) and reference them in Grapes HTML as `{{ fields.your_key }}` or slots `[[fields.your_key]]`.
+3. Custom `PageBuilderKitAccessCheckerInterface` implementations must expose `canLayout()` / `canContent()` / `canPublish()` / `canTemplates()` (+ `canAccess()` / `can()`).
+4. Optional — template apply checkbox / JSON `include_seo: true` to copy SEO meta from the template snapshot (default remains **false**).
+5. Optional — media library `GET {path_prefix}/assets` (route `admin_page_builder_assets_list`) when uploads are enabled.
+6. Frontend hosts that vendor bundle JS: rebuild with `pnpm install && pnpm run build` at the bundle root (Vite). Demo uses Pentatrion Vite.
+7. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#140---2026-10-02).
 
 ## 1.3.0
 

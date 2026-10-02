@@ -107,6 +107,7 @@ CSS;
             'i18n' => DemoContentExtraPages::i18n($locale),
             'draft' => DemoContentExtraPages::draft($locale),
             'twig' => DemoContentExtraPages::twig($locale),
+            'fields' => DemoContentFieldsSeed::html($locale),
             'seo' => DemoContentExtraPages::seo($locale),
             'sections-i18n' => DemoGrapesSectionsI18n::html($locale),
             default => $locale === 'es'

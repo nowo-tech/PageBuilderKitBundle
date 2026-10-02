@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadResult;
+use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetLibraryInterface;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -74,5 +75,30 @@ final class AssetUploadHandlerTest extends TestCase
         self::assertSame([$file], AssetUploadHandler::normalizeFiles([$file, 'skip']));
         self::assertSame([], AssetUploadHandler::normalizeFiles([]));
         self::assertSame([], AssetUploadHandler::normalizeFiles('bad'));
+    }
+
+    #[Test]
+    public function listLibraryDelegatesWhenStorageSupportsIt(): void
+    {
+        $storage = new class implements PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface {
+            public function store(UploadedFile $file): AssetUploadResult
+            {
+                return new AssetUploadResult('/x.png', 'x.png');
+            }
+
+            public function list(int $limit = 100): array
+            {
+                return [['src' => '/a.png', 'type' => 'image', 'name' => 'a.png']];
+            }
+        };
+
+        $handler = new AssetUploadHandler($storage, true);
+        self::assertTrue($handler->supportsLibrary());
+        self::assertSame('/a.png', $handler->listLibrary()[0]['src']);
+
+        $plain    = $this->createStub(PageBuilderAssetStorageInterface::class);
+        $disabled = new AssetUploadHandler($plain, false);
+        self::assertFalse($disabled->supportsLibrary());
+        self::assertSame([], $disabled->listLibrary());
     }
 }

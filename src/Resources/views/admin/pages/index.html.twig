@@ -9,7 +9,9 @@
 {% block page_title %}{{ 'admin.pages.title'|trans }}{% endblock %}
 
 {% block header_actions %}
-    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates') }}">{{ 'admin.templates.title'|trans }}</a>
+    {% if nowo_page_builder_can('templates') %}
+        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates') }}">{{ 'admin.templates.title'|trans }}</a>
+    {% endif %}
 {% endblock %}
 
 {% block admin %}
@@ -26,30 +28,48 @@
                             <span class="badge bg-secondary ms-2">{{ page.status.value }}</span>
                         </span>
                         <span class="d-flex gap-2 flex-wrap">
+                        {% if nowo_page_builder_can('content') or nowo_page_builder_can('layout') %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_content', {pageKey: page.pageKey}) }}">
+                                {{ 'admin.pages.content'|trans }}
+                            </a>
+                        {% endif %}
+                        {% if nowo_page_builder_can('content') %}
                         <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_seo', {pageKey: page.pageKey}) }}">
                             {{ 'admin.pages.seo'|trans }}
                         </a>
+                        {% endif %}
+                        {% if nowo_page_builder_can('layout') or nowo_page_builder_can('content') or nowo_page_builder_can('templates') %}
                         <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_document_export', {pageKey: page.pageKey}) }}">
                             {{ 'admin.pages.export'|trans }}
                         </a>
+                        {% endif %}
+                        {% if nowo_page_builder_can('layout') %}
                         <form method="post" action="{{ path('admin_page_builder_document_duplicate', {pageKey: page.pageKey}) }}" class="d-inline">
                             <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
                             <input type="hidden" name="pageKey" value="{{ page.pageKey }}-copy">
                             <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'admin.pages.duplicate'|trans }}</button>
                         </form>
-                        {% if nowo_page_builder_revisions_enabled() %}
+                        {% endif %}
+                        {% if nowo_page_builder_revisions_enabled() and nowo_page_builder_can('layout') %}
                             <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_revisions', {pageKey: page.pageKey}) }}">
                                 {{ 'admin.pages.revisions'|trans }}
                             </a>
                         {% endif %}
                         {% set _engine = page.document and page.document.structure.engine|default('classic') %}
-                        {% if _engine == 'grapesjs' %}
-                            <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page.pageKey}) }}">
-                                {{ 'admin.pages.edit'|trans }}
-                            </a>
-                        {% else %}
-                            <a class="btn btn-sm btn-warning" href="{{ path('admin_page_builder_sections', {pageKey: page.pageKey}) }}">
-                                {{ 'admin.pages.sections'|trans }}
+                        {% if nowo_page_builder_can('layout') %}
+                            {% if _engine == 'grapesjs' %}
+                                <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page.pageKey}) }}">
+                                    {{ 'admin.pages.edit'|trans }}
+                                </a>
+                            {% else %}
+                                <a class="btn btn-sm btn-warning" href="{{ path('admin_page_builder_sections', {pageKey: page.pageKey}) }}">
+                                    {{ 'admin.pages.sections'|trans }}
+                                    <span class="badge text-bg-dark ms-1">{{ 'admin.pages.legacy'|trans }}</span>
+                                </a>
+                            {% endif %}
+                        {% elseif nowo_page_builder_can('content') %}
+                            <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_content', {pageKey: page.pageKey}) }}">
+                                {{ 'admin.pages.content'|trans }}
                             </a>
                         {% endif %}
                         </span>
@@ -59,6 +79,7 @@
         {% endif %}
     </section>
 
+    {% if nowo_page_builder_can('layout') %}
     <section class="pbk-create card">
         <div class="card-header fw-semibold">{{ 'admin.pages.create'|trans }}</div>
         <div class="card-body">
@@ -71,4 +92,5 @@
             {{ form_end(create_form) }}
         </div>
     </section>
+    {% endif %}
 {% endblock %}

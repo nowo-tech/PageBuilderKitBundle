@@ -1,0 +1,387 @@
+{% extends nowo_page_builder_layout_template() %}
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+
+{% block page_title %}{{ 'admin.content.title'|trans({'%key%': pageKey}) }}{% endblock %}
+
+{% block header_actions %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.title'|trans }}</a>
+    {% if nowo_page_builder_can('layout') %}
+        {% set _engine = page.document and page.document.structure.engine|default('classic') %}
+        {% if _engine == 'grapesjs' %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: pageKey}) }}">{{ 'admin.pages.edit'|trans }}</a>
+        {% else %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_sections', {pageKey: pageKey}) }}">{{ 'admin.pages.sections'|trans }}</a>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block admin %}
+    <p class="text-muted">{{ 'admin.content.hint'|trans }}</p>
+
+    {% if can_edit_schema %}
+        <section class="card mb-4">
+            <div class="card-header fw-semibold">{{ 'admin.content.schema'|trans }}</div>
+            <div class="card-body">
+                {% if schema is empty %}
+                    <p class="text-muted mb-3">{{ 'admin.content.schema_empty'|trans }}</p>
+                {% else %}
+                    <ul class="list-group mb-3">
+                        {% for field in schema %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>
+                                    <code>{{ field.key }}</code>
+                                    <span class="badge bg-secondary ms-2">{{ field.type }}</span>
+                                    {{ field.display_label|default(field.label) }}
+                                    {% if field.required %}<span class="text-danger">*</span>{% endif %}
+                                    {% if field.fields is defined and field.fields is not empty %}
+                                        <small class="text-muted ms-1">[
+                                            {% for sub in field.fields %}{{ sub.key }}:{{ sub.type }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                        ]</small>
+                                    {% endif %}
+                                </span>
+                                <form method="post" action="{{ path('admin_page_builder_content_schema', {pageKey: pageKey}) }}" class="d-inline">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_content') }}">
+                                    <input type="hidden" name="schema_action" value="remove">
+                                    <input type="hidden" name="key" value="{{ field.key }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">{{ 'admin.content.remove_field'|trans }}</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <form method="post" action="{{ path('admin_page_builder_content_schema', {pageKey: pageKey}) }}" class="row g-2 align-items-end">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_content') }}">
+                    <input type="hidden" name="schema_action" value="add">
+                    <div class="col-md-2">
+                        <label class="form-label">{{ 'admin.content.field_key'|trans }}</label>
+                        <input class="form-control" name="key" required pattern="[a-z][a-z0-9_]*" placeholder="hero_title">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">{{ 'admin.content.field_type'|trans }}</label>
+                        <select class="form-select" name="type">
+                            {% for type in field_types %}
+                                <option value="{{ type }}">{{ type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ 'admin.content.field_label'|trans }}</label>
+                        <input class="form-control" name="label" placeholder="Hero title">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ 'admin.content.field_options'|trans }}</label>
+                        <input class="form-control" name="options" placeholder="a,b,c">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ 'admin.content.field_subfields'|trans }}</label>
+                        <input class="form-control" name="subfields" placeholder="question:string,answer:text">
+                        <div class="form-text">{{ 'admin.content.field_subfields_hint'|trans }}</div>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">{{ 'admin.content.field_min'|trans }}</label>
+                        <input class="form-control" name="min" type="number" min="0" placeholder="0">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">{{ 'admin.content.field_max'|trans }}</label>
+                        <input class="form-control" name="max" type="number" min="0" placeholder="">
+                    </div>
+                    <div class="col-md-1 form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="required" value="1" id="pbk-field-required">
+                        <label class="form-check-label" for="pbk-field-required">{{ 'admin.content.field_required'|trans }}</label>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100">{{ 'admin.content.add_field'|trans }}</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    {% endif %}
+
+    {% if can_edit_values %}
+        <section class="card">
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>{{ 'admin.content.values'|trans }}</span>
+                <span class="btn-group btn-group-sm">
+                    {% for locale in locales %}
+                        <a class="btn btn-outline-secondary{% if locale == active_locale %} active{% endif %}"
+                           href="{{ path('admin_page_builder_content', {pageKey: pageKey, locale: locale}) }}">{{ locale }}</a>
+                    {% endfor %}
+                </span>
+            </div>
+            <div class="card-body">
+                {% if schema is empty %}
+                    <p class="text-muted">{{ 'admin.content.no_fields'|trans }}</p>
+                {% else %}
+                    <form method="post" action="{{ path('admin_page_builder_content', {pageKey: pageKey, locale: active_locale}) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_content') }}">
+                        <input type="hidden" name="action" value="save_values">
+                        {% for field in schema %}
+                            {% set current = fieldValues[active_locale][field.key]|default(field.default|default(field.type == 'bool' ? false : '')) %}
+                            {% set current_label = field.labels[active_locale]|default(field.display_label|default(field.label)) %}
+                            <div class="mb-3">
+                                <label class="form-label" for="field-{{ field.key }}">
+                                    {{ field.display_label|default(field.label) }}
+                                    {% if field.required %}<span class="text-danger">*</span>{% endif %}
+                                    <small class="text-muted">({{ field.key }} · {{ field.type }})</small>
+                                </label>
+                                <div class="mb-2">
+                                    <label class="form-label form-label-sm text-muted mb-0" for="field-label-{{ field.key }}">
+                                        {{ 'admin.content.field_label_locale'|trans({'%locale%': active_locale}) }}
+                                    </label>
+                                    <input class="form-control form-control-sm" id="field-label-{{ field.key }}"
+                                           name="fieldLabels[{{ active_locale }}][{{ field.key }}]"
+                                           value="{{ current_label }}"
+                                           placeholder="{{ field.key }}">
+                                </div>
+                                {% if field.type == 'bool' %}
+                                    <div class="form-check">
+                                        <input type="hidden" name="fieldValues[{{ active_locale }}][{{ field.key }}]" value="0">
+                                        <input class="form-check-input" type="checkbox" id="field-{{ field.key }}"
+                                               name="fieldValues[{{ active_locale }}][{{ field.key }}]" value="1"
+                                               {% if current %}checked{% endif %}>
+                                    </div>
+                                {% elseif field.type == 'group' %}
+                                    <div class="border rounded p-2 bg-light">
+                                        {% for sub in field.fields|default([]) %}
+                                            {% set sub_current = current[sub.key]|default('') %}
+                                            <div class="mb-2">
+                                                <label class="form-label form-label-sm mb-0" for="field-{{ field.key }}-{{ sub.key }}">{{ sub.label|default(sub.key) }}</label>
+                                                {% if sub.type == 'text' or sub.type == 'richtext' or sub.type == 'html' or sub.type == 'raw' %}
+                                                    <textarea class="form-control form-control-sm" id="field-{{ field.key }}-{{ sub.key }}" rows="2"
+                                                              name="fieldValues[{{ active_locale }}][{{ field.key }}][{{ sub.key }}]">{{ sub_current }}</textarea>
+                                                {% else %}
+                                                    <input class="form-control form-control-sm" id="field-{{ field.key }}-{{ sub.key }}"
+                                                           name="fieldValues[{{ active_locale }}][{{ field.key }}][{{ sub.key }}]"
+                                                           value="{{ sub_current }}">
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted small mb-0">{{ 'admin.content.no_subfields'|trans }}</p>
+                                        {% endfor %}
+                                    </div>
+                                {% elseif field.type == 'repeater' %}
+                                    {% set rows = current is iterable and current is not same as({}) ? current : [] %}
+                                    {% set row_count = rows|length %}
+                                    {% set slots = row_count + 1 %}
+                                    <div class="border rounded p-2 bg-light">
+                                        {% for i in 0..(slots - 1) %}
+                                            {% set row = rows[i]|default({}) %}
+                                            <div class="border-bottom pb-2 mb-2">
+                                                <div class="small text-muted mb-1">{{ 'admin.content.repeater_row'|trans({'%n%': i + 1}) }}</div>
+                                                {% for sub in field.fields|default([]) %}
+                                                    {% set sub_current = row[sub.key]|default(sub.type == 'group' ? {} : '') %}
+                                                    <div class="mb-1">
+                                                        <label class="form-label form-label-sm mb-0" for="field-{{ field.key }}-{{ i }}-{{ sub.key }}">{{ sub.label|default(sub.key) }}</label>
+                                                        {% if sub.type == 'group' %}
+                                                            <div class="ps-2 border-start">
+                                                                {% for gsub in sub.fields|default([]) %}
+                                                                    {% set g_current = sub_current[gsub.key]|default('') %}
+                                                                    <label class="form-label form-label-sm mb-0" for="field-{{ field.key }}-{{ i }}-{{ sub.key }}-{{ gsub.key }}">{{ gsub.label|default(gsub.key) }}</label>
+                                                                    <input class="form-control form-control-sm mb-1" id="field-{{ field.key }}-{{ i }}-{{ sub.key }}-{{ gsub.key }}"
+                                                                           name="fieldValues[{{ active_locale }}][{{ field.key }}][{{ i }}][{{ sub.key }}][{{ gsub.key }}]"
+                                                                           value="{{ g_current }}">
+                                                                {% else %}
+                                                                    <p class="text-muted small mb-0">{{ 'admin.content.no_subfields'|trans }}</p>
+                                                                {% endfor %}
+                                                            </div>
+                                                        {% elseif sub.type == 'text' or sub.type == 'richtext' or sub.type == 'html' or sub.type == 'raw' %}
+                                                            <textarea class="form-control form-control-sm" id="field-{{ field.key }}-{{ i }}-{{ sub.key }}" rows="2"
+                                                                      name="fieldValues[{{ active_locale }}][{{ field.key }}][{{ i }}][{{ sub.key }}]">{{ sub_current }}</textarea>
+                                                        {% else %}
+                                                            <input class="form-control form-control-sm" id="field-{{ field.key }}-{{ i }}-{{ sub.key }}"
+                                                                   name="fieldValues[{{ active_locale }}][{{ field.key }}][{{ i }}][{{ sub.key }}]"
+                                                                   value="{{ sub_current }}">
+                                                        {% endif %}
+                                                    </div>
+                                                {% else %}
+                                                    <p class="text-muted small mb-0">{{ 'admin.content.no_subfields'|trans }}</p>
+                                                {% endfor %}
+                                            </div>
+                                        {% endfor %}
+                                        <p class="form-text mb-0">{{ 'admin.content.repeater_hint'|trans }}</p>
+                                    </div>
+                                {% elseif field.type == 'text' or field.type == 'richtext' or field.type == 'html' or field.type == 'raw' %}
+                                    <textarea class="form-control" id="field-{{ field.key }}" rows="4"
+                                              name="fieldValues[{{ active_locale }}][{{ field.key }}]">{{ current }}</textarea>
+                                {% elseif field.type == 'select' %}
+                                    <select class="form-select" id="field-{{ field.key }}"
+                                            name="fieldValues[{{ active_locale }}][{{ field.key }}]">
+                                        {% for option in field.options %}
+                                            <option value="{{ option }}" {% if current == option %}selected{% endif %}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% elseif field.type == 'reference' %}
+                                    <select class="form-select" id="field-{{ field.key }}"
+                                            name="fieldValues[{{ active_locale }}][{{ field.key }}]">
+                                        <option value="">{{ 'admin.content.reference_none'|trans }}</option>
+                                        {% for page_ref in reference_pages|default([]) %}
+                                            <option value="{{ page_ref }}" {% if current == page_ref %}selected{% endif %}>{{ page_ref }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% elseif field.type == 'image' %}
+                                    <div class="input-group">
+                                        <input class="form-control" id="field-{{ field.key }}"
+                                               type="url"
+                                               name="fieldValues[{{ active_locale }}][{{ field.key }}]"
+                                               value="{{ current }}"
+                                               placeholder="https://…">
+                                        {% if asset_library_enabled|default(false) %}
+                                            <button type="button" class="btn btn-outline-secondary"
+                                                    data-pbk-media-pick
+                                                    data-target="#field-{{ field.key }}"
+                                                    data-library-url="{{ asset_library_url }}">
+                                                {{ 'admin.content.browse_library'|trans }}
+                                            </button>
+                                        {% endif %}
+                                        {% if asset_upload_enabled|default(false) %}
+                                            <label class="btn btn-outline-secondary mb-0">
+                                                {{ 'admin.content.upload_image'|trans }}
+                                                <input type="file" accept="image/*" class="d-none" data-pbk-image-upload
+                                                       data-target="#field-{{ field.key }}"
+                                                       data-upload-url="{{ asset_upload_url }}"
+                                                       data-csrf="{{ asset_upload_csrf }}">
+                                            </label>
+                                        {% endif %}
+                                    </div>
+                                    {% if current %}
+                                        <div class="mt-2"><img src="{{ current|e('html_attr') }}" alt="" style="max-height:80px" class="rounded border" data-pbk-image-preview="#field-{{ field.key }}"></div>
+                                    {% endif %}
+                                {% else %}
+                                    <input class="form-control" id="field-{{ field.key }}"
+                                           type="{{ field.type == 'url' ? 'url' : (field.type == 'number' ? 'number' : 'text') }}"
+                                           name="fieldValues[{{ active_locale }}][{{ field.key }}]"
+                                           value="{{ current }}">
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-success">{{ 'admin.content.save_values'|trans }}</button>
+                    </form>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
+
+    {% if asset_upload_enabled|default(false) or asset_library_enabled|default(false) %}
+        <div class="modal fade" id="pbk-media-library-modal" tabindex="-1" aria-labelledby="pbk-media-library-title" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="pbk-media-library-title">{{ 'admin.content.media_library'|trans }}</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3" data-pbk-media-empty hidden>{{ 'admin.content.media_library_empty'|trans }}</p>
+                        <div class="row g-2" data-pbk-media-grid></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                function setFieldUrl(target, url) {
+                    if (!target || !url) return;
+                    target.value = url;
+                    target.dispatchEvent(new Event('change'));
+                    var preview = document.querySelector('[data-pbk-image-preview="#' + target.id + '"]');
+                    if (preview) {
+                        preview.src = url;
+                    } else if (target.id) {
+                        var wrap = target.closest('.mb-3, .form-group, div');
+                        if (wrap) {
+                            var img = wrap.querySelector('img');
+                            if (img) img.src = url;
+                        }
+                    }
+                }
+
+                document.querySelectorAll('[data-pbk-image-upload]').forEach(function (input) {
+                    input.addEventListener('change', function () {
+                        if (!input.files || !input.files[0]) return;
+                        var target = document.querySelector(input.getAttribute('data-target'));
+                        if (!target) return;
+                        var data = new FormData();
+                        data.append('files[]', input.files[0]);
+                        fetch(input.getAttribute('data-upload-url'), {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': input.getAttribute('data-csrf') || '', Accept: 'application/json' },
+                            credentials: 'same-origin',
+                            body: data
+                        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                          .then(function (res) {
+                              var url = res.j && (res.j.data && res.j.data[0] && (res.j.data[0].src || res.j.data[0].url));
+                              if (!url && res.j && res.j.files && res.j.files[0]) url = res.j.files[0];
+                              if (!url && Array.isArray(res.j) && res.j[0]) url = res.j[0].src || res.j[0];
+                              if (res.ok && url) {
+                                  setFieldUrl(target, url);
+                              } else {
+                                  alert((res.j && res.j.error) || 'Upload failed');
+                              }
+                          }).catch(function () { alert('Upload failed'); });
+                    });
+                });
+
+                var modalEl = document.getElementById('pbk-media-library-modal');
+                var grid = modalEl ? modalEl.querySelector('[data-pbk-media-grid]') : null;
+                var emptyEl = modalEl ? modalEl.querySelector('[data-pbk-media-empty]') : null;
+                var activeTarget = null;
+
+                function openLibrary(target, libraryUrl) {
+                    activeTarget = target;
+                    if (!modalEl || !grid || !libraryUrl) return;
+                    grid.innerHTML = '';
+                    if (emptyEl) emptyEl.hidden = true;
+                    fetch(libraryUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            var assets = (j && Array.isArray(j.data)) ? j.data : [];
+                            if (!assets.length) {
+                                if (emptyEl) emptyEl.hidden = false;
+                                return;
+                            }
+                            assets.forEach(function (asset) {
+                                if (!asset || !asset.src) return;
+                                var col = document.createElement('div');
+                                col.className = 'col-6 col-md-3';
+                                var btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'btn btn-light border w-100 p-1 text-start';
+                                btn.innerHTML = '<img src="' + String(asset.src).replace(/"/g, '&quot;') + '" alt="" class="img-fluid rounded mb-1" style="max-height:96px;object-fit:cover;width:100%">'
+                                    + '<span class="d-block text-truncate small">' + String(asset.name || asset.src).replace(/</g, '&lt;') + '</span>';
+                                btn.addEventListener('click', function () {
+                                    setFieldUrl(activeTarget, asset.src);
+                                    if (window.bootstrap && bootstrap.Modal) {
+                                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                                    } else {
+                                        modalEl.classList.remove('show');
+                                        modalEl.style.display = 'none';
+                                    }
+                                });
+                                col.appendChild(btn);
+                                grid.appendChild(col);
+                            });
+                        })
+                        .catch(function () {
+                            if (emptyEl) {
+                                emptyEl.hidden = false;
+                                emptyEl.textContent = 'Library unavailable';
+                            }
+                        });
+                    if (window.bootstrap && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    } else {
+                        modalEl.classList.add('show');
+                        modalEl.style.display = 'block';
+                    }
+                }
+
+                document.querySelectorAll('[data-pbk-media-pick]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var target = document.querySelector(btn.getAttribute('data-target'));
+                        openLibrary(target, btn.getAttribute('data-library-url'));
+                    });
+                });
+            })();
+        </script>
+    {% endif %}
+{% endblock %}

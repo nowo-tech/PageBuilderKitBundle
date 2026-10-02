@@ -32,6 +32,10 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
 
     private PageBuilderKitTraceInterface $trace;
 
+    private ContentFieldsNormalizer $contentFieldsNormalizer;
+
+    private ContentFieldSlotReplacer $contentFieldSlotReplacer;
+
     /**
      * @param iterable<GrapesTwigContextProviderInterface> $twigContextProviders
      */
@@ -47,12 +51,16 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         private PageSeoBuilder $pageSeoBuilder = new PageSeoBuilder(),
         iterable $twigContextProviders = [],
         ?PageBuilderKitTraceInterface $trace = null,
+        ?ContentFieldsNormalizer $contentFieldsNormalizer = null,
+        ?ContentFieldSlotReplacer $contentFieldSlotReplacer = null,
     ) {
         $providers = $twigContextProviders instanceof Traversable
             ? iterator_to_array($twigContextProviders, false)
             : $twigContextProviders;
-        $this->twigContextProviders = array_values($providers);
-        $this->trace                = $trace ?? new NullPageBuilderKitTrace();
+        $this->twigContextProviders     = array_values($providers);
+        $this->trace                    = $trace ?? new NullPageBuilderKitTrace();
+        $this->contentFieldsNormalizer  = $contentFieldsNormalizer ?? new ContentFieldsNormalizer();
+        $this->contentFieldSlotReplacer = $contentFieldSlotReplacer ?? new ContentFieldSlotReplacer();
     }
 
     /**
@@ -82,6 +90,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         $structure   = $this->documentNormalizer->normalize($document->getStructure());
         $translation = $page->getTranslation($locale) ?? $page->getTranslation($fallbackLocale);
         $title       = $translation?->getTitle() ?? $pageKey;
+        $fields      = $this->contentFieldsNormalizer->resolveForLocale($structure, $locale, $fallbackLocale);
 
         $base = [
             'pageKey' => $pageKey,
@@ -90,6 +99,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             'title'   => $title,
             'slug'    => $translation?->getSlug() ?? $pageKey,
             'seo'     => $this->pageSeoBuilder->build($translation, $pageKey, $locale, $title),
+            'fields'  => $fields,
         ];
 
         $timings = [
@@ -126,6 +136,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             'slug'         => (string) $result['slug'],
             'title'        => (string) $result['title'],
             'seoKeys'      => array_keys($seo),
+            'fieldKeys'    => array_keys($fields),
             'twigApplied'  => (bool) ($result['twigApplied'] ?? false),
             'twigError'    => is_string($result['twigError'] ?? null) ? $result['twigError'] : null,
             'contextKeys'  => $contextKeys,
@@ -174,19 +185,28 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         $twigResult      = $this->grapesTwigRenderer->render($html, $twigContext);
         $timings['twig'] = $this->msSince($tTwig);
 
+        $schema  = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
+        $htmlOut = $this->contentFieldSlotReplacer->replace(
+            $twigResult['html'],
+            is_array($base['fields'] ?? null) ? $base['fields'] : [],
+            $schema,
+        );
+        $slotsApplied = $htmlOut !== $twigResult['html'];
+
         $tSanitize           = hrtime(true);
         $cssOut              = $this->grapesDocumentSanitizer->sanitizeCss($css);
         $timings['sanitize'] = $this->msSince($tSanitize);
 
         return [
-            'engine'      => DocumentNormalizer::ENGINE_GRAPESJS,
-            'html'        => $twigResult['html'],
-            'css'         => $cssOut,
-            'sections'    => [],
-            'twigApplied' => $twigResult['twigApplied'],
-            'twigError'   => $twigResult['twigError'],
-            'contextKeys' => $contextKeys,
-            'timingsMs'   => $timings,
+            'engine'       => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'         => $htmlOut,
+            'css'          => $cssOut,
+            'sections'     => [],
+            'twigApplied'  => $twigResult['twigApplied'],
+            'twigError'    => $twigResult['twigError'],
+            'slotsApplied' => $slotsApplied,
+            'contextKeys'  => $contextKeys,
+            'timingsMs'    => $timings,
         ];
     }
 
@@ -205,6 +225,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             'title'   => $base['title'],
             'slug'    => $base['slug'],
             'seo'     => $base['seo'] ?? [],
+            'fields'  => is_array($base['fields'] ?? null) ? $base['fields'] : [],
             'page'    => [
                 'key'    => $base['pageKey'],
                 'locale' => $base['locale'],

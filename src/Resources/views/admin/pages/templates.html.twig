@@ -59,10 +59,25 @@
                             <td>{{ template.label }}</td>
                             <td class="text-end">
                                 <a class="btn btn-outline-secondary btn-sm mb-1" href="{{ path('admin_page_builder_templates_export', {templateKey: template.templateKey}) }}">{{ 'admin.templates.export'|trans }}</a>
-                                <form method="post" action="{{ path('admin_page_builder_templates_apply', {templateKey: template.templateKey}) }}" class="d-inline-flex gap-1 mb-1">
+                                <form method="post" action="{{ path('admin_page_builder_templates_apply', {templateKey: template.templateKey}) }}" class="d-inline-flex flex-wrap gap-1 align-items-center mb-1">
                                     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                                     <input class="form-control form-control-sm" name="pageKey" placeholder="{{ 'form.page_key'|trans }}" required pattern="[a-z0-9_-]+">
                                     <input class="form-control form-control-sm" name="title" placeholder="{{ 'form.page_title'|trans }}">
+                                    <div class="form-check form-check-inline m-0">
+                                        <input type="hidden" name="include_field_schema" value="0">
+                                        <input class="form-check-input" type="checkbox" name="include_field_schema" value="1" id="tpl-schema-{{ template.templateKey }}" checked>
+                                        <label class="form-check-label small" for="tpl-schema-{{ template.templateKey }}">{{ 'admin.templates.include_field_schema'|trans }}</label>
+                                    </div>
+                                    <div class="form-check form-check-inline m-0">
+                                        <input type="hidden" name="include_field_values" value="0">
+                                        <input class="form-check-input" type="checkbox" name="include_field_values" value="1" id="tpl-values-{{ template.templateKey }}">
+                                        <label class="form-check-label small" for="tpl-values-{{ template.templateKey }}">{{ 'admin.templates.include_field_values'|trans }}</label>
+                                    </div>
+                                    <div class="form-check form-check-inline m-0">
+                                        <input type="hidden" name="include_seo" value="0">
+                                        <input class="form-check-input" type="checkbox" name="include_seo" value="1" id="tpl-seo-{{ template.templateKey }}">
+                                        <label class="form-check-label small" for="tpl-seo-{{ template.templateKey }}">{{ 'admin.templates.include_seo'|trans }}</label>
+                                    </div>
                                     <button class="btn btn-primary btn-sm" type="submit">{{ 'admin.templates.apply'|trans }}</button>
                                 </form>
                                 <form method="post" action="{{ path('admin_page_builder_templates_delete', {templateKey: template.templateKey}) }}" class="d-inline" onsubmit="return confirm({{ ('admin.templates.delete_confirm')|trans|json_encode|raw }});">

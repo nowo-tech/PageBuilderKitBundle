@@ -38,6 +38,10 @@ final class ConfigurablePageBuilderKitAccessCheckerTest extends TestCase
         $checker = new ConfigurablePageBuilderKitAccessChecker(
             $authorizationChecker,
             ['ROLE_VIEWER', 'ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
         );
 
         self::assertTrue($checker->canAccess());
@@ -53,6 +57,10 @@ final class ConfigurablePageBuilderKitAccessCheckerTest extends TestCase
 
         $checker = new ConfigurablePageBuilderKitAccessChecker(
             $authorizationChecker,
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
+            ['ROLE_EDITOR'],
             ['ROLE_EDITOR'],
         );
 

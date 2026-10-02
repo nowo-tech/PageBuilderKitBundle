@@ -18,6 +18,16 @@
             <b>Revisions</b>
             <span>{{ collector.revisionsEnabled ? 'on' : 'off' }}</span>
         </div>
+        {% if collector.capabilities %}
+            <div class="sf-toolbar-info-piece">
+                <b>Capabilities</b>
+                <span>
+                    {% for name, ok in collector.capabilities %}
+                        {{ name }}{{ ok ? '✓' : '✗' }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </span>
+            </div>
+        {% endif %}
     {% endset %}
     {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { link: collector.renderCount > 0 or collector.publicOutcomes|length > 0 or collector.adminActions|length > 0 }) }}
 {% endblock %}
@@ -49,6 +59,26 @@
             <span class="label">Revisions</span>
         </div>
     </div>
+
+    {% if collector.capabilities %}
+        <h3>Effective capabilities</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>capability</th>
+                    <th>granted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, ok in collector.capabilities %}
+                    <tr>
+                        <td><code>{{ name }}</code></td>
+                        <td>{{ ok ? 'yes' : 'no' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
 
     <h3>Public outcomes</h3>
     {% if collector.publicOutcomes is empty %}
@@ -85,6 +115,7 @@
                     <th>locale</th>
                     <th>status</th>
                     <th>engine</th>
+                    <th>fields</th>
                     <th>Twig</th>
                     <th>context keys</th>
                     <th>timings (ms)</th>
@@ -102,6 +133,7 @@
                         <td>{{ row.locale }}</td>
                         <td>{{ row.status }}</td>
                         <td>{{ row.engine }}</td>
+                        <td><code>{{ (row.fieldKeys|default([]))|join(', ') }}</code></td>
                         <td>
                             {% if row.twigApplied|default(false) %}
                                 applied

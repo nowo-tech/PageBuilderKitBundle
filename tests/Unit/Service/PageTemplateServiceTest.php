@@ -16,6 +16,7 @@ use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
+use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
@@ -525,6 +526,144 @@ final class PageTemplateServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $service->delete('missing');
+    }
+
+    #[Test]
+    public function createPageFromTemplateRespectsFieldOptions(): void
+    {
+        $template = (new BuilderPageTemplate())
+            ->setTemplateKey('fields-tpl')
+            ->setLabel('Fields')
+            ->setStructure([
+                'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'    => '<p>{{ fields.hero_title }}</p>',
+                'css'     => '',
+                'grapes'  => [],
+                'fields'  => [
+                    ['key' => 'hero_title', 'type' => 'string', 'label' => 'Hero'],
+                ],
+                'fieldValues' => [
+                    'es' => ['hero_title' => 'Hola'],
+                ],
+            ])
+            ->setWidgetPropsByLocale([]);
+
+        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private readonly BuilderPageTemplate $template)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $templateKey === 'fields-tpl' ? $this->template : null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return [$this->template];
+            }
+        };
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $this->createStub(EntityManagerInterface::class),
+            $this->documents(),
+            new DocumentNormalizer(),
+            new ContentFieldsNormalizer(),
+        );
+
+        $schemaOnly = $service->createPageFromTemplate('fields-tpl', 'a', 'A', 'es');
+        $structureA = $schemaOnly->getDocument()?->getStructure() ?? [];
+        self::assertArrayHasKey('fields', $structureA);
+        self::assertSame('hero_title', $structureA['fields'][0]['key']);
+        self::assertSame([], $structureA['fieldValues'] ?? []);
+
+        $layoutOnly = $service->createPageFromTemplate('fields-tpl', 'b', 'B', 'es', [
+            'include_field_schema' => false,
+        ]);
+        $structureB = $layoutOnly->getDocument()?->getStructure() ?? [];
+        self::assertSame([], $structureB['fields'] ?? ['x']);
+        self::assertSame([], $structureB['fieldValues'] ?? ['x']);
+
+        $withValues = $service->createPageFromTemplate('fields-tpl', 'c', 'C', 'es', [
+            'include_field_schema' => true,
+            'include_field_values' => true,
+        ]);
+        $structureC = $withValues->getDocument()?->getStructure() ?? [];
+        self::assertSame('Hola', $structureC['fieldValues']['es']['hero_title']);
+    }
+
+    #[Test]
+    public function createPageFromTemplateOptionallyCopiesSeo(): void
+    {
+        $template = (new BuilderPageTemplate())
+            ->setTemplateKey('seo-tpl')
+            ->setLabel('SEO')
+            ->setStructure([
+                'version'             => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+                'engine'              => DocumentNormalizer::ENGINE_GRAPESJS,
+                'html'                => '<p>Hi</p>',
+                'css'                 => '',
+                'grapes'              => [],
+                'fields'              => [],
+                'fieldValues'         => [],
+                'templateSeoByLocale' => [
+                    'es' => [
+                        'metaTitle'       => 'Meta ES',
+                        'metaDescription' => 'Desc ES',
+                        'ogTitle'         => 'OG ES',
+                        'ogDescription'   => null,
+                        'ogImage'         => null,
+                        'canonicalUrl'    => 'https://example.test/es',
+                        'robots'          => 'index,follow',
+                    ],
+                ],
+            ])
+            ->setWidgetPropsByLocale([]);
+
+        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private readonly BuilderPageTemplate $template)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $templateKey === 'seo-tpl' ? $this->template : null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return [$this->template];
+            }
+        };
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $em,
+            $this->documents(),
+            new DocumentNormalizer(),
+            new ContentFieldsNormalizer(),
+        );
+
+        $without = $service->createPageFromTemplate('seo-tpl', 'no-seo', 'No SEO', 'es');
+        self::assertNull($without->getTranslation('es')?->getMetaTitle());
+
+        $with = $service->createPageFromTemplate('seo-tpl', 'with-seo', 'With SEO', 'es', [
+            'include_seo' => true,
+        ]);
+        $seo = $with->getTranslation('es');
+        self::assertNotNull($seo);
+        self::assertSame('Meta ES', $seo->getMetaTitle());
+        self::assertSame('Desc ES', $seo->getMetaDescription());
+        self::assertSame('OG ES', $seo->getOgTitle());
+        self::assertSame('https://example.test/es', $seo->getCanonicalUrl());
+        self::assertSame('index,follow', $seo->getRobots());
+        // Live page structure must not keep template-only SEO blob.
+        self::assertArrayNotHasKey('templateSeoByLocale', $with->getDocument()?->getStructure() ?? []);
     }
 
     private function documents(): DocumentService

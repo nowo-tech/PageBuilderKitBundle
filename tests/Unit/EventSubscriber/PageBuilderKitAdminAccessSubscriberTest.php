@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\EventSubscriber;
 
+use Nowo\PageBuilderKitBundle\Enum\PageBuilderCapability;
 use Nowo\PageBuilderKitBundle\EventSubscriber\PageBuilderKitAdminAccessSubscriber;
 use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
@@ -39,17 +40,52 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
     #[Test]
     public function deniesAdminRouteWhenCheckerRejects(): void
     {
-        $checker = new class implements PageBuilderKitAccessCheckerInterface {
-            public function canAccess(): bool
-            {
-                return false;
-            }
-        };
-        $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($this->denyAllChecker());
 
         $this->expectException(AccessDeniedException::class);
 
         $subscriber->onKernelController($this->controllerEvent('admin_page_builder_edit'));
+    }
+
+    #[Test]
+    public function deniesCanvasWithoutLayoutCapability(): void
+    {
+        $checker = new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return true;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return $capability === 'content' || $capability === PageBuilderCapability::Content;
+            }
+        };
+
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
+
+        $this->expectException(AccessDeniedException::class);
+        $subscriber->onKernelController($this->controllerEvent('admin_page_builder_canvas'));
     }
 
     #[Test]
@@ -68,6 +104,31 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
 
                 return false;
             }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return false;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return false;
+            }
         };
         $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
 
@@ -75,6 +136,41 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
         $subscriber->onKernelController($this->controllerEvent(null));
 
         self::assertSame(0, $calls->count);
+    }
+
+    private function denyAllChecker(): PageBuilderKitAccessCheckerInterface
+    {
+        return new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return false;
+            }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return false;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return false;
+            }
+        };
     }
 
     private function controllerEvent(?string $route): ControllerEvent

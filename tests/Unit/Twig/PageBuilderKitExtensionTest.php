@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Twig;
 
+use Nowo\PageBuilderKitBundle\Enum\PageBuilderCapability;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
+use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
 use Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
@@ -70,7 +72,35 @@ final class PageBuilderKitExtensionTest extends TestCase
             {
                 return true;
             }
+
+            public function canLayout(): bool
+            {
+                return true;
+            }
+
+            public function canContent(): bool
+            {
+                return true;
+            }
+
+            public function canPublish(): bool
+            {
+                return true;
+            }
+
+            public function canTemplates(): bool
+            {
+                return true;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return true;
+            }
         };
+
+        $inline = $this->createStub(InlineContentFieldRendererInterface::class);
+        $inline->method('render')->willReturn('<span>field</span>');
 
         $extension = new PageBuilderKitExtension(
             '@NowoPageBuilderKitBundle/admin/layout.html.twig',
@@ -78,6 +108,7 @@ final class PageBuilderKitExtensionTest extends TestCase
             $renderProvider,
             $registry,
             $accessChecker,
+            $inline,
         );
 
         self::assertSame(
@@ -97,7 +128,9 @@ final class PageBuilderKitExtensionTest extends TestCase
             ],
             $extension->widgetTypes(),
         );
-        self::assertCount(6, $extension->getFunctions());
+        self::assertCount(8, $extension->getFunctions());
+        self::assertTrue($extension->can('layout'));
+        self::assertSame('<span>field</span>', $extension->field('home', 'hero_title', ['type' => 'string']));
 
         self::assertSame(
             ['pageKey' => 'home', 'sections' => [], 'context' => ['x' => 1]],

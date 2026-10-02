@@ -12,7 +12,10 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function file_put_contents;
+use function mkdir;
 use function sys_get_temp_dir;
+use function time;
+use function touch;
 use function uniqid;
 
 #[CoversClass(LocalFilesystemAssetStorage::class)]
@@ -86,5 +89,29 @@ final class LocalFilesystemAssetStorageTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid file name.');
         $storage->store($upload);
+    }
+
+    #[Test]
+    public function listsStoredImagesNewestFirst(): void
+    {
+        $dir     = sys_get_temp_dir() . '/pbk-lib-' . uniqid('', true);
+        $storage = new LocalFilesystemAssetStorage($dir, '/media', 5_000_000, ['image/png']);
+        mkdir($dir, 0775, true);
+
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
+        self::assertNotFalse($png);
+        file_put_contents($dir . '/older.png', $png);
+        touch($dir . '/older.png', time() - 10);
+        file_put_contents($dir . '/newer.png', $png);
+        touch($dir . '/newer.png', time());
+
+        $listed = $storage->list(10);
+        self::assertCount(2, $listed);
+        self::assertSame('newer.png', $listed[0]['name']);
+        self::assertSame('/media/newer.png', $listed[0]['src']);
+        self::assertSame('image', $listed[0]['type']);
+
+        self::assertSame([], $storage->list(0));
+        self::assertCount(1, $storage->list(1));
     }
 }

@@ -81,7 +81,7 @@ final class DemoPageSeeder
         } else {
             $en = DemoContentCatalog::contentFor($pageKey, 'en');
             $es = DemoContentCatalog::contentFor($pageKey, 'es');
-            $this->documentService->saveDocument($page, [
+            $structure = [
                 'version'       => 2,
                 'engine'        => 'grapesjs',
                 'html'          => $en['html'],
@@ -92,7 +92,12 @@ final class DemoPageSeeder
                     'es' => ['html' => $es['html'], 'css' => $es['css'], 'grapes' => []],
                 ],
                 'sections' => [],
-            ], []);
+            ];
+            if ($pageKey === 'fields') {
+                $structure['fields']      = DemoContentFieldsSeed::schema();
+                $structure['fieldValues'] = DemoContentFieldsSeed::values();
+            }
+            $this->documentService->saveDocument($page, $structure, []);
         }
 
         $this->syncPublishState($page, $case['publish']);

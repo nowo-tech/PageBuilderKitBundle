@@ -12,6 +12,9 @@ use Throwable;
 
 use function bin2hex;
 use function class_exists;
+use function closedir;
+use function count;
+use function filemtime;
 use function finfo_file;
 use function finfo_open;
 use function getimagesize;
@@ -21,20 +24,23 @@ use function is_dir;
 use function is_file;
 use function is_string;
 use function mkdir;
+use function opendir;
 use function preg_replace;
 use function random_bytes;
+use function readdir;
 use function rtrim;
 use function sprintf;
 use function str_contains;
 use function strtolower;
 use function trim;
+use function usort;
 
 use const FILEINFO_MIME_TYPE;
 
 /**
  * Validates and stores uploads on the local public filesystem.
  */
-final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterface
+final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
@@ -92,6 +98,72 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStor
             mimeType: $mime !== '' ? $mime : null,
             storageKey: $basename,
         );
+    }
+
+    /**
+     * @return list<array{src: string, type: string, name: string, width?: int, height?: int, storageKey?: string}>
+     */
+    public function list(int $limit = 100): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+        if (!is_dir($this->directory)) {
+            return [];
+        }
+
+        $files  = [];
+        $handle = @opendir($this->directory);
+        if ($handle === false) {
+            return [];
+        }
+        while (($entry = readdir($handle)) !== false) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $path = $this->directory . '/' . $entry;
+            if (!is_file($path)) {
+                continue;
+            }
+            $files[] = ['name' => $entry, 'mtime' => (int) @filemtime($path), 'path' => $path];
+        }
+        closedir($handle);
+
+        usort(
+            $files,
+            static fn (array $a, array $b): int => $b['mtime'] <=> $a['mtime'],
+        );
+
+        $prefix = rtrim($this->publicPrefix, '/');
+        $out    = [];
+        foreach ($files as $file) {
+            if (count($out) >= $limit) {
+                break;
+            }
+            $basename = $file['name'];
+            $src      = $prefix . '/' . $basename;
+            $width    = $height = null;
+            $size     = @getimagesize($file['path']);
+            if (is_array($size)) {
+                $width  = (int) $size[0];
+                $height = (int) $size[1];
+            }
+            $asset = [
+                'src'        => $src,
+                'type'       => 'image',
+                'name'       => $basename,
+                'storageKey' => $basename,
+            ];
+            if ($width !== null) {
+                $asset['width'] = $width;
+            }
+            if ($height !== null) {
+                $asset['height'] = $height;
+            }
+            $out[] = $asset;
+        }
+
+        return $out;
     }
 
     private function assertValidUpload(UploadedFile $file): void

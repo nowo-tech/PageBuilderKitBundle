@@ -21,6 +21,7 @@ use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
 use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
@@ -103,6 +104,10 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.doctrine.table_prefix', $config['doctrine']['table_prefix']);
         $container->setParameter('nowo_page_builder_kit.doctrine.connection', $config['doctrine']['connection']);
         $container->setParameter('nowo_page_builder_kit.security.access_roles', $config['security']['access_roles']);
+        $container->setParameter('nowo_page_builder_kit.security.layout_roles', $config['security']['layout_roles']);
+        $container->setParameter('nowo_page_builder_kit.security.content_roles', $config['security']['content_roles']);
+        $container->setParameter('nowo_page_builder_kit.security.publish_roles', $config['security']['publish_roles']);
+        $container->setParameter('nowo_page_builder_kit.security.templates_roles', $config['security']['templates_roles']);
         $container->setParameter('nowo_page_builder_kit.security.access_checker', $config['security']['access_checker']);
         $container->setParameter('nowo_page_builder_kit.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);
         $container->setParameter('nowo_page_builder_kit.web_ui.path_prefix', $config['web_ui']['path_prefix']);
@@ -299,7 +304,15 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
     }
 
     /**
-     * @param array{access_checker: ?string, access_roles: list<string>, allow_unauthenticated: bool} $security
+     * @param array{
+     *     access_checker: ?string,
+     *     access_roles: list<string>,
+     *     layout_roles: list<string>,
+     *     content_roles: list<string>,
+     *     publish_roles: list<string>,
+     *     templates_roles: list<string>,
+     *     allow_unauthenticated: bool
+     * } $security
      */
     private function registerAccessChecker(ContainerBuilder $container, array $security): void
     {
@@ -307,6 +320,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             $id = 'nowo_page_builder_kit.access_checker.allow_all';
             $container->setDefinition($id, new Definition(AllowAllPageBuilderKitAccessChecker::class));
             $container->setAlias(PageBuilderKitAccessCheckerInterface::class, $id);
+            $this->registerAccessGuard($container, $id);
 
             return;
         }
@@ -314,6 +328,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $custom = $security['access_checker'] ?? null;
         if (is_string($custom) && $custom !== '') {
             $container->setAlias(PageBuilderKitAccessCheckerInterface::class, $custom);
+            $this->registerAccessGuard($container, $custom);
 
             return;
         }
@@ -321,9 +336,23 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $id         = 'nowo_page_builder_kit.access_checker.default';
         $definition = new Definition(ConfigurablePageBuilderKitAccessChecker::class);
         $definition->setArgument('$accessRoles', $security['access_roles']);
+        $definition->setArgument('$layoutRoles', $security['layout_roles']);
+        $definition->setArgument('$contentRoles', $security['content_roles']);
+        $definition->setArgument('$publishRoles', $security['publish_roles']);
+        $definition->setArgument('$templatesRoles', $security['templates_roles']);
         $definition->setArgument('$authorizationChecker', new Reference('security.authorization_checker'));
         $container->setDefinition($id, $definition);
         $container->setAlias(PageBuilderKitAccessCheckerInterface::class, $id);
+        $this->registerAccessGuard($container, $id);
+    }
+
+    private function registerAccessGuard(ContainerBuilder $container, string $checkerId): void
+    {
+        $guardId = 'nowo_page_builder_kit.access_guard';
+        $guard   = new Definition(PageBuilderKitAccessGuard::class);
+        $guard->setArgument('$accessChecker', new Reference($checkerId));
+        $container->setDefinition($guardId, $guard);
+        $container->setAlias(PageBuilderKitAccessGuard::class, $guardId);
     }
 
     /**
@@ -377,6 +406,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
                 new Reference(PageBuilderKitTraceInterface::class),
                 (string) $config['web_ui']['path_prefix'],
                 (bool) $config['revisions']['enabled'],
+                new Reference(PageBuilderKitAccessCheckerInterface::class),
             ])
             ->addTag('data_collector', [
                 'template' => '@NowoPageBuilderKitBundle/Collector/page_builder.html.twig',

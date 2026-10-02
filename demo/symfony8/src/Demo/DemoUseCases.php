@@ -23,7 +23,7 @@ namespace App\Demo;
  */
 final class DemoUseCases
 {
-    public const int SEED_VERSION = 11;
+    public const int SEED_VERSION = 13;
 
     /** Page keys rendered together by the multi-render collector demo. */
     public const array MULTI_RENDER_EMBED_KEYS = ['pricing', 'about', 'faq'];
@@ -231,6 +231,17 @@ final class DemoUseCases
                 'publish'        => true,
                 'description_en' => 'GrapesJS HTML with {{ title }}, {{ locale }}, conditionals (sandboxed).',
                 'description_es' => 'HTML GrapesJS con {{ title }}, {{ locale }}, condicionales (sandbox).',
+            ],
+            [
+                'key'            => 'fields',
+                'route'          => 'fields',
+                'title_en'       => 'Content fields',
+                'title_es'       => 'Content fields',
+                'category'       => 'Content fields',
+                'engine'         => 'grapesjs',
+                'publish'        => true,
+                'description_en' => 'Typed fields + labels i18n + repeater/reference; slots [[fields.*]] and Twig {{ fields.* }}.',
+                'description_es' => 'Campos tipados + labels i18n + repeater/reference; slots [[fields.*]] y Twig {{ fields.* }}.',
             ],
             [
                 'key'            => 'seo',

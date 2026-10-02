@@ -36,6 +36,7 @@ final readonly class DocumentService
         private WidgetPropsMerger $widgetPropsMerger,
         private GrapesDocumentSanitizer $grapesDocumentSanitizer = new GrapesDocumentSanitizer(),
         private ?PageRevisionStore $pageRevisionStore = null,
+        private ?ContentFieldsNormalizer $contentFieldsNormalizer = null,
     ) {
     }
 
@@ -187,6 +188,18 @@ final readonly class DocumentService
 
     public function publish(BuilderPage $page): void
     {
+        $document = $page->getDocument();
+        if ($document instanceof BuilderDocument && $this->contentFieldsNormalizer instanceof ContentFieldsNormalizer) {
+            $structure = $this->documentNormalizer->normalize($document->getStructure());
+            $errors    = $this->contentFieldsNormalizer->validateRequired(
+                $structure,
+                $this->builderLocales->getAll(),
+            );
+            if ($errors !== []) {
+                throw new InvalidArgumentException($errors[0]['message']);
+            }
+        }
+
         if ($this->pageRevisionStore?->isOnPublish() === true) {
             $this->pageRevisionStore->snapshot(
                 $page,

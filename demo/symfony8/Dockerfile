@@ -1,6 +1,10 @@
 FROM dunglas/frankenphp:1-php8.5-alpine
 
-RUN apk add --no-cache git unzip bash
+# Node + npm; pnpm via npm -g (Alpine nodejs often ships without corepack on PATH).
+RUN apk add --no-cache git unzip bash nodejs npm \
+	&& npm install -g pnpm@9.14.2 \
+	&& pnpm --version
+
 RUN install-php-extensions intl zip pdo_mysql pdo_sqlite
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

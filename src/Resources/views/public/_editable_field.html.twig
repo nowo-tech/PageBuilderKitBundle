@@ -1,0 +1,64 @@
+{% trans_default_domain 'NowoPageBuilderKitBundle' %}
+{# Multilingual content field: public value; pencil + modal when canContent(). #}
+{% set _tag = tag|default('span') %}
+<span class="pbk-field{% if editable %} pbk-field--editable{% endif %}{% if attr_class %} {{ attr_class }}{% endif %}"
+      data-pbk-field
+      data-pbk-page="{{ page_key }}"
+      data-pbk-key="{{ field_key }}"
+      data-pbk-type="{{ type }}"
+      data-pbk-locale="{{ locale }}"
+      data-pbk-label="{{ label|e('html_attr') }}"
+      data-pbk-labels="{{ labels|default({})|json_encode|e('html_attr') }}"
+      data-pbk-required="{{ required ? '1' : '0' }}"
+      {% if editable %}
+      data-pbk-save-url="{{ save_url }}"
+      data-pbk-csrf="{{ csrf_token }}"
+      data-pbk-options="{{ options|json_encode|e('html_attr') }}"
+      {% endif %}>
+    <{{ _tag }} class="pbk-field__value" data-pbk-value>
+        {% if type == 'bool' %}
+            {{ value ? 'public.field.yes'|trans : 'public.field.no'|trans }}
+        {% elseif type == 'image' and value %}
+            <img src="{{ value|e('html_attr') }}" alt="{{ label|e('html_attr') }}" class="pbk-field__img">
+        {% elseif type == 'icon' and value %}
+            {# Icon class name (e.g. bi bi-star) or short label #}
+            <i class="{{ value|e('html_attr') }}" aria-hidden="true"></i>
+            <span class="visually-hidden">{{ value }}</span>
+        {% elseif type == 'url' and value %}
+            <a href="{{ value|e('html_attr') }}">{{ value }}</a>
+        {% elseif is_html_output %}
+            {{ value|raw }}
+        {% else %}
+            {{ value }}
+        {% endif %}
+    </{{ _tag }}>
+
+    {% if editable %}
+        <button type="button"
+                class="pbk-field__edit"
+                data-pbk-edit
+                title="{{ 'public.field.edit'|trans({'%label%': label}) }}"
+                aria-label="{{ 'public.field.edit'|trans({'%label%': label}) }}">
+            {{ include('@NowoPageBuilderKitBundle/public/_icon_pencil.svg.twig') }}
+        </button>
+    {% endif %}
+</span>
+
+{% if include_assets %}
+    <link rel="stylesheet" href="{{ asset_base }}/css/page-builder.css">
+    <dialog class="pbk-field-modal" data-pbk-field-modal hidden>
+        <form method="dialog" class="pbk-field-modal__panel" data-pbk-field-form>
+            <header class="pbk-field-modal__head">
+                <h2 class="pbk-field-modal__title" data-pbk-modal-title></h2>
+                <button type="submit" value="cancel" class="pbk-field-modal__close" aria-label="{{ 'public.field.cancel'|trans }}">&times;</button>
+            </header>
+            <div class="pbk-field-modal__body" data-pbk-modal-body></div>
+            <footer class="pbk-field-modal__foot">
+                <p class="pbk-field-modal__error" data-pbk-modal-error hidden></p>
+                <button type="submit" value="cancel" class="pbk-field-modal__btn pbk-field-modal__btn--ghost">{{ 'public.field.cancel'|trans }}</button>
+                <button type="button" class="pbk-field-modal__btn pbk-field-modal__btn--primary" data-pbk-modal-save>{{ 'public.field.save'|trans }}</button>
+            </footer>
+        </form>
+    </dialog>
+    <script src="{{ asset_base }}/js/page-builder-inline-edit.js" defer></script>
+{% endif %}

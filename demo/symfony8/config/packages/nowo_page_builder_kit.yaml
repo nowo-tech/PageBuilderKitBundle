@@ -34,8 +34,13 @@ nowo_page_builder_kit:
         asset_embed_as_base64: false
         assets_upload:
             enabled: true
-            storage: local
+            storage: s3
             max_bytes: 5242880
+            s3:
+                helper_service: App\Demo\DemoS3Helper
+                folder: page-builder
+                private: false
+                public_base_url: '%env(S3_PUBLIC_BASE_URL)%'
             local:
                 directory: '%kernel.project_dir%/public/uploads/page-builder'
                 public_prefix: /uploads/page-builder

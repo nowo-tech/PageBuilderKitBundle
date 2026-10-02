@@ -9,8 +9,10 @@ use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface;
 
+use function array_key_exists;
 use function is_array;
 use function is_string;
 use function preg_match;
@@ -31,6 +33,7 @@ final readonly class PageTemplateService
         private EntityManagerInterface $entityManager,
         private DocumentService $documentService,
         private DocumentNormalizer $documentNormalizer,
+        private ContentFieldsNormalizer $contentFieldsNormalizer = new ContentFieldsNormalizer(),
     ) {
     }
 
@@ -65,7 +68,9 @@ final readonly class PageTemplateService
         }
 
         $structure = $this->documentNormalizer->normalize($document->getStructure());
-        $props     = [];
+        // Template-only metadata (stripped by DocumentNormalizer when applied to a live page).
+        $structure['templateSeoByLocale'] = $this->snapshotSeoByLocale($page);
+        $props                            = [];
         foreach ($document->getLocales() as $localeDocument) {
             $props[$localeDocument->getLocale()] = $localeDocument->getWidgetProps();
         }
@@ -86,12 +91,28 @@ final readonly class PageTemplateService
         return $template;
     }
 
-    public function createPageFromTemplate(string $templateKey, string $pageKey, string $title, string $locale): BuilderPage
-    {
+    /**
+     * @param array{
+     *     include_field_schema?: bool,
+     *     include_field_values?: bool,
+     *     include_seo?: bool
+     * } $options
+     */
+    public function createPageFromTemplate(
+        string $templateKey,
+        string $pageKey,
+        string $title,
+        string $locale,
+        array $options = [],
+    ): BuilderPage {
         $template = $this->templateRepository->findOneByTemplateKey($templateKey);
         if (!$template instanceof BuilderPageTemplate) {
             throw new InvalidArgumentException(sprintf('Unknown template "%s".', $templateKey));
         }
+
+        $includeFieldSchema = ($options['include_field_schema'] ?? true) !== false;
+        $includeFieldValues = ($options['include_field_values'] ?? false) === true;
+        $includeSeo         = ($options['include_seo'] ?? false) === true;
 
         $page = $this->documentService->createPage($pageKey, $title, $locale);
 
@@ -104,7 +125,23 @@ final readonly class PageTemplateService
             }
         }
 
-        $this->documentService->saveDocument($page, $template->getStructure(), $props);
+        $rawStructure = $template->getStructure();
+        $seoByLocale  = is_array($rawStructure['templateSeoByLocale'] ?? null)
+            ? $rawStructure['templateSeoByLocale']
+            : [];
+
+        $structure = $this->documentNormalizer->normalize($rawStructure);
+        $structure = $this->contentFieldsNormalizer->applyTemplateFieldOptions(
+            $structure,
+            $includeFieldSchema,
+            $includeFieldValues,
+        );
+
+        $this->documentService->saveDocument($page, $structure, $props);
+
+        if ($includeSeo && $seoByLocale !== []) {
+            $this->applySeoByLocale($page, $seoByLocale, $locale, $title, $pageKey);
+        }
 
         return $page;
     }
@@ -224,12 +261,19 @@ final readonly class PageTemplateService
      */
     private function exportTemplate(BuilderPageTemplate $template): array
     {
+        $raw       = $template->getStructure();
+        $structure = $this->documentNormalizer->normalize($raw);
+        $seo       = is_array($raw['templateSeoByLocale'] ?? null) ? $raw['templateSeoByLocale'] : null;
+        if ($seo !== null) {
+            $structure['templateSeoByLocale'] = $seo;
+        }
+
         return [
             'formatVersion'       => self::FORMAT_VERSION,
             'kind'                => self::KIND_SINGLE,
             'templateKey'         => $template->getTemplateKey(),
             'label'               => $template->getLabel(),
-            'structure'           => $this->documentNormalizer->normalize($template->getStructure()),
+            'structure'           => $structure,
             'widgetPropsByLocale' => $template->getWidgetPropsByLocale(),
         ];
     }
@@ -257,7 +301,13 @@ final readonly class PageTemplateService
         }
 
         /** @var array<string, mixed> $structure */
+        $seoByLocale = is_array($structure['templateSeoByLocale'] ?? null)
+            ? $structure['templateSeoByLocale']
+            : null;
         $structure = $this->documentNormalizer->normalize($structure);
+        if ($seoByLocale !== null) {
+            $structure['templateSeoByLocale'] = $seoByLocale;
+        }
 
         $widgetProps = $payload['widgetPropsByLocale'] ?? [];
         if (!is_array($widgetProps)) {
@@ -291,5 +341,76 @@ final readonly class PageTemplateService
         $this->entityManager->flush();
 
         return $templateKey;
+    }
+
+    /**
+     * @return array<string, array<string, string|null>>
+     */
+    private function snapshotSeoByLocale(BuilderPage $page): array
+    {
+        $out = [];
+        foreach ($page->getTranslations() as $translation) {
+            if (!$translation instanceof BuilderPageTranslation) {
+                continue;
+            }
+            $out[$translation->getLocale()] = [
+                'metaTitle'       => $translation->getMetaTitle(),
+                'metaDescription' => $translation->getMetaDescription(),
+                'ogTitle'         => $translation->getOgTitle(),
+                'ogDescription'   => $translation->getOgDescription(),
+                'ogImage'         => $translation->getOgImage(),
+                'canonicalUrl'    => $translation->getCanonicalUrl(),
+                'robots'          => $translation->getRobots(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $seoByLocale
+     */
+    private function applySeoByLocale(
+        BuilderPage $page,
+        array $seoByLocale,
+        string $primaryLocale,
+        string $title,
+        string $pageKey,
+    ): void {
+        unset($primaryLocale);
+        foreach ($seoByLocale as $locale => $row) {
+            if (!is_string($locale) || $locale === '' || !is_array($row)) {
+                continue;
+            }
+
+            $translation = $page->getTranslation($locale);
+            if (!$translation instanceof BuilderPageTranslation) {
+                $translation = (new BuilderPageTranslation())
+                    ->setLocale($locale)
+                    ->setTitle($title)
+                    ->setSlug($pageKey);
+                $page->addTranslation($translation);
+            }
+
+            foreach ([
+                'metaTitle'       => 'setMetaTitle',
+                'metaDescription' => 'setMetaDescription',
+                'ogTitle'         => 'setOgTitle',
+                'ogDescription'   => 'setOgDescription',
+                'ogImage'         => 'setOgImage',
+                'canonicalUrl'    => 'setCanonicalUrl',
+                'robots'          => 'setRobots',
+            ] as $field => $setter) {
+                if (!array_key_exists($field, $row)) {
+                    continue;
+                }
+                $value = $row[$field];
+                if (is_string($value) || $value === null) {
+                    $translation->{$setter}($value);
+                }
+            }
+        }
+
+        $this->entityManager->flush();
     }
 }

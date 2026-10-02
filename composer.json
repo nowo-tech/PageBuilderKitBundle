@@ -62,6 +62,7 @@
         "nowo-tech/tiptap-editor-bundle": "Rich text editing for text widgets in the canvas.",
         "nowo-tech/ckeditor5-editor-bundle": "Alternative rich text editor for text widgets.",
         "core/aws-s3-bundle": "AWS S3 uploads for GrapesJS Asset Manager (grapesjs.assets_upload.storage=s3).",
+        "pentatrion/vite-bundle": "Compile host-app frontend with Pentatrion Vite (Twig vite_entry_*). The Symfony 8 demo uses this stack with pnpm.",
         "symfony/flex": "Automatic recipe installation"
     },
     "require-dev": {
@@ -98,7 +99,22 @@
     "archive": {
         "exclude": [
             "/demo",
-            "/.cursor"
+            "/.cursor",
+            "/.specify",
+            "/specs",
+            "/coverage",
+            "/.phpunit.cache",
+            "/tests",
+            "/phpunit.xml.dist",
+            "/phpstan.neon.dist",
+            "/phpstan-baseline.neon",
+            "/.php-cs-fixer.dist.php",
+            "/.twig-cs-fixer.php",
+            "/rector.php",
+            "/Makefile",
+            "/.githooks",
+            "/vendor",
+            "/node_modules"
         ]
     },
     "scripts": {

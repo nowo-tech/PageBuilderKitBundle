@@ -30,6 +30,8 @@ final class DocumentNormalizerTest extends TestCase
                 'css'           => '',
                 'grapes'        => [],
                 'localeContent' => [],
+                'fields'        => [],
+                'fieldValues'   => [],
                 'sections'      => [],
             ],
             $this->normalizer->emptyStructure(),

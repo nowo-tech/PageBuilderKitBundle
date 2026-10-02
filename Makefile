@@ -13,7 +13,7 @@ endif
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra
+.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra check-composer-archive
 
 # Default target
 help:
@@ -38,6 +38,7 @@ help:
 	@echo "  phpstan       Run PHPStan static analysis"
 	@echo "  igor          Run Igor worker-state audit (REQ-CS-008)"
 	@echo "  qa            Run all QA checks (cs-check + test)"
+	@echo "  check-composer-archive  Assert composer archive omits demo/ (Packagist dist)"
 	@echo "  release-check Pre-release: cs-fix, cs-check, rector-dry, phpstan, igor, test-coverage, demo healthchecks"
 	@echo "  demo-smoke    Boot demo/symfony8 and assert HTTP 200 (REQ-TEST-011)"
 	@echo "  check-open-prs Fail if unresolved open GitHub PRs remain (REQ-REL-003)"
@@ -47,7 +48,7 @@ help:
 	@echo "  update-deps   Update bundle and demo dependencies (REQ-MAKE-008)"
 	@echo "  validate      Run composer validate --strict"
 	@echo "  validate-translations Check translation YAML key parity (REQ-MAKE-004)"
-	@echo "  assets        No-op (no frontend assets in this bundle)"
+	@echo "  assets        pnpm install + Vite build (TS → src/Resources/public)"
 	@echo "  setup-hooks   Install git pre-commit hooks"
 	@echo ""
 	@echo "Demos: use make -C demo or make -C demo/<demo-name>"
@@ -143,7 +144,12 @@ check-twig-extra:
 # Run Igor worker-state audit (REQ-CS-008)
 igor: ensure-up
 	$(COMPOSE) exec -T php composer igor
-release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage release-check-demos
+# Assert Packagist/composer archive never ships demo/ (or other export-ignored paths).
+check-composer-archive:
+	@chmod +x .scripts/check-composer-archive-excludes-demo.sh
+	@./.scripts/check-composer-archive-excludes-demo.sh
+
+release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-composer-archive composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage release-check-demos
 
 # REQ-TEST-011 — boot demo stack and assert one HTTP 200
 # classic mode keeps FrankenPHP up before vendor/ is installed on fresh CI checkouts
@@ -193,9 +199,21 @@ update: ensure-up
 validate: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict
 
-# No-op for bundles without frontend assets
+# TypeScript sources under src/Resources/assets → Vite → src/Resources/public
 assets:
-	@echo "Assets live under src/Resources/public (Vite/TS source in src/Resources/assets)."
+	@if [ ! -f package.json ]; then \
+		echo "No package.json found in bundle root."; \
+		exit 1; \
+	fi
+	@if ! command -v pnpm >/dev/null 2>&1; then \
+		echo "pnpm is required to build frontend assets."; \
+		exit 1; \
+	fi
+	@echo "Installing frontend dependencies..."
+	@pnpm install
+	@echo "Building Vite assets..."
+	@pnpm run build
+	@echo "Frontend assets built in src/Resources/public"
 
 # Setup git hooks for pre-commit checks
 check-no-cursor-coauthor:

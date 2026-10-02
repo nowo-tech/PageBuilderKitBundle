@@ -11,6 +11,7 @@ This bundle uses [GitHub Spec Kit](https://github.com/github/spec-kit) with **Cu
 | `specs/002-phase2-grapesjs/spec.md` | Phase 2 GrapesJS canvas / schema v2 (**shipped** v1.0.0) |
 | `specs/003-phase3-revisions-templates/spec.md` | Phase 3 revisions, templates, I/O, draft preview (**shipped** v1.1.0) |
 | `specs/004-phase4-external-widgets/spec.md` | Phase 4 classic widget packs baseline (**shipped** v1.1.0); Grapes block packs follow-up in **v1.2.0** |
+| `specs/005-content-fields-i18n/spec.md` | Phase 5 content fields + capabilities MVP (**shipped**, unreleased) |
 | `docs/SPEC-DRIVEN-DEVELOPMENT.md` | User stories, scope, roadmap, `REQ-*` anchors |
 | `.specify/` | Templates and constitution (after `specify init`) |
 | `.cursor/skills/speckit-*/` | Cursor slash commands |
@@ -67,3 +68,4 @@ Full tooling manual: upstream [Spec Kit documentation](https://github.github.io/
 - [specs/002-phase2-grapesjs/spec.md](../specs/002-phase2-grapesjs/spec.md)
 - [specs/003-phase3-revisions-templates/spec.md](../specs/003-phase3-revisions-templates/spec.md)
 - [specs/004-phase4-external-widgets/spec.md](../specs/004-phase4-external-widgets/spec.md)
+- [specs/005-content-fields-i18n/spec.md](../specs/005-content-fields-i18n/spec.md)

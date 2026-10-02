@@ -16,15 +16,22 @@ Security considerations for page builder admin, document API, and public renderi
 
 | Risk | Mitigation |
 | --- | --- |
-| Unauthorized users reach admin or document API | `access_roles`, custom `access_checker`, Symfony Security (REQ-UI-002) |
+| Unauthorized users reach admin or document API | `access_roles` / `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`, custom `access_checker` (guard), Symfony Security (REQ-UI-002) |
 | CSRF on document save or publish | `X-CSRF-TOKEN` validated against intention `page_builder_document` |
-| Stored XSS through `text` / `html` widgets | Twig auto-escaping where applicable; configurable `html.sanitize` on persist and render |
+| CSRF on content field forms | `_csrf_token` intention `page_builder_content` |
+| Stored XSS through `text` / `html` widgets / richtext fields | Twig auto-escaping; default `html.sanitize: allowlist` (DOM tag/attr allowlist); Grapes sanitizer on persist/render |
+| Layout vs content privilege escalation | Capabilities via roles or custom `PageBuilderKitAccessCheckerInterface`; `PageBuilderKitAccessGuard` in controllers |
 | Overly broad demo access | `allow_unauthenticated` defaults to `false` |
 | Shared-database table collisions | Optional `doctrine.table_prefix` |
 
 ## Admin access guard (REQ-UI-002)
 
-The bundle protects route names beginning with `admin_page_builder_` via `PageBuilderKitAdminAccessSubscriber`.
+The bundle protects route names beginning with `admin_page_builder_` via `PageBuilderKitAdminAccessSubscriber` (`canAccess()` then capability).
+
+**Two options** (same as BlogKit / MarketingKit):
+
+1. **Roles** — configure `access_roles` (shortcut for all) and optional `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`.
+2. **Custom guard** — implement `PageBuilderKitAccessCheckerInterface` and set `security.access_checker`. Controllers may also inject `PageBuilderKitAccessGuard`.
 
 Default configuration:
 
@@ -32,8 +39,14 @@ Default configuration:
 nowo_page_builder_kit:
     security:
         access_roles: [ROLE_EDITOR]
+        layout_roles: [ROLE_EDITOR]
+        content_roles: [ROLE_EDITOR]
+        publish_roles: [ROLE_EDITOR]
+        templates_roles: [ROLE_EDITOR]
         allow_unauthenticated: false
 ```
+
+Twig helpers: `nowo_page_builder_can_edit()`, `nowo_page_builder_can('layout')`.
 
 Recommended host access control (match `web_ui.path_prefix`, default `/admin/page-builder`):
 

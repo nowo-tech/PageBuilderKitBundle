@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Twig;
 
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
+use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
@@ -20,6 +21,7 @@ final class PageBuilderKitExtension extends AbstractExtension
         private readonly PageRenderProviderInterface $pageRenderProvider,
         private readonly WidgetTypeRegistry $widgetTypeRegistry,
         private readonly PageBuilderKitAccessCheckerInterface $accessChecker,
+        private readonly InlineContentFieldRendererInterface $inlineContentFieldRenderer,
         private readonly ?PageRevisionStore $pageRevisionStore = null,
     ) {
     }
@@ -32,7 +34,9 @@ final class PageBuilderKitExtension extends AbstractExtension
             new TwigFunction('nowo_page_builder_render', $this->renderPage(...)),
             new TwigFunction('nowo_page_builder_widget_types', $this->widgetTypes(...)),
             new TwigFunction('nowo_page_builder_can_edit', $this->canEdit(...)),
+            new TwigFunction('nowo_page_builder_can', $this->can(...)),
             new TwigFunction('nowo_page_builder_revisions_enabled', $this->revisionsEnabled(...)),
+            new TwigFunction('nowo_page_builder_field', $this->field(...), ['is_safe' => ['html']]),
         ];
     }
 
@@ -55,9 +59,27 @@ final class PageBuilderKitExtension extends AbstractExtension
         return $this->accessChecker->canAccess();
     }
 
+    /**
+     * Fine-grained capability: layout | content | publish | templates.
+     */
+    public function can(string $capability): bool
+    {
+        return $this->accessChecker->can($capability);
+    }
+
     public function revisionsEnabled(): bool
     {
         return $this->pageRevisionStore?->isEnabled() === true;
+    }
+
+    /**
+     * Inline multilingual field: shows stored value; with content capability, pencil + modal.
+     *
+     * @param array<string, mixed> $options type, label, labels, locale, default, tag, class, options, editable
+     */
+    public function field(string $pageKey, string $fieldKey, array $options = []): string
+    {
+        return $this->inlineContentFieldRenderer->render($pageKey, $fieldKey, $options);
     }
 
     /**

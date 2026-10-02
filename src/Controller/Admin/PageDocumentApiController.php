@@ -104,7 +104,11 @@ final class PageDocumentApiController extends AbstractController
             return $this->statusError($request, 'not_found', Response::HTTP_NOT_FOUND);
         }
 
-        $this->documentService->publish($page);
+        try {
+            $this->documentService->publish($page);
+        } catch (InvalidArgumentException $exception) {
+            return $this->statusError($request, $exception->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
         // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
         $this->trace->addAdminAction('publish', $pageKey);
 

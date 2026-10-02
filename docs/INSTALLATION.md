@@ -38,6 +38,8 @@ composer require twig/extra-bundle twig/string-extra
 
 `twig/extra-bundle` is required because the bundle ships Twig templates that expect Twig Extra to be enabled in the host application.
 
+The Packagist / Composer dist archive **does not include** `demo/` (see `composer.json` → `archive.exclude` and root `.gitattributes` → `export-ignore`). Verify with `make check-composer-archive`. The FrankenPHP demo lives only in the Git repository for maintainers.
+
 ## Symfony Flex recipe
 
 When the Flex recipe is available, it copies:

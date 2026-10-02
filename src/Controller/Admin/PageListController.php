@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageCreateType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,6 +21,7 @@ final class PageListController extends AbstractController
         private readonly BuilderPageRepository $pageRepository,
         private readonly DocumentService $documentService,
         private readonly BuilderLocales $builderLocales,
+        private readonly PageBuilderKitAccessGuard $accessGuard,
     ) {
     }
 
@@ -30,6 +32,8 @@ final class PageListController extends AbstractController
         $createForm->handleRequest($request);
 
         if ($createForm->isSubmitted() && $createForm->isValid()) {
+            $this->accessGuard->assertLayout();
+
             /** @var array{pageKey: string, title: string} $data */
             $data = $createForm->getData();
 

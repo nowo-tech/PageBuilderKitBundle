@@ -18,6 +18,7 @@ interface PageBuilderKitTraceInterface
      *     slug?: string,
      *     title?: string,
      *     seoKeys?: list<string>,
+     *     fieldKeys?: list<string>,
      *     twigApplied?: bool,
      *     twigError?: string|null,
      *     contextKeys?: list<string>,

@@ -160,6 +160,7 @@ final class AcmeMarketingBlockPack implements GrapesBlockPackInterface
             'id'       => 'acme-promo',
             'label'    => 'Promo banner',
             'category' => 'Acme',
+            'media'    => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 12h8"/></svg>',
             'content'  => '<div class="acme-promo">Promo</div>',
         ]];
     }

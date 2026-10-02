@@ -16,6 +16,9 @@ services:
             - '../../Resources/'
             - '../../Security/PageBuilderProtection.php'
             - '../../Security/PageBuilderProtectionConfig.php'
+            - '../../Security/AllowAllPageBuilderKitAccessChecker.php'
+            - '../../Security/ConfigurablePageBuilderKitAccessChecker.php'
+            - '../../Security/PageBuilderKitAccessGuard.php'
             - '../../Security/Html/'
 
     Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace: ~
@@ -70,6 +73,7 @@ services:
             $protection: '@Nowo\PageBuilderKitBundle\Security\PageBuilderProtection'
             $grapesDocumentSanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
             $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
+            $contentFieldsNormalizer: '@Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer'
 
     Nowo\PageBuilderKitBundle\Service\PageRevisionStore:
         arguments:
@@ -103,10 +107,18 @@ services:
             $strictVariables: false
             $sanitizer: '@Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer'
 
+    Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface:
+        alias: Nowo\PageBuilderKitBundle\Service\InlineContentFieldRenderer
+
+    Nowo\PageBuilderKitBundle\Service\InlineContentFieldRenderer:
+        arguments:
+            $assetBasePath: '/bundles/nowopagebuilderkit'
+
     Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension:
         arguments:
             $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
             $cssFramework: '%nowo_page_builder_kit.web_ui.css_framework%'
             $accessChecker: '@Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface'
+            $inlineContentFieldRenderer: '@Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface'
             $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
         tags: ['twig.extension']

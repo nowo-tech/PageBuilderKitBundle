@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.0] - 2026-10-02](#140---2026-10-02)
 - [[1.3.0] - 2026-09-28](#130---2026-09-28)
 
 - [[1.2.0] - 2026-09-27](#120---2026-09-27)
@@ -19,6 +20,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.4.0] - 2026-10-02
+
+### Added
+
+- **Template apply SEO (optional):** `include_seo` copies `BuilderPageTranslation` meta/OG/canonical/robots from template snapshot `structure.templateSeoByLocale` (saved with the template; stripped from live pages). Default **off** (BC).
+- **Web Profiler:** effective capabilities (`access`/`layout`/`content`/`publish`/`templates`) + render `fieldKeys`.
+- **Demo CSRF WebTestCase:** HTTP kernel tests for document + content-field save (403 missing token / 200 valid).
+- **Frontend DX:** bundle assets via **pnpm + Vite + TypeScript**; demo uses **Pentatrion Vite** (`vite_entry_*`).
+- **Phase 7 media + tags + nesting:** media library list (`GET …/assets`) + content picker; Grapes Asset Manager seed; Dynamic tag trait on text/link/image; composite nesting safety cap **32**. Spec: [`specs/008-phase7-media-tags-nesting/spec.md`](../specs/008-phase7-media-tags-nesting/spec.md).
+- **Demo S3 mock:** Compose service `s3` (Adobe S3Mock); `assets_upload.storage: s3` via `App\Demo\DemoS3Helper` (host port 9190).
+- **Phase 6b content wave 2:** nested composites (depth 2), Twig-free slots `[[fields.path]]`, Grapes **Content fields** blocks, image upload + page reference select in content admin. Spec: [`specs/007-phase6b-content-wave2/spec.md`](../specs/007-phase6b-content-wave2/spec.md).
+- **Demo `/fields` use case** + expanded Playwright e2e/screenshots for [BUILDER-MANUAL.md](BUILDER-MANUAL.md).
+- **Phase 6 content hardening:** field types `repeater`, `group`, `reference`; nested subfields (one level); required validation on publish; template apply options `include_field_schema` / `include_field_values`. Spec: [`specs/006-phase6-content-hardening/spec.md`](../specs/006-phase6-content-hardening/spec.md).
+- **Content fields (Phase 5 MVP):** `structure.fields` schema + `structure.fieldValues[locale]`; Twig context `fields.*`; admin UI `/pages/{pageKey}/content` (+ schema for layout editors). Spec: [`specs/005-content-fields-i18n/spec.md`](../specs/005-content-fields-i18n/spec.md).
+- **Inline editable field component:** `nowo_page_builder_field(pageKey, key, { type, label, labels, … })` — public value for everyone; pencil + modal when `canContent()`; types include `html`, `raw`, `number`, `icon`, ….
+- **Translatable field labels:** schema `labels[locale]` with fallback (`locale` → `default_locale` → singular `label` → key); admin content UI edits label per locale tab.
+- **Capabilities:** `canLayout()` / `canContent()` / `canPublish()` / `canTemplates()` (+ Twig `nowo_page_builder_can()`); roles `layout_roles`… **or** custom `access_checker`; `PageBuilderKitAccessGuard` for controllers.
+- CSRF coverage for document save (403/200) and XSS sanitizer matrix tests.
+- FrankenPHP worker audit refreshed for v1.3 + Phase 5 surface.
+- Spec Kit: `specs/005-content-fields-i18n/spec.md` + inventory updates.
+
+### Changed
+
+- Classic schema v1 / Sections editor documented as **legacy**; Grapes + content fields are the primary path.
+- Demo `s3-init`: treat HTTP **409** (bucket exists) as success; retry loop for S3Mock race on first boot.
+
+### Fixed
+
+- Packagist/dist installs: ensure `demo/` is never shipped (`composer.json` `archive.exclude` + `.gitattributes` `export-ignore` + `make check-composer-archive`).
+
+### Security
+
+- Fine-grained admin route gating by capability (roles `*_roles` or custom `access_checker` / `PageBuilderKitAccessGuard`).
+
+### Notes
+
+- Backward compatible for hosts on `^1.3`. **No** Doctrine schema changes. Optional: content fields, capability roles, media library, template `include_seo`. See [UPGRADING.md](UPGRADING.md#140).
 
 ## [1.3.0] - 2026-09-28
 

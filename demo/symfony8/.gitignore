@@ -23,6 +23,8 @@ coverage.xml
 .idea
 .vscode
 .pnpm-store/
+/node_modules
+/public/build
 *.swp
 .DS_Store
 
