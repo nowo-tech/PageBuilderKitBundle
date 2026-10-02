@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.2] - 2026-10-02](#142---2026-10-02)
 - [[1.4.1] - 2026-10-02](#141---2026-10-02)
 - [[1.4.0] - 2026-10-02](#140---2026-10-02)
 - [[1.3.0] - 2026-09-28](#130---2026-09-28)
@@ -21,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.4.2] - 2026-10-02
+
+### Added
+
+- **Example Grapes pack:** [`examples/acme-grapes-block-pack/`](../examples/acme-grapes-block-pack/) — copy-ready Composer package + cookbook link.
+- **Tests:** unit coverage for `DocumentStructureValidator`, `ClassicPageTreeBuilder`, `ContentFieldsService`, content-field / capability enums (PHP lines ≥90%).
+
+### Changed
+
+- **Canvas TypeScript:** removed `@ts-nocheck` from `page-builder-canvas.ts`; typed boot helpers via `grapes-types.ts` (`ContentFieldCanvasConfig`, `TwigCanvasVariable`, …). Rebuilt public canvas JS.
+
+### Notes
+
+- Backward compatible for hosts on `^1.4`. **No** Doctrine schema changes. Optional: rebuild canvas assets if vendoring bundle JS. See [UPGRADING.md](UPGRADING.md#142).
 
 ## [1.4.1] - 2026-10-02
 

@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.4.2](#142)
 - [1.4.1](#141)
 - [1.4.0](#140)
 - [1.3.0](#130)
@@ -14,6 +15,16 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.4.2
+
+From **1.4.1**:
+
+1. Optional — copy [`examples/acme-grapes-block-pack/`](../examples/acme-grapes-block-pack/) as a starting Composer Grapes block pack (see [COOKBOOK.md](COOKBOOK.md#ship-a-grapes-block-pack)).
+2. Optional — rebuild canvas assets (`pnpm install && pnpm run build` at the bundle root) if you vendor `src/Resources/public/js/page-builder-canvas.js` (canvas is now fully typechecked without `@ts-nocheck`).
+3. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#142---2026-10-02).
 
 ## 1.4.1
 

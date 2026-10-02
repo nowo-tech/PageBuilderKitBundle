@@ -4,10 +4,24 @@
 
 export type PluginFlags = Record<string, boolean | undefined>;
 
+export type TwigCanvasVariable = {
+  name: string;
+  sample?: string;
+  label?: string;
+};
+
 export type GrapesTwigConfig = {
   enabled?: boolean;
   canvasHelpers?: boolean;
-  variables?: Record<string, unknown>;
+  variables?: TwigCanvasVariable[];
+};
+
+export type ContentFieldCanvasConfig = {
+  key: string;
+  label?: string;
+  type?: string;
+  sample?: string;
+  bind?: string;
 };
 
 export type GrapesBlockPackBlock = {
@@ -46,7 +60,7 @@ export type GrapesFrontendConfig = {
   assetsLibraryUrl?: string;
   uploadUrl?: string;
   assetCsrf?: string;
-  contentFields?: Array<Record<string, unknown>>;
+  contentFields?: ContentFieldCanvasConfig[];
   twig?: GrapesTwigConfig;
   blockPacks?: GrapesBlockPack[];
 };

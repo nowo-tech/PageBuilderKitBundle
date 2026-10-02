@@ -1,0 +1,20 @@
+{
+  "name": "acme/grapes-block-pack",
+  "description": "Example Composer package that ships GrapesJS blocks for nowo-tech/page-builder-kit-bundle.",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "nowo-tech/page-builder-kit-bundle": "^1.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Acme\\GrapesBlockPack\\": "src/"
+    }
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-main": "1.0-dev"
+    }
+  }
+}

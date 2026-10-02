@@ -63,6 +63,7 @@ services:
 - Keep `id` stable across pack versions (editors may embed component types).
 - Prefer HTML `content` that references content fields (`{{ fields.hero_title }}` or `[[fields.hero_title]]`) over hard-coded copy.
 - Demo reference: `App\Demo\DemoGrapesBlockPack` in `demo/symfony8`.
+- Copy-ready Composer package: [`examples/acme-grapes-block-pack/`](../examples/acme-grapes-block-pack/) (path-require + service tag recipe in its README).
 
 Full API notes: [WIDGET_AUTHORS.md § GrapesJS block packs](WIDGET_AUTHORS.md#grapesjs-block-packs).
 

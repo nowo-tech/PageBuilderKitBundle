@@ -1,22 +1,33 @@
-// @ts-nocheck — Grapes editor/plugins from esm.sh; config helpers typed in grapes-types.ts.
 /**
  * Page Builder Kit — GrapesJS canvas (ESM + official plugins).
  * Loads GrapesJS and community plugins from esm.sh; persists schema v2.
  * Built with Vite from this file → src/Resources/public/js/page-builder-canvas.js
+ *
+ * GrapesJS itself is typed loosely (CDN ESM); local config/structure helpers live in grapes-types.ts.
  */
 import {
+  type ContentFieldCanvasConfig,
+  type GrapesBlockPackBlock,
   type GrapesDocumentStructure,
   type GrapesFrontendConfig,
+  type TwigCanvasVariable,
+  emptyLocalePayload,
   ensureLocaleContent,
   parseJsonAttr,
 } from './grapes-types';
 
-
 /** Grapes editor instance — typed loosely until official GrapesJS types are vendored. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GrapesEditor = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GrapesModule = any;
 
-const PLUGIN_SPECS = {
+type PluginSpec = {
+  pkg: string;
+  opts: Record<string, unknown>;
+};
+
+const PLUGIN_SPECS: Record<string, PluginSpec> = {
   blocks_basic: { pkg: 'grapesjs-blocks-basic@1.0.2', opts: { flexGrid: true, category: 'Basic' } },
   forms: { pkg: 'grapesjs-plugin-forms@2.0.6', opts: { category: 'Forms' } },
   navbar: { pkg: 'grapesjs-navbar@1.0.2', opts: {} },
@@ -40,23 +51,28 @@ const PLUGIN_SPECS = {
     opts: {
       modalImportTitle: 'Import HTML',
       modalImportLabel: '<div style="margin-bottom:10px;font-size:13px;">Paste HTML/CSS and click Import</div>',
-      modalImportContent: (editor) => editor.getHtml() + '<style>' + editor.getCss() + '</style>',
+      modalImportContent: (editor: GrapesEditor) => editor.getHtml() + '<style>' + editor.getCss() + '</style>',
       textBlocks: 1,
     },
   },
 };
 
-async function importDefault(url) {
-  const mod = await import(url);
+async function importDefault(url: string): Promise<GrapesModule> {
+  const mod = await import(/* @vite-ignore */ url);
   return mod.default || mod;
 }
 
-async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{ grapesjs: GrapesModule; plugins: GrapesModule[]; pluginsOpts: Record<string, unknown> }> {
+async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{
+  grapesjs: GrapesModule;
+  plugins: GrapesModule[];
+  pluginsOpts: Record<PropertyKey, Record<string, unknown>>;
+}> {
   const base = (config.pluginCdnBase || 'https://esm.sh').replace(/\/$/, '');
   const version = config.cdnVersion || '0.22.9';
   const grapesjs = await importDefault(`${base}/grapesjs@${version}`);
-  const plugins = [];
-  const pluginsOpts = {};
+  const plugins: GrapesModule[] = [];
+  // GrapesJS indexes pluginsOpts by plugin function reference.
+  const pluginsOpts: Record<PropertyKey, Record<string, unknown>> = {};
   const flags = config.plugins || {};
 
   // Order matters: feature plugins first, preset webpage last (UI chrome).
@@ -74,9 +90,9 @@ async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{ grapesjs
     try {
       const plugin = await importDefault(`${base}/${spec.pkg}`);
       plugins.push(plugin);
-      pluginsOpts[plugin] = typeof spec.opts === 'function' ? spec.opts : { ...spec.opts };
+      pluginsOpts[plugin as PropertyKey] = { ...spec.opts };
       if (key === 'preset_webpage') {
-        pluginsOpts[plugin].modalImportContent = (editor) =>
+        pluginsOpts[plugin as PropertyKey].modalImportContent = (editor: GrapesEditor) =>
           editor.getHtml() + '<style>' + editor.getCss() + '</style>';
       }
     } catch (err) {
@@ -88,11 +104,12 @@ async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{ grapesjs
 }
 
 async function boot() {
-  const root = document.getElementById('page-builder-canvas');
-  if (!root) return;
+  const rootEl = document.getElementById('page-builder-canvas');
+  if (!rootEl) return;
+  const root: HTMLElement = rootEl;
 
   const statusEl = root.querySelector('[data-pbk-status]');
-  const setBootStatus = (msg, isError) => {
+  const setBootStatus = (msg: string, isError = false): void => {
     if (!statusEl) return;
     statusEl.textContent = msg || '';
     statusEl.classList.toggle('text-danger', !!isError);
@@ -120,17 +137,22 @@ async function boot() {
   });
 
   const localeTabs = Array.from(root.querySelectorAll('[data-pbk-locale-tab]'));
-  let locales = localeTabs.map((btn) => btn.getAttribute('data-pbk-locale-tab')).filter(Boolean);
+  let locales: string[] = localeTabs
+    .map((btn) => btn.getAttribute('data-pbk-locale-tab'))
+    .filter((locale): locale is string => typeof locale === 'string' && locale !== '');
   if (!locales.length) locales = [defaultLocale];
   structure = ensureLocaleContent(structure, locales, defaultLocale);
   let activeLocale = defaultLocale;
 
-  let grapesjs, plugins, pluginsOpts;
+  let grapesjs: GrapesModule;
+  let plugins: GrapesModule[];
+  let pluginsOpts: Record<PropertyKey, Record<string, unknown>>;
   try {
     ({ grapesjs, plugins, pluginsOpts } = await loadGrapesStack(config));
   } catch (err) {
     console.error(err);
-    setBootStatus('Failed to load GrapesJS: ' + (err && err.message ? err.message : err), true);
+    const message = err instanceof Error ? err.message : String(err);
+    setBootStatus('Failed to load GrapesJS: ' + message, true);
     return;
   }
 
@@ -189,7 +211,7 @@ async function boot() {
 
   setBootStatus('');
 
-    function setStatus(msg, isError) {
+    function setStatus(msg: string, isError = false): void {
       if (!statusEl) {
         return;
       }
@@ -198,7 +220,7 @@ async function boot() {
       statusEl.classList.toggle('text-success', !isError && !!msg);
     }
 
-    function loadLocale(locale) {
+    function loadLocale(locale: string): void {
       activeLocale = locale;
       var payload = structure.localeContent[locale] || emptyLocalePayload();
       try { editor.stopCommand('core:component-outline'); } catch (e) { /* optional */ }
@@ -749,7 +771,13 @@ async function boot() {
           if (!block || !block.id) {
             return;
           }
-          var entry = {
+          var entry: {
+            label: string;
+            category: string;
+            content: GrapesBlockPackBlock['content'];
+            media?: string;
+            attributes?: Record<string, unknown>;
+          } = {
             label: block.label || block.id,
             category: block.category || packCategory,
             content: block.content != null ? block.content : '<div></div>',
@@ -788,7 +816,7 @@ async function boot() {
       }
 
       if (twigCfg.enabled !== false && twigCfg.canvasHelpers !== false) {
-        var vars = Array.isArray(twigCfg.variables) ? twigCfg.variables : [];
+        var vars: TwigCanvasVariable[] = Array.isArray(twigCfg.variables) ? twigCfg.variables : [];
         if (!vars.length) {
           vars = [
             { name: 'title', sample: '{{ title }}', label: 'Page title' },
@@ -798,7 +826,7 @@ async function boot() {
             { name: 'status', sample: '{{ status }}', label: 'Status' },
           ];
         }
-        vars.forEach(function (item) {
+        vars.forEach(function (item: TwigCanvasVariable) {
           var sample = item.sample || ('{{ ' + item.name + ' }}');
           bm.add('pbk-twig-' + String(item.name).replace(/[^a-z0-9_-]/gi, '-'), {
             label: item.label || item.name,
@@ -818,8 +846,8 @@ async function boot() {
         });
       }
 
-      var contentFields = Array.isArray(config.contentFields) ? config.contentFields : [];
-      contentFields.forEach(function (field) {
+      var contentFields: ContentFieldCanvasConfig[] = Array.isArray(config.contentFields) ? config.contentFields : [];
+      contentFields.forEach(function (field: ContentFieldCanvasConfig) {
         if (!field || !field.key) {
           return;
         }
@@ -856,7 +884,7 @@ async function boot() {
             }
             var defaults = type.model.prototype.defaults || {};
             var existing = Array.isArray(defaults.traits) ? defaults.traits.slice() : [];
-            var names = existing.map(function (t) { return typeof t === 'string' ? t : t.name; });
+            var names = existing.map(function (t: string | { name?: string }) { return typeof t === 'string' ? t : t.name; });
             a11yTraits.forEach(function (trait) {
               if (names.indexOf(trait.name) === -1) {
                 existing.push(trait);
@@ -912,8 +940,8 @@ async function boot() {
 
       // Dynamic tags: bind text/link/image to [[fields.*]] from the Traits panel.
       if (contentFields.length) {
-        var tagOptions = [{ id: '', name: '— None —' }];
-        contentFields.forEach(function (field) {
+        var tagOptions: Array<{ id: string; name: string }> = [{ id: '', name: '— None —' }];
+        contentFields.forEach(function (field: ContentFieldCanvasConfig) {
           if (!field || !field.key || field.bind === 'none') {
             return;
           }
@@ -923,7 +951,7 @@ async function boot() {
           });
         });
 
-        function applyDynamicTag(component, fieldKey) {
+        function applyDynamicTag(component: GrapesEditor, fieldKey: string): void {
           if (!fieldKey) {
             return;
           }
@@ -945,7 +973,7 @@ async function boot() {
           } else if (typeName === 'link') {
             var children = component.components();
             if (children && children.length) {
-              children.each(function (child) {
+              children.each(function (child: GrapesEditor) {
                 if (child.is('text') || child.get('type') === 'textnode' || child.get('type') === 'text') {
                   child.set('content', slot);
                 }
@@ -971,7 +999,7 @@ async function boot() {
             }
             var defaults = type.model.prototype.defaults || {};
             var existing = Array.isArray(defaults.traits) ? defaults.traits.slice() : [];
-            var names = existing.map(function (t) { return typeof t === 'string' ? t : t.name; });
+            var names = existing.map(function (t: string | { name?: string }) { return typeof t === 'string' ? t : t.name; });
             if (names.indexOf('pbk-dynamic-tag') === -1) {
               existing.push({
                 type: 'select',
@@ -989,7 +1017,7 @@ async function boot() {
           } catch (e) { /* type may be missing */ }
         });
 
-        editor.on('component:selected', function (component) {
+        editor.on('component:selected', function (component: GrapesEditor) {
           if (!component || typeof component.on !== 'function') {
             return;
           }
@@ -1015,7 +1043,7 @@ async function boot() {
       });
     });
 
-    function postJson(url, body) {
+    function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
       return fetch(url, {
         method: 'POST',
         headers: {
@@ -1034,7 +1062,11 @@ async function boot() {
       });
     }
 
-    function saveDocument() {
+    function saveDocument(): Promise<void> {
+      if (!saveUrl) {
+        setStatus('Save URL missing', true);
+        return Promise.resolve();
+      }
       captureActiveLocale();
       setStatus('Saving…');
       return postJson(saveUrl, {
@@ -1042,12 +1074,13 @@ async function boot() {
         widgetPropsByLocale: {},
       }).then(function () {
         setStatus('Saved.');
-      }).catch(function (err) {
-        setStatus(err.message || 'Save failed', true);
+      }).catch(function (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Save failed';
+        setStatus(message, true);
       });
     }
 
-    function setPageStatus(status) {
+    function setPageStatus(status: string): void {
       root.setAttribute('data-pbk-page-status', status);
       var badge = document.querySelector('[data-pbk-status-badge]');
       if (badge) {
@@ -1057,36 +1090,44 @@ async function boot() {
         badge.classList.toggle('text-bg-secondary', status !== 'published');
       }
       document.querySelectorAll('[data-pbk-action="publish"]').forEach(function (btn) {
-        btn.hidden = status === 'published';
+        (btn as HTMLElement).hidden = status === 'published';
       });
       document.querySelectorAll('[data-pbk-action="unpublish"]').forEach(function (btn) {
-        btn.hidden = status !== 'published';
+        (btn as HTMLElement).hidden = status !== 'published';
       });
     }
 
-    function publishDocument() {
+    function publishDocument(): Promise<void> {
+      if (!publishUrl) {
+        setStatus('Publish URL missing', true);
+        return Promise.resolve();
+      }
       return saveDocument().then(function () {
         setStatus('Publishing…');
         return postJson(publishUrl, {}).then(function (data) {
-          setPageStatus((data && data.status) || 'published');
+          const status = typeof data.status === 'string' ? data.status : 'published';
+          setPageStatus(status);
           setStatus('Published.');
         });
-      }).catch(function (err) {
-        setStatus(err.message || 'Publish failed', true);
+      }).catch(function (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Publish failed';
+        setStatus(message, true);
       });
     }
 
-    function unpublishDocument() {
+    function unpublishDocument(): Promise<void> {
       if (!unpublishUrl) {
         setStatus('Unpublish URL missing', true);
         return Promise.resolve();
       }
       setStatus('Moving to draft…');
       return postJson(unpublishUrl, {}).then(function (data) {
-        setPageStatus((data && data.status) || 'draft');
+        const status = typeof data.status === 'string' ? data.status : 'draft';
+        setPageStatus(status);
         setStatus('Saved as draft. Public /p/… returns 404 until published again.');
-      }).catch(function (err) {
-        setStatus(err.message || 'Unpublish failed', true);
+      }).catch(function (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unpublish failed';
+        setStatus(message, true);
       });
     }
 
@@ -1107,11 +1148,12 @@ async function boot() {
     });
 }
 
-boot().catch((err) => {
+boot().catch((err: unknown) => {
   console.error(err);
   const el = document.querySelector('[data-pbk-status]');
   if (el) {
-    el.textContent = 'GrapesJS boot error: ' + (err && err.message ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err);
+    el.textContent = 'GrapesJS boot error: ' + message;
     el.classList.add('text-danger');
   }
 });
