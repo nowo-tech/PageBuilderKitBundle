@@ -32,6 +32,30 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
     }
 
     #[Test]
+    public function listReturnsEmptyWhenDirectoryMissingOrNotReadable(): void
+    {
+        $missing = new LocalFilesystemAssetStorage(
+            sys_get_temp_dir() . '/pbk-missing-' . uniqid('', true),
+            '/media',
+        );
+        self::assertSame([], $missing->list(10));
+        self::assertSame([], $missing->list(0));
+
+        $fileAsDir = sys_get_temp_dir() . '/pbk-file-' . uniqid('', true);
+        file_put_contents($fileAsDir, 'x');
+        $storage = new LocalFilesystemAssetStorage($fileAsDir, '/media');
+        self::assertSame([], $storage->list(5));
+
+        $dir = sys_get_temp_dir() . '/pbk-list-' . uniqid('', true);
+        mkdir($dir);
+        mkdir($dir . '/subdir');
+        file_put_contents($dir . '/ok.png', 'x');
+        $listed = (new LocalFilesystemAssetStorage($dir, '/media'))->list(10);
+        self::assertCount(1, $listed);
+        self::assertSame('ok.png', $listed[0]['name']);
+    }
+
+    #[Test]
     public function storeRejectsInvalidUpload(): void
     {
         $storage = new LocalFilesystemAssetStorage(sys_get_temp_dir(), '/media', 5_000_000, ['image/png']);

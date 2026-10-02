@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.4.3](#143)
 - [1.4.2](#142)
 - [1.4.1](#141)
 - [1.4.0](#140)
@@ -15,6 +16,16 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.4.3
+
+From **1.4.2**:
+
+1. No host action required for Form Twig remediation (admin/demo templates only).
+2. Optional — rebuild inline-edit assets (`pnpm run build:inline-edit`) if you vendor `src/Resources/public/js/page-builder-inline-edit.js`.
+3. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#143---2026-10-02).
 
 ## 1.4.2
 

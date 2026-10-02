@@ -100,5 +100,9 @@ final class AssetUploadHandlerTest extends TestCase
         $disabled = new AssetUploadHandler($plain, false);
         self::assertFalse($disabled->supportsLibrary());
         self::assertSame([], $disabled->listLibrary());
+
+        $enabledWithoutLibrary = new AssetUploadHandler($plain, true);
+        self::assertFalse($enabledWithoutLibrary->supportsLibrary());
+        self::assertSame([], $enabledWithoutLibrary->listLibrary());
     }
 }

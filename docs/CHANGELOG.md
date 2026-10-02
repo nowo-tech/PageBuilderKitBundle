@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.3] - 2026-10-02](#143---2026-10-02)
 - [[1.4.2] - 2026-10-02](#142---2026-10-02)
 - [[1.4.1] - 2026-10-02](#141---2026-10-02)
 - [[1.4.0] - 2026-10-02](#140---2026-10-02)
@@ -22,6 +23,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.4.3] - 2026-10-02
+
+### Added
+
+- **Form types:** admin mutations (templates, revisions, sections, content schema/values, CSRF-only actions) + demo `DemoLoginType`; public inline modal shell `InlineFieldModalType`.
+
+### Changed
+
+- **Twig (REQ-TWIG-003/005):** all bundle/demo form-submitting templates use `form_start` + children loop + `form_end` (no raw `<form`/`<input`).
+- **Coverage:** PHP Clover **elements ≥99%** (local ~99.73%); `coverage-check-100.php` gate aligned to ≥99% (REQ-TEST-003 / CI).
+- **README:** Tests section reports element coverage; Phase 9 marked done.
+
+### Notes
+
+- Backward compatible for hosts on `^1.4`. **No** Doctrine schema changes. Controllers that still read `Request` for CSRF remain compatible with empty form block prefixes.
 
 ## [1.4.2] - 2026-10-02
 

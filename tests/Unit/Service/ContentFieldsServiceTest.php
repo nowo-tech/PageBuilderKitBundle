@@ -19,6 +19,7 @@ use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 
 #[CoversClass(ContentFieldsService::class)]
 final class ContentFieldsServiceTest extends TestCase
@@ -169,6 +170,152 @@ final class ContentFieldsServiceTest extends TestCase
         ]);
 
         self::assertSame('title', $page->getDocument()?->getStructure()['fields'][0]['key'] ?? null);
+    }
+
+    #[Test]
+    public function saveValuesAcceptsSchemaOverrideAndSnapshots(): void
+    {
+        $page = $this->pageWithDocument(['fields' => [], 'fieldValues' => []]);
+        $em   = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('persist');
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $revisionRepo = $this->createStub(BuilderPageRevisionRepositoryInterface::class);
+        $revisionRepo->method('findLatestForPage')->willReturn(null);
+        $revisionRepo->method('findByPageNewestFirst')->willReturn([]);
+        $store = new PageRevisionStore($em, $revisionRepo, enabled: true, onSave: true, onPublish: true);
+
+        $this->service($em, HtmlSanitizeStrategy::None, $store)->saveValues($page, [
+            'es' => ['title' => 'Hola'],
+        ], [
+            ['key' => 'title', 'type' => 'string', 'label' => 'Title'],
+            ['key' => 'other', 'type' => 'string', 'label' => 'Other'],
+        ]);
+
+        $structure = $page->getDocument()?->getStructure() ?? [];
+        self::assertSame('Hola', $structure['fieldValues']['es']['title']);
+        self::assertCount(2, $structure['fields']);
+    }
+
+    #[Test]
+    public function saveFieldValueSnapshotsAndSkipsNonMatchingSchemaKeys(): void
+    {
+        $page = $this->pageWithDocument([
+            'fields' => [
+                ['key' => 'other', 'type' => 'string'],
+                ['key' => 'title', 'type' => 'string'],
+            ],
+            'fieldValues' => [],
+        ]);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::atLeastOnce())->method('persist');
+        $em->expects(self::atLeastOnce())->method('flush');
+
+        $revisionRepo = $this->createStub(BuilderPageRevisionRepositoryInterface::class);
+        $revisionRepo->method('findLatestForPage')->willReturn(null);
+        $revisionRepo->method('findByPageNewestFirst')->willReturn([]);
+        $store = new PageRevisionStore($em, $revisionRepo, enabled: true, onSave: true, onPublish: true);
+
+        $this->service($em, HtmlSanitizeStrategy::None, $store)->saveFieldValue($page, 'title', 'es', 'Hi');
+
+        self::assertSame('Hi', $page->getDocument()?->getStructure()['fieldValues']['es']['title'] ?? null);
+    }
+
+    #[Test]
+    public function sanitizeSkipsMalformedBagsRowsAndUnknownTypes(): void
+    {
+        $schema = [
+            ['key' => 'body', 'type' => 'html'],
+            ['key' => 'weird', 'type' => 'not-real'],
+            [
+                'key'    => 'faqs',
+                'type'   => 'repeater',
+                'fields' => [
+                    'bad-sub',
+                    ['type' => 'html'],
+                    ['key' => 'answer', 'type' => 'html'],
+                ],
+            ],
+            [
+                'key'    => 'hero',
+                'type'   => 'group',
+                'fields' => [
+                    'bad',
+                    ['type' => 'html'],
+                    ['key' => 'blurb', 'type' => 'html'],
+                ],
+            ],
+        ];
+        $page = $this->pageWithDocument(['fields' => $schema, 'fieldValues' => []]);
+
+        // Force a non-array locale bag through sanitizeHtmlTypedValues by mocking normalizer?
+        // Instead exercise repeater/group skip branches via saveValues.
+        $this->service(null, HtmlSanitizeStrategy::Strip)->saveValues($page, [
+            'es' => [
+                'body'  => '<b>ok</b>',
+                'weird' => '<script>x</script>',
+                'faqs'  => [
+                    'skip-row',
+                    ['answer' => '<i>A</i>', 'ignored' => 'x'],
+                ],
+                'hero' => [
+                    'blurb' => '<em>E</em>',
+                    'x'     => 'y',
+                ],
+            ],
+        ]);
+
+        $values = $page->getDocument()?->getStructure()['fieldValues']['es'] ?? [];
+        self::assertSame('ok', $values['body']);
+        self::assertSame('<script>x</script>', $values['weird']);
+        self::assertSame('A', $values['faqs'][0]['answer']);
+        self::assertSame('E', $values['hero']['blurb']);
+    }
+
+    #[Test]
+    public function sanitizeHandlesMalformedBagsViaReflection(): void
+    {
+        $service = $this->service(null, HtmlSanitizeStrategy::Strip);
+        $schema  = [
+            ['key' => 'body', 'type' => 'not-a-type'],
+            [
+                'key'    => 'faqs',
+                'type'   => 'repeater',
+                'fields' => [
+                    'bad',
+                    ['type' => 'html'],
+                    ['key' => 'answer', 'type' => 'html'],
+                ],
+            ],
+            [
+                'key'    => 'hero',
+                'type'   => 'group',
+                'fields' => [
+                    'bad',
+                    ['type' => 'html'],
+                    ['key' => 'blurb', 'type' => 'html'],
+                ],
+            ],
+        ];
+
+        $method = new ReflectionMethod(ContentFieldsService::class, 'sanitizeHtmlTypedValues');
+        $out    = $method->invoke($service, [
+            'bad' => 'not-array',
+            'es'  => [
+                'body' => '<b>x</b>',
+                'faqs' => [
+                    'skip',
+                    ['answer' => '<i>A</i>'],
+                ],
+                'hero' => [
+                    'blurb' => '<em>E</em>',
+                ],
+            ],
+        ], $schema);
+
+        self::assertSame('<b>x</b>', $out['es']['body']);
+        self::assertSame('A', $out['es']['faqs'][0]['answer']);
+        self::assertSame('E', $out['es']['hero']['blurb']);
     }
 
     /**

@@ -89,6 +89,136 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
     }
 
     #[Test]
+    public function allowsCanvasWhenLayoutCapabilityGranted(): void
+    {
+        $checker = new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+
+            public function canLayout(): bool
+            {
+                return true;
+            }
+
+            public function canContent(): bool
+            {
+                return false;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return $capability === PageBuilderCapability::Layout->value
+                    || $capability === PageBuilderCapability::Layout;
+            }
+        };
+
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
+        $event      = $this->controllerEvent('admin_page_builder_canvas');
+
+        $subscriber->onKernelController($event);
+
+        self::assertSame('admin_page_builder_canvas', $event->getRequest()->attributes->get('_route'));
+    }
+
+    #[Test]
+    public function allowsDocumentGetWhenAnyListedCapabilityMatches(): void
+    {
+        $checker = new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return true;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return $capability === PageBuilderCapability::Content->value
+                    || $capability === PageBuilderCapability::Content;
+            }
+        };
+
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
+        $event      = $this->controllerEvent('admin_page_builder_document_get');
+
+        $subscriber->onKernelController($event);
+
+        self::assertSame('admin_page_builder_document_get', $event->getRequest()->attributes->get('_route'));
+    }
+
+    #[Test]
+    public function deniesDocumentGetWhenNoListedCapabilityMatches(): void
+    {
+        $checker = new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return false;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                return false;
+            }
+        };
+
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($checker);
+
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('Page builder capability required for this route.');
+        $subscriber->onKernelController($this->controllerEvent('admin_page_builder_document_get'));
+    }
+
+    #[Test]
     public function ignoresNonAdminRoutesAndMissingRoute(): void
     {
         $calls        = new stdClass();

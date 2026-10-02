@@ -8,6 +8,7 @@ use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 
 #[CoversClass(ContentFieldsNormalizer::class)]
 final class ContentFieldsNormalizerTest extends TestCase
@@ -183,5 +184,218 @@ final class ContentFieldsNormalizerTest extends TestCase
         $schemaOnly = $normalizer->applyTemplateFieldOptions($structure, true, false);
         self::assertNotEmpty($schemaOnly['fields']);
         self::assertSame([], $schemaOnly['fieldValues']);
+
+        $withValues = $normalizer->applyTemplateFieldOptions($structure, true, true);
+        self::assertNotEmpty($withValues['fieldValues']);
+    }
+
+    #[Test]
+    public function coversEdgeBranchesForSchemaValuesAndLabels(): void
+    {
+        $normalizer = new ContentFieldsNormalizer();
+
+        self::assertSame([], $normalizer->normalizeSchema('not-an-array'));
+        self::assertSame([], $normalizer->normalizeSchema([null, 'x', 1]));
+
+        $schema = $normalizer->normalizeSchema([
+            [
+                'key'     => 'faqs',
+                'type'    => 'repeater',
+                'min'     => '2',
+                'max'     => '1',
+                'options' => null,
+                'labels'  => ['' => 'x', 1 => 'y', 'es' => '  ', 'en' => 'FAQs'],
+                'fields'  => [['key' => 'q', 'type' => 'string']],
+            ],
+            [
+                'key'       => 'related',
+                'type'      => 'reference',
+                'reference' => 'product',
+                'labels'    => ['es' => 'Relacionado'],
+            ],
+            ['key' => 'amount', 'type' => 'number'],
+            ['key' => 'flag', 'type' => 'bool', 'required' => true],
+            [
+                'key'      => 'hero',
+                'type'     => 'group',
+                'required' => true,
+                'fields'   => [['key' => 'title', 'type' => 'string', 'required' => true]],
+            ],
+            ['key' => 'weird', 'type' => 'not-a-real-type'],
+        ]);
+
+        self::assertSame(2, $schema[0]['min']);
+        self::assertSame(2, $schema[0]['max']);
+        self::assertSame(['en' => 'FAQs'], $schema[0]['labels']);
+        self::assertSame('FAQs', $schema[0]['label']);
+        self::assertSame('product', $schema[1]['reference']);
+        self::assertSame('string', $schema[5]['type']);
+
+        self::assertSame('field', $normalizer->resolveLabel(['labels' => []], 'es', 'en'));
+        self::assertSame('k', $normalizer->resolveLabel(['key' => 'k', 'labels' => []], 'es', 'en'));
+
+        $mergedNull = $normalizer->mergeLabels($schema[1], null);
+        self::assertSame('product', $mergedNull['reference']);
+
+        $mergedEmpty = $normalizer->mergeLabels(
+            ['key' => 'x', 'type' => 'string', 'label' => 'x', 'labels' => [], 'required' => false, 'options' => [], 'default' => null],
+            // @phpstan-ignore argument.type (intentionally malformed labels bag)
+            ['labels' => ['' => 'bad', 'fr' => '  ', 'es' => 'Hola', 2 => 'nope']],
+            '',
+        );
+        self::assertSame('Hola', $mergedEmpty['labels']['es']);
+        self::assertSame('Hola', $mergedEmpty['label']);
+
+        $sub = $normalizer->parseSubfieldsSpec(' , :text , ok: , valid:number ');
+        self::assertSame(['ok', 'valid'], array_column($sub, 'key'));
+        self::assertSame('string', $sub[0]['type']);
+        self::assertSame('number', $sub[1]['type']);
+
+        $values = $normalizer->normalizeValues('bad', $schema);
+        self::assertSame([], $values);
+
+        $values = $normalizer->normalizeValues([
+            ''   => ['amount' => 1],
+            1    => ['amount' => 1],
+            'es' => 'not-array',
+            'en' => [
+                'unknown' => 'x',
+                'amount'  => 12.5,
+                'flag'    => 'yes',
+                'related' => ['bad'],
+                'faqs'    => 'not-rows',
+                'hero'    => 'not-group',
+            ],
+            'fr' => [
+                'amount'  => ['bad'],
+                'related' => 'Bad Key!',
+                'faqs'    => [
+                    'skip',
+                    ['q' => ''],
+                    ['q' => 'One'],
+                    ['q' => 'Two'],
+                    ['q' => 'Three'],
+                ],
+                'hero'  => ['title' => 'T'],
+                'weird' => ['obj'],
+            ],
+        ], $schema);
+
+        self::assertSame('12.5', $values['en']['amount']);
+        self::assertTrue($values['en']['flag']);
+        self::assertSame('', $values['en']['related']);
+        self::assertSame([], $values['en']['faqs']);
+        self::assertSame([], $values['en']['hero']);
+        self::assertSame('', $values['fr']['amount']);
+        self::assertSame('', $values['fr']['related']);
+        self::assertCount(2, $values['fr']['faqs']); // max=2 after empty row discard
+        self::assertSame('T', $values['fr']['hero']['title']);
+        self::assertSame('', $values['fr']['weird']);
+
+        $structure = $normalizer->applyToStructure([], $schema, $values);
+        $resolved  = $normalizer->resolveForLocale($structure, 'de', 'en');
+        self::assertSame('12.5', $resolved['amount']);
+        self::assertFalse($resolved['flag'] === null);
+
+        $errors = $normalizer->validateRequired($structure, ['', 'en', 'fr']);
+        $keys   = array_map(static fn (array $e): string => $e['locale'] . ':' . $e['key'], $errors);
+        self::assertContains('en:faqs', $keys);
+        self::assertNotContains(':faqs', $keys);
+
+        $groupRequired = $normalizer->validateRequired([
+            'fields' => [[
+                'key'      => 'hero',
+                'type'     => 'group',
+                'required' => true,
+                'fields'   => [],
+            ]],
+            'fieldValues' => ['es' => ['hero' => []]],
+        ], ['es']);
+        self::assertNotEmpty($groupRequired);
+
+        $emptyGroupSubs = $normalizer->validateRequired([
+            'fields' => [[
+                'key'      => 'hero',
+                'type'     => 'group',
+                'required' => true,
+                'fields'   => [['key' => 'title', 'type' => 'string']],
+            ]],
+            'fieldValues' => ['es' => ['hero' => ['title' => '']]],
+        ], ['es']);
+        self::assertNotEmpty($emptyGroupSubs);
+
+        $filledGroup = $normalizer->validateRequired([
+            'fields' => [[
+                'key'      => 'hero',
+                'type'     => 'group',
+                'required' => true,
+                'fields'   => [['key' => 'title', 'type' => 'string']],
+            ]],
+            'fieldValues' => ['es' => ['hero' => ['title' => 'Hi']]],
+        ], ['es']);
+        self::assertSame([], $filledGroup);
+
+        $intBounds = $normalizer->normalizeSchema([
+            ['key' => 'r', 'type' => 'repeater', 'min' => -3, 'max' => null, 'fields' => []],
+            ['key' => 'r2', 'type' => 'repeater', 'min' => '', 'max' => new stdClass(), 'fields' => []],
+        ]);
+        self::assertSame(0, $intBounds[0]['min']);
+        self::assertNull($intBounds[0]['max']);
+        self::assertNull($intBounds[1]['min']);
+        self::assertNull($intBounds[1]['max']);
+
+        $refOk = $normalizer->normalizeValues([
+            'es' => ['related' => ' home_1 '],
+        ], $normalizer->normalizeSchema([['key' => 'related', 'type' => 'reference']]));
+        self::assertSame('home_1', $refOk['es']['related']);
+
+        $numBlank = $normalizer->normalizeValues([
+            'es' => ['amount' => '  ', 'amount2' => true],
+        ], $normalizer->normalizeSchema([
+            ['key' => 'amount', 'type' => 'number'],
+            ['key' => 'amount2', 'type' => 'number'],
+        ]));
+        self::assertSame('', $numBlank['es']['amount']);
+        self::assertSame('1', $numBlank['es']['amount2']);
+
+        $groupPartial = $normalizer->normalizeValues([
+            'es' => ['hero' => ['extra' => 'x']],
+        ], $normalizer->normalizeSchema([[
+            'key'    => 'hero',
+            'type'   => 'group',
+            'fields' => [['key' => 'title', 'type' => 'string']],
+        ]]));
+        self::assertSame('', $groupPartial['es']['hero']['title']);
+
+        $repeaterMissingSub = $normalizer->normalizeValues([
+            'es' => ['faqs' => [['answer' => 'only']]],
+        ], $normalizer->normalizeSchema([[
+            'key'    => 'faqs',
+            'type'   => 'repeater',
+            'fields' => [
+                ['key' => 'question', 'type' => 'string'],
+                ['key' => 'answer', 'type' => 'string'],
+            ],
+        ]]));
+        self::assertSame('', $repeaterMissingSub['es']['faqs'][0]['question']);
+        self::assertSame('only', $repeaterMissingSub['es']['faqs'][0]['answer']);
+
+        $emptyField = $normalizer->mergeLabels(
+            // @phpstan-ignore argument.type (incomplete field shape for defensive merge)
+            ['key' => '!!!', 'type' => 'string'],
+            ['label' => 'Fixed'],
+            'es',
+        );
+        self::assertSame('!!!', $emptyField['key']);
+        self::assertSame('Fixed', $emptyField['label']);
+        self::assertSame('Fixed', $emptyField['labels']['es']);
+
+        $withDefault = $normalizer->resolveForLocale([
+            'fields' => [
+                ['key' => 'title', 'type' => 'string', 'default' => 'Hello'],
+            ],
+            'fieldValues' => [],
+        ], 'es', 'en');
+        self::assertSame('Hello', $withDefault['title']);
     }
 }

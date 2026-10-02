@@ -16,9 +16,9 @@
 
 In this repository, spec-driven development has three layers that stay in sync:
 
-1. **GitHub Spec Kit**: `specs/001-baseline/` (Phase 1), `002`–`004` feature specs (Phases 2–4), plus canonical `code-inventory.md` under `001-baseline/`.
-2. **Product behavior**: Canvas admin, document API, widgets, i18n props, publish flow, and public rendering are documented in integrator docs.
-3. **Traceability anchors**: Stable `REQ-*` identifiers link docs, demo expectations, and QA workflows.
+1. **GitHub Spec Kit**: `specs/001-baseline/` (Phase 1 + canonical `code-inventory.md`), feature specs `002`–`009` (Phases 2–7 + product polish/compliance).
+2. **Product behavior**: Canvas admin, document API, widgets, content fields, i18n, publish flow, and public rendering are documented in integrator docs.
+3. **Traceability anchors**: Stable `REQ-*` / `FR-*` identifiers link docs, demo expectations, and QA workflows.
 
 ## User stories
 
@@ -34,7 +34,7 @@ In this repository, spec-driven development has three layers that stay in sync:
 
 ## Functional scope (shipped)
 
-**Shipped in v1.0+:**
+**Shipped in v1.0+ through v1.4.x:**
 
 - Document schema v1 (classic) and v2 (GrapesJS)
 - Core classic widget types + public Twig templates
@@ -42,11 +42,13 @@ In this repository, spec-driven development has three layers that stay in sync:
 - Publish / unpublish (draft), public `/p/{pageKey}`
 - Draft **preview** for users who pass `PageBuilderKitAccessCheckerInterface` (banner; anonymous visitors still get 404)
 - Revisions (`revisions.*`): list, create, restore, **diff preview**
-- Page **duplicate**, JSON **export/import**, **templates** library (`BuilderPageTemplate`)
+- Page **duplicate**, JSON **export/import**, **templates** library (`BuilderPageTemplate`) + optional `include_seo`
 - Locale-aware props / Grapes `localeContent`, Doctrine optional table prefix
-- Security access checker, HTML sanitize strategies, Twig-in-Grapes sandbox
+- Security access checker + fine-grained capabilities, HTML sanitize strategies, Twig-in-Grapes sandbox
 - Web Profiler **DataCollector** (`debug.collector`, `kernel.debug` only)
-- External **widget packs** (`WidgetPackInterface` + docs)
+- External **widget packs** and **Grapes block packs**
+- Typed **content fields** (composites, slots, media library, dynamic tags)
+- Cookbook + example Composer Grapes pack; engine extract validators/builders; typed canvas TS
 - FrankenPHP demo on port **8137**
 
 ## Roadmap
@@ -99,6 +101,18 @@ Nesting depth 2, Twig-free `[[fields.*]]` slots, Grapes Content-fields blocks, i
 
 Spec Kit: [`specs/007-phase6b-content-wave2/spec.md`](../specs/007-phase6b-content-wave2/spec.md).
 
+### Phase 7 — Media library, dynamic tags, nesting (shipped)
+
+Unlimited composite nesting (safety cap 32), media library list + picker, Grapes Asset Manager seed, Dynamic tag traits.
+
+Spec Kit: [`specs/008-phase7-media-tags-nesting/spec.md`](../specs/008-phase7-media-tags-nesting/spec.md).
+
+### Phase 9 — Product polish + standards compliance (shipped)
+
+**Shipped (v1.4.1 / v1.4.2 / v1.4.3):** legacy UX badges/banners, COOKBOOK + `examples/acme-grapes-block-pack/`, engine extract (`DocumentStructureValidator`, `ClassicPageTreeBuilder`), typed Grapes canvas (no `@ts-nocheck`), PHP Clover **elements ≥99%**, Symfony Form Twig (`form_start` + children loop; no raw `<form>`/`<input>`), README Tests numeric percentages.
+
+Spec Kit: [`specs/009-product-polish-compliance/spec.md`](../specs/009-product-polish-compliance/spec.md).
+
 ## Validating the spec
 
 ```bash
@@ -124,6 +138,10 @@ make release-check
 | REQ-GIT-001 | `docs/GITHUB_CI.md` | No Cursor co-author trailers in git history |
 | REQ-CS-007 | `docs/PSR.md` | PSR adoption evaluation |
 | REQ-DEBUG-001 | `docs/CONFIGURATION.md`, DataCollector | Web Profiler panel when `debug.collector` + `kernel.debug` |
+| REQ-TEST-003 | CI coverage gate / Phase 9 | PHP coverage ≥99% of includable `src/` |
+| REQ-CI-003 | GitHub Actions `ci.yml` | Default-branch CI must stay green |
+| REQ-TWIG-003 / REQ-TWIG-005 | Admin Twig forms / Phase 9 | Children-loop FormView; no raw `<form>` / `<input>` mutations |
+| REQ-TEST-007 | `README.md` Tests section | Numeric coverage % per language (or N/A) |
 
 ## Suggested workflow for contributors
 
@@ -131,7 +149,7 @@ make release-check
 2. Update or create the relevant spec artifact.
 3. Implement with tests when production behavior changes.
 4. Update integrator docs when host applications must act.
-5. Keep phase specs (`001`–`005`) and `specs/001-baseline/code-inventory.md` aligned with `src/`.
+5. Keep phase specs (`001`–`009`) and `specs/001-baseline/code-inventory.md` aligned with `src/`.
 
 ## GitHub Spec Kit (summary)
 
@@ -143,6 +161,10 @@ make release-check
 | Phase 3 revisions/templates | `specs/003-phase3-revisions-templates/spec.md` |
 | Phase 4 external widgets | `specs/004-phase4-external-widgets/spec.md` |
 | Phase 5 content fields + ACL | `specs/005-content-fields-i18n/spec.md` |
+| Phase 6 content hardening | `specs/006-phase6-content-hardening/spec.md` |
+| Phase 6b content wave 2 | `specs/007-phase6b-content-wave2/spec.md` |
+| Phase 7 media / tags / nesting | `specs/008-phase7-media-tags-nesting/spec.md` |
+| Phase 9 polish + compliance | `specs/009-product-polish-compliance/spec.md` |
 | Tooling manual | `docs/SPEC-KIT.md` |
 
 See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.
@@ -150,7 +172,8 @@ See [SPEC-KIT.md](SPEC-KIT.md) for install and Cursor skills.
 ## See also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Mermaid diagrams
-- [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md) — external classic widgets
+- [COOKBOOK.md](COOKBOOK.md) — Grapes packs + template sharing
+- [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md) — external classic widgets / Grapes packs
 - [SPEC-KIT.md](SPEC-KIT.md)
 - [INSTALLATION.md](INSTALLATION.md)
 - [CONFIGURATION.md](CONFIGURATION.md)

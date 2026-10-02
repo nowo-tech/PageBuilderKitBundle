@@ -17,14 +17,14 @@
 {% block admin %}
     <p class="text-muted">{{ 'admin.revisions.hint'|trans({'%max%': max_per_page}) }}</p>
 
-    <form method="post" action="{{ create_url }}" class="mb-4 d-flex flex-wrap gap-2 align-items-end">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-        <div>
-            <label class="form-label" for="pbk-revision-label">{{ 'admin.revisions.label'|trans }}</label>
-            <input id="pbk-revision-label" class="form-control form-control-sm" type="text" name="label" maxlength="255" placeholder="{{ 'admin.revisions.label_placeholder'|trans }}">
-        </div>
+    {{ form_start(create_form, { attr: { class: 'mb-4 d-flex flex-wrap gap-2 align-items-end' } }) }}
+        {% for child in create_form %}
+            {% if not child.rendered %}
+                {{ form_row(child) }}
+            {% endif %}
+        {% endfor %}
         <button type="submit" class="btn btn-success btn-sm">{{ 'admin.revisions.create'|trans }}</button>
-    </form>
+    {{ form_end(create_form) }}
 
     {% if revisions is empty %}
         <p class="text-muted">{{ 'admin.revisions.empty'|trans }}</p>
@@ -55,12 +55,18 @@
                                    href="{{ path('admin_page_builder_revisions_diff', {pageKey: page_key, revisionId: revision.id}) }}">
                                     {{ 'admin.revisions.diff'|trans }}
                                 </a>
-                                <form method="post"
-                                      action="{{ path('admin_page_builder_revisions_restore', {pageKey: page_key, revisionId: revision.id}) }}"
-                                      onsubmit="return confirm({{ ('admin.revisions.restore_confirm')|trans|json_encode|raw }});">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                {{ form_start(restore_forms[revision.id|default('')], {
+                                    attr: {
+                                        onsubmit: 'return confirm(' ~ ('admin.revisions.restore_confirm'|trans|json_encode|raw) ~ ');'
+                                    }
+                                }) }}
+                                    {% for child in restore_forms[revision.id] %}
+                                        {% if not child.rendered %}
+                                            {{ form_widget(child) }}
+                                        {% endif %}
+                                    {% endfor %}
                                     <button type="submit" class="btn btn-outline-primary btn-sm">{{ 'admin.revisions.restore'|trans }}</button>
-                                </form>
+                                {{ form_end(restore_forms[revision.id]) }}
                             </td>
                         </tr>
                     {% endfor %}

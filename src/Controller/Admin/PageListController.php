@@ -6,11 +6,13 @@ namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageCreateType;
+use Nowo\PageBuilderKitBundle\Form\PageDuplicateType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -52,9 +54,23 @@ final class PageListController extends AbstractController
             return $this->redirectToRoute('admin_page_builder_canvas', ['pageKey' => $page->getPageKey()]);
         }
 
+        $pages = $this->pageRepository->findAllOrdered();
+        /** @var array<string, FormView> $duplicateForms */
+        $duplicateForms = [];
+        foreach ($pages as $page) {
+            $key                  = $page->getPageKey();
+            $duplicateForms[$key] = $this->createForm(PageDuplicateType::class, [
+                'pageKey' => $key . '-copy',
+            ], [
+                'action' => $this->generateUrl('admin_page_builder_document_duplicate', ['pageKey' => $key]),
+                'method' => 'POST',
+            ])->createView();
+        }
+
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/index.html.twig', [
-            'pages'       => $this->pageRepository->findAllOrdered(),
-            'create_form' => $createForm,
+            'pages'           => $pages,
+            'create_form'     => $createForm,
+            'duplicate_forms' => $duplicateForms,
         ]);
     }
 }

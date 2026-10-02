@@ -6,9 +6,11 @@ namespace Nowo\PageBuilderKitBundle\Service;
 
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
+use Nowo\PageBuilderKitBundle\Form\InlineFieldModalType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
+use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -36,6 +38,7 @@ final readonly class InlineContentFieldRenderer implements InlineContentFieldRen
         private UrlGeneratorInterface $urlGenerator,
         private CsrfTokenManagerInterface $csrfTokenManager,
         private RequestStack $requestStack,
+        private FormFactoryInterface $formFactory,
         private string $assetBasePath = '/bundles/nowopagebuilderkit',
     ) {
     }
@@ -187,6 +190,8 @@ final readonly class InlineContentFieldRenderer implements InlineContentFieldRen
         bool $editable,
         string $saveUrl,
     ): array {
+        $includeAssets = $editable && $this->markAssetsOnce();
+
         return [
             'page_key'       => $pageKey,
             'field_key'      => $fieldKey,
@@ -202,9 +207,12 @@ final readonly class InlineContentFieldRenderer implements InlineContentFieldRen
             'editable'       => $editable,
             'save_url'       => $saveUrl,
             'csrf_token'     => $editable ? $this->csrfTokenManager->getToken('page_builder_content')->getValue() : '',
-            'include_assets' => $editable && $this->markAssetsOnce(),
+            'include_assets' => $includeAssets,
             'asset_base'     => rtrim($this->assetBasePath, '/'),
             'is_html_output' => $type->isHtmlOutput(),
+            'modal_form'     => $includeAssets
+                ? $this->formFactory->create(InlineFieldModalType::class)->createView()
+                : null,
         ];
     }
 

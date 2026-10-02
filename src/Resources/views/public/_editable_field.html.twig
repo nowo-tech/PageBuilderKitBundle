@@ -47,18 +47,29 @@
 {% if include_assets %}
     <link rel="stylesheet" href="{{ asset_base }}/css/page-builder.css">
     <dialog class="pbk-field-modal" data-pbk-field-modal hidden>
-        <form method="dialog" class="pbk-field-modal__panel" data-pbk-field-form>
+        {{ form_start(modal_form, {
+            attr: {
+                class: 'pbk-field-modal__panel',
+                'data-pbk-field-form': '',
+                onsubmit: 'return false;'
+            }
+        }) }}
             <header class="pbk-field-modal__head">
                 <h2 class="pbk-field-modal__title" data-pbk-modal-title></h2>
-                <button type="submit" value="cancel" class="pbk-field-modal__close" aria-label="{{ 'public.field.cancel'|trans }}">&times;</button>
+                <button type="button" class="pbk-field-modal__close" data-pbk-modal-close aria-label="{{ 'public.field.cancel'|trans }}">&times;</button>
             </header>
             <div class="pbk-field-modal__body" data-pbk-modal-body></div>
             <footer class="pbk-field-modal__foot">
                 <p class="pbk-field-modal__error" data-pbk-modal-error hidden></p>
-                <button type="submit" value="cancel" class="pbk-field-modal__btn pbk-field-modal__btn--ghost">{{ 'public.field.cancel'|trans }}</button>
+                <button type="button" class="pbk-field-modal__btn pbk-field-modal__btn--ghost" data-pbk-modal-close>{{ 'public.field.cancel'|trans }}</button>
                 <button type="button" class="pbk-field-modal__btn pbk-field-modal__btn--primary" data-pbk-modal-save>{{ 'public.field.save'|trans }}</button>
             </footer>
-        </form>
+            {% for child in modal_form %}
+                {% if not child.rendered %}
+                    {{ form_widget(child) }}
+                {% endif %}
+            {% endfor %}
+        {{ form_end(modal_form) }}
     </dialog>
     <script src="{{ asset_base }}/js/page-builder-inline-edit.js" defer></script>
 {% endif %}

@@ -9,6 +9,8 @@ use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
+use Nowo\PageBuilderKitBundle\Form\CsrfPostType;
+use Nowo\PageBuilderKitBundle\Form\RevisionCreateType;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
@@ -63,14 +65,30 @@ final class PageRevisionsController extends AbstractController
             ? 'grapesjs'
             : 'classic';
 
+        $revisions    = $this->revisionService->list($page);
+        $restoreForms = [];
+        foreach ($revisions as $revision) {
+            $id                = (string) $revision->getId();
+            $restoreForms[$id] = $this->createForm(CsrfPostType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_revisions_restore', [
+                    'pageKey'    => $pageKey,
+                    'revisionId' => $revision->getId(),
+                ]),
+                'method' => 'POST',
+            ])->createView();
+        }
+
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/revisions.html.twig', [
             'page'         => $page,
             'page_key'     => $pageKey,
-            'revisions'    => $this->revisionService->list($page),
+            'revisions'    => $revisions,
             'engine'       => $engine,
             'max_per_page' => $this->revisionStore->getMaxPerPage(),
-            'csrf_token'   => $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue(),
-            'create_url'   => $this->generateUrl('admin_page_builder_revisions_create', ['pageKey' => $pageKey]),
+            'create_form'  => $this->createForm(RevisionCreateType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_revisions_create', ['pageKey' => $pageKey]),
+                'method' => 'POST',
+            ])->createView(),
+            'restore_forms' => $restoreForms,
         ]);
     }
 

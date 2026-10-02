@@ -8,6 +8,7 @@ use Nowo\PageBuilderKitBundle\Service\ContentFieldSlotReplacer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 
 #[CoversClass(ContentFieldSlotReplacer::class)]
 final class ContentFieldSlotReplacerTest extends TestCase
@@ -55,5 +56,65 @@ final class ContentFieldSlotReplacerTest extends TestCase
     {
         $replacer = new ContentFieldSlotReplacer();
         self::assertSame('<p>Hi</p>', $replacer->replace('<p>Hi</p>', ['x' => 'y']));
+    }
+
+    #[Test]
+    public function resolvesNumericPathsBoolsArraysAndRawEdges(): void
+    {
+        $replacer = new ContentFieldSlotReplacer();
+        $fields   = [
+            'faqs' => [
+                0 => ['question' => 'Q0', 'body' => '<b>raw</b>'],
+            ],
+            'flag'  => true,
+            'off'   => false,
+            'items' => ['a', 'b'],
+            'obj'   => new stdClass(),
+            'hero'  => ['title' => 'T'],
+        ];
+        $schema = [
+            [
+                'key'    => 'faqs',
+                'type'   => 'repeater',
+                'fields' => [
+                    ['key' => 'question', 'type' => 'string'],
+                    ['key' => 'body', 'type' => 'html'],
+                ],
+            ],
+            ['key' => 'flag', 'type' => 'bool'],
+            ['key' => 'off', 'type' => 'bool'],
+            ['key' => 'items', 'type' => 'string'],
+            [
+                'key'    => 'hero',
+                'type'   => 'group',
+                'fields' => [['key' => 'title', 'type' => 'string']],
+            ],
+            ['key' => 'html_top', 'type' => 'html'],
+        ];
+
+        $out = $replacer->replace(
+            'A [[fields.faqs.0.question]]'
+            . ' B [[@fields.faqs.0.body]]'
+            . ' C [[fields.flag]] [[fields.off]]'
+            . ' D [[fields.items]]'
+            . ' E [[@fields.items]]'
+            . ' F [[fields.obj]]'
+            . ' G [[fields.hero.missing]]'
+            . ' H [[fields.faqs.0.unknown]]'
+            . ' I [[fields.html_top]]'
+            . ' J [[@fields.html_top.nested]]',
+            $fields,
+            $schema,
+        );
+
+        self::assertStringContainsString('Q0', $out);
+        self::assertStringContainsString('<b>raw</b>', $out);
+        self::assertStringContainsString('C 1 0', $out);
+        self::assertStringContainsString('[2 items]', $out);
+        self::assertStringContainsString('E ', $out);
+        self::assertStringContainsString('F ', $out);
+        self::assertStringContainsString('G ', $out);
+        self::assertStringContainsString('H ', $out);
+        self::assertStringContainsString('J ', $out);
     }
 }

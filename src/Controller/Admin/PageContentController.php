@@ -7,6 +7,9 @@ namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
+use Nowo\PageBuilderKitBundle\Form\ContentSchemaAddType;
+use Nowo\PageBuilderKitBundle\Form\ContentSchemaRemoveType;
+use Nowo\PageBuilderKitBundle\Form\ContentValuesType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
@@ -15,6 +18,7 @@ use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +27,7 @@ use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 use function array_filter;
+use function array_key_exists;
 use function array_map;
 use function array_merge;
 use function array_values;
@@ -85,6 +90,13 @@ final class PageContentController extends AbstractController
                     continue;
                 }
                 /* @var array<string, mixed> $bag */
+                // Unchecked Symfony checkboxes omit the key; treat missing bools as false.
+                foreach ($schema as $fieldDef) {
+                    if (($fieldDef['type'] ?? '') === ContentFieldType::Bool->value
+                        && !array_key_exists($fieldDef['key'], $bag)) {
+                        $bag[$fieldDef['key']] = '0';
+                    }
+                }
                 $merged[$locale] = array_merge($merged[$locale] ?? [], $bag);
             }
 
@@ -132,17 +144,54 @@ final class PageContentController extends AbstractController
 
         $assetUploadEnabled = $this->assetUploadHandler->isEnabled();
 
+        /** @var array<string, FormView> $removeForms */
+        $removeForms  = [];
+        $schemaAction = $this->generateUrl('admin_page_builder_content_schema', ['pageKey' => $pageKey]);
+        foreach ($schemaView as $field) {
+            $key               = $field['key'];
+            $removeForms[$key] = $this->createForm(ContentSchemaRemoveType::class, [
+                'schema_action' => 'remove',
+                'key'           => $key,
+            ], [
+                'action' => $schemaAction,
+                'method' => 'POST',
+            ])->createView();
+        }
+
+        $valuesForm = null;
+        if ($this->accessGuard->checker()->canContent() && $schemaView !== []) {
+            $valuesForm = $this->createForm(ContentValuesType::class, null, [
+                'schema'          => $schemaView,
+                'locale'          => $active,
+                'values'          => $values[$active] ?? [],
+                'reference_pages' => $referencePages,
+                'action'          => $this->generateUrl('admin_page_builder_content', [
+                    'pageKey' => $pageKey,
+                    'locale'  => $active,
+                ]),
+                'method' => 'POST',
+            ])->createView();
+        }
+
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/content.html.twig', [
-            'page'                  => $page,
-            'pageKey'               => $pageKey,
-            'schema'                => $schemaView,
-            'fieldValues'           => $values,
-            'locales'               => $locales,
-            'active_locale'         => $active,
-            'field_types'           => ContentFieldType::values(),
-            'can_edit_schema'       => $this->accessGuard->checker()->canLayout(),
-            'can_edit_values'       => $this->accessGuard->checker()->canContent(),
-            'reference_pages'       => $referencePages,
+            'page'            => $page,
+            'pageKey'         => $pageKey,
+            'schema'          => $schemaView,
+            'fieldValues'     => $values,
+            'locales'         => $locales,
+            'active_locale'   => $active,
+            'field_types'     => ContentFieldType::values(),
+            'can_edit_schema' => $this->accessGuard->checker()->canLayout(),
+            'can_edit_values' => $this->accessGuard->checker()->canContent(),
+            'reference_pages' => $referencePages,
+            'schema_add_form' => $this->createForm(ContentSchemaAddType::class, [
+                'schema_action' => 'add',
+            ], [
+                'action' => $schemaAction,
+                'method' => 'POST',
+            ])->createView(),
+            'schema_remove_forms'   => $removeForms,
+            'values_form'           => $valuesForm,
             'asset_upload_enabled'  => $assetUploadEnabled,
             'asset_library_enabled' => $assetUploadEnabled && $this->assetUploadHandler->supportsLibrary(),
             'asset_upload_url'      => $assetUploadEnabled

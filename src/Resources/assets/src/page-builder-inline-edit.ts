@@ -284,6 +284,18 @@ function initInlineEdit(): void {
     save();
   });
 
+  modal.querySelectorAll('[data-pbk-modal-close]').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const dialog = modal as HTMLDialogElement;
+      if (typeof dialog.close === 'function') {
+        dialog.close();
+      }
+      modal.hidden = true;
+      activeRoot = null;
+    });
+  });
+
   modal.addEventListener('close', () => {
     activeRoot = null;
     showError('');

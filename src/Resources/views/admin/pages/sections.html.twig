@@ -15,17 +15,23 @@
         {% endif %}
         <a class="btn btn-outline-primary btn-sm" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
         {% if page.status.value != 'published' %}
-            <form method="post" action="{{ path('admin_page_builder_document_publish', {pageKey: page_key}) }}" class="d-inline">
-                <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
-                <input type="hidden" name="_redirect" value="{{ path('admin_page_builder_sections', {pageKey: page_key, locale: locale}) }}">
+            {{ form_start(publish_form, { attr: { class: 'd-inline' } }) }}
+                {% for child in publish_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
                 <button type="submit" class="btn btn-success btn-sm">{{ 'admin.canvas.publish'|trans }}</button>
-            </form>
+            {{ form_end(publish_form) }}
         {% else %}
-            <form method="post" action="{{ path('admin_page_builder_document_unpublish', {pageKey: page_key}) }}" class="d-inline">
-                <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
-                <input type="hidden" name="_redirect" value="{{ path('admin_page_builder_sections', {pageKey: page_key, locale: locale}) }}">
+            {{ form_start(unpublish_form, { attr: { class: 'd-inline' } }) }}
+                {% for child in unpublish_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
                 <button type="submit" class="btn btn-outline-warning btn-sm">{{ 'admin.canvas.unpublish'|trans }}</button>
-            </form>
+            {{ form_end(unpublish_form) }}
         {% endif %}
     </div>
 {% endblock %}
@@ -50,9 +56,7 @@
         {% endfor %}
     </ul>
 
-    <form method="post" class="pbk-sections-editor">
-        <input type="hidden" name="_token" value="{{ csrf_token('page_builder_sections') }}">
-
+    {{ form_start(form, { attr: { class: 'pbk-sections-editor' } }) }}
         {% for section in sections_tree %}
             <details class="card mb-3" open>
                 <summary class="card-header fw-semibold" style="cursor:pointer">
@@ -69,26 +73,17 @@
                                         <strong>{{ widget.label|trans }}</strong>
                                         <span class="badge text-bg-secondary">{{ widget.type }} · {{ widget.id }}</span>
                                     </div>
-                                    {% for field in widget.fields %}
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1" for="w-{{ widget.id }}-{{ field }}">{{ field }}</label>
-                                            {% set value = widget.props[field]|default('') %}
-                                            {% if field in ['html', 'alt'] or (value|length > 80) %}
-                                                <textarea class="form-control form-control-sm"
-                                                          id="w-{{ widget.id }}-{{ field }}"
-                                                          name="widgets[{{ widget.id }}][{{ field }}]"
-                                                          rows="3">{{ value }}</textarea>
-                                            {% else %}
-                                                <input class="form-control form-control-sm"
-                                                       id="w-{{ widget.id }}-{{ field }}"
-                                                       type="text"
-                                                       name="widgets[{{ widget.id }}][{{ field }}]"
-                                                       value="{{ value }}">
+                                    {% if form.widgets[widget.id] is defined %}
+                                        {% for field in widget.fields %}
+                                            {% if form.widgets[widget.id][field] is defined %}
+                                                {{ form_row(form.widgets[widget.id][field]) }}
                                             {% endif %}
-                                        </div>
+                                        {% else %}
+                                            <p class="text-muted small mb-0">{{ 'admin.sections.no_props'|trans }}</p>
+                                        {% endfor %}
                                     {% else %}
                                         <p class="text-muted small mb-0">{{ 'admin.sections.no_props'|trans }}</p>
-                                    {% endfor %}
+                                    {% endif %}
                                 </div>
                             {% else %}
                                 <p class="text-muted small mb-0">{{ 'admin.sections.empty_column'|trans }}</p>
@@ -101,8 +96,14 @@
             <div class="alert alert-info">{{ 'admin.sections.empty'|trans }}</div>
         {% endfor %}
 
+        {% for child in form %}
+            {% if not child.rendered %}
+                {{ form_row(child) }}
+            {% endif %}
+        {% endfor %}
+
         {% if sections_tree is not empty %}
             <button type="submit" class="btn btn-success">{{ 'admin.sections.save'|trans({'%locale%': locale|upper}) }}</button>
         {% endif %}
-    </form>
+    {{ form_end(form) }}
 {% endblock %}

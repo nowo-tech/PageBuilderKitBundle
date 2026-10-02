@@ -63,5 +63,7 @@ final class ConfigurablePageBuilderKitAccessCheckerCapabilitiesTest extends Test
         self::assertTrue($checker->canContent());
         self::assertFalse($checker->canPublish());
         self::assertFalse($checker->can('templates'));
+        self::assertFalse($checker->can(''));
+        self::assertFalse($checker->can('unknown'));
     }
 }

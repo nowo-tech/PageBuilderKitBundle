@@ -10,6 +10,7 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocumentLocale;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
@@ -25,6 +26,7 @@ use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 
 use function count;
 
@@ -664,6 +666,136 @@ final class PageTemplateServiceTest extends TestCase
         self::assertSame('index,follow', $seo->getRobots());
         // Live page structure must not keep template-only SEO blob.
         self::assertArrayNotHasKey('templateSeoByLocale', $with->getDocument()?->getStructure() ?? []);
+    }
+
+    #[Test]
+    public function saveExportImportPreserveSeoAndApplyCreatesMissingLocales(): void
+    {
+        $page     = (new BuilderPage())->setPageKey('pricing');
+        $document = (new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>Plan</p>',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => [],
+        ]);
+        $page->setDocument($document);
+        $page->addTranslation(
+            (new BuilderPageTranslation())
+                ->setLocale('es')
+                ->setTitle('Pricing')
+                ->setSlug('pricing')
+                ->setMetaTitle('Meta')
+                ->setMetaDescription('Desc')
+                ->setOgTitle('OG')
+                ->setOgDescription('OGD')
+                ->setOgImage('https://cdn/x.png')
+                ->setCanonicalUrl('https://example.test/es')
+                ->setRobots('noindex'),
+        );
+        // Ignored by snapshotSeoByLocale (non-translation entries).
+        // @phpstan-ignore argument.type
+        $page->getTranslations()->add(new stdClass());
+
+        $templates    = [];
+        $templateRepo = new class($templates) implements BuilderPageTemplateRepositoryInterface {
+            /** @param array<string, BuilderPageTemplate> $templates */
+            public function __construct(private array &$templates)
+            {
+            }
+
+            public function findOneByTemplateKey(string $templateKey): ?BuilderPageTemplate
+            {
+                return $this->templates[$templateKey] ?? null;
+            }
+
+            public function findAllOrdered(): array
+            {
+                return array_values($this->templates);
+            }
+
+            public function put(BuilderPageTemplate $template): void
+            {
+                $this->templates[$template->getTemplateKey()] = $template;
+            }
+        };
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(
+            static function (object $entity) use ($templateRepo): void {
+                if ($entity instanceof BuilderPageTemplate) {
+                    $templateRepo->put($entity);
+                }
+            },
+        );
+
+        $service = new PageTemplateService(
+            $templateRepo,
+            $em,
+            $this->documents(),
+            new DocumentNormalizer(),
+            new ContentFieldsNormalizer(),
+        );
+
+        $saved = $service->saveFromPage($page, 'seo-round', 'SEO round');
+        self::assertSame('Meta', $saved->getStructure()['templateSeoByLocale']['es']['metaTitle'] ?? null);
+
+        $exported = $service->export('seo-round');
+        self::assertSame('Meta', $exported['structure']['templateSeoByLocale']['es']['metaTitle'] ?? null);
+
+        $importedKeys = $service->import([
+            'formatVersion'       => PageTemplateService::FORMAT_VERSION,
+            'kind'                => PageTemplateService::KIND_SINGLE,
+            'templateKey'         => 'seo-imported',
+            'label'               => '',
+            'structure'           => $exported['structure'],
+            'widgetPropsByLocale' => [],
+        ]);
+        self::assertSame(['seo-imported'], $importedKeys);
+        $imported = $templateRepo->findOneByTemplateKey('seo-imported');
+        self::assertNotNull($imported);
+        self::assertSame('seo-imported', $imported->getLabel());
+        self::assertSame('Meta', $imported->getStructure()['templateSeoByLocale']['es']['metaTitle'] ?? null);
+
+        $created = $service->createPageFromTemplate('seo-imported', 'from-seo', 'From SEO', 'es', [
+            'include_seo' => true,
+        ]);
+        // Apply SEO for a locale that createPage did not seed (en).
+        $emFlush = $this->createMock(EntityManagerInterface::class);
+        $emFlush->expects(self::atLeastOnce())->method('flush');
+        $serviceFlush = new PageTemplateService(
+            $templateRepo,
+            $emFlush,
+            $this->documents(),
+            new DocumentNormalizer(),
+            new ContentFieldsNormalizer(),
+        );
+        $tpl = $templateRepo->findOneByTemplateKey('seo-imported');
+        self::assertNotNull($tpl);
+        $structure                        = $tpl->getStructure();
+        $structure['templateSeoByLocale'] = [
+            'skip' => 'bad',
+            ''     => ['metaTitle' => 'x'],
+            'en'   => [
+                'metaTitle' => 'EN Meta',
+                'robots'    => 'index',
+                'ignored'   => 123,
+            ],
+            'fr' => [
+                'metaTitle' => ['bad'],
+            ],
+        ];
+        $tpl->setStructure($structure);
+
+        $withExtra = $serviceFlush->createPageFromTemplate('seo-imported', 'extra-seo', 'Extra', 'es', [
+            'include_seo' => true,
+        ]);
+        $en = $withExtra->getTranslation('en');
+        self::assertNotNull($en);
+        self::assertSame('EN Meta', $en->getMetaTitle());
+        self::assertSame('index', $en->getRobots());
+        self::assertSame('From SEO', $created->getTranslation('es')?->getTitle() ?? $created->getPageKey());
     }
 
     private function documents(): DocumentService

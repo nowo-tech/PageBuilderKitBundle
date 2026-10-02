@@ -276,4 +276,133 @@ final class DocumentStructureValidatorTest extends TestCase
             ]],
         ], $this->normalizer);
     }
+
+    #[Test]
+    public function rejectsGrapesNonStringCss(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('GrapesJS css must be a string.');
+
+        $this->validator->validate([
+            'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'    => '',
+            'css'     => ['x'],
+            'grapes'  => [],
+        ], $this->normalizer);
+    }
+
+    #[Test]
+    public function rejectsLocaleContentNonObjectEntry(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('localeContent.es must be an object.');
+
+        $this->validator->validate([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '',
+            'css'           => '',
+            'grapes'        => [],
+            'localeContent' => ['es' => 'bad'],
+        ], $this->normalizer);
+    }
+
+    #[Test]
+    public function rejectsClassicWrongVersionAndMalformedNodes(): void
+    {
+        try {
+            $this->validator->validate([
+                'version'  => 99,
+                'sections' => [],
+            ], $this->normalizer);
+            self::fail('Expected classic version rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Unsupported document version.', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'version'  => DocumentNormalizer::SCHEMA_VERSION,
+                'sections' => ['bad'],
+            ], $this->normalizer);
+            self::fail('Expected section object rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Each section must be an object.', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'version'  => DocumentNormalizer::SCHEMA_VERSION,
+                'sections' => [[
+                    'id'      => 'sec',
+                    'columns' => ['bad'],
+                ]],
+            ], $this->normalizer);
+            self::fail('Expected column object rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Each column must be an object.', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'version'  => DocumentNormalizer::SCHEMA_VERSION,
+                'sections' => [[
+                    'id'      => 'sec',
+                    'columns' => [[
+                        'id'      => 'col',
+                        'widgets' => 'bad',
+                    ]],
+                ]],
+            ], $this->normalizer);
+            self::fail('Expected widgets array rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Each column must contain a widgets array.', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'version'  => DocumentNormalizer::SCHEMA_VERSION,
+                'sections' => [[
+                    'id'      => 'sec',
+                    'columns' => [[
+                        'id'      => 'col',
+                        'widgets' => ['bad'],
+                    ]],
+                ]],
+            ], $this->normalizer);
+            self::fail('Expected widget object rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Each widget must be an object.', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'version'  => DocumentNormalizer::SCHEMA_VERSION,
+                'sections' => [[
+                    'id'      => 'sec',
+                    'columns' => [[
+                        'id'      => 'col',
+                        'widgets' => [['id' => 'w1', 'type' => '']],
+                    ]],
+                ]],
+            ], $this->normalizer);
+            self::fail('Expected widget type rejection.');
+        } catch (InvalidArgumentException $e) {
+            self::assertSame('Widget type is required.', $e->getMessage());
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Widget children must be an array.');
+        $this->validator->validate([
+            'version'  => DocumentNormalizer::SCHEMA_VERSION,
+            'sections' => [[
+                'id'      => 'sec',
+                'columns' => [[
+                    'id'      => 'col',
+                    'widgets' => [['id' => 'w1', 'type' => 'heading', 'children' => 'bad']],
+                ]],
+            ]],
+        ], $this->normalizer);
+    }
 }

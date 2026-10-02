@@ -17,15 +17,17 @@
             <p class="text-muted">{{ 'admin.pages.empty'|trans }}</p>
         {% else %}
             {% for page in pages %}
-                <form method="post"
-                      action="{{ path('admin_page_builder_templates_save', {pageKey: page.pageKey}) }}"
-                      class="d-flex flex-wrap gap-2 align-items-end mb-2">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
                     <span class="me-2"><code>{{ page.pageKey }}</code></span>
-                    <input name="templateKey" class="form-control form-control-sm" style="max-width:10rem" pattern="[a-z0-9_-]+" placeholder="{{ 'admin.templates.key'|trans }}" required>
-                    <input name="label" class="form-control form-control-sm" style="max-width:12rem" placeholder="{{ 'admin.templates.label'|trans }}" required>
-                    <button type="submit" class="btn btn-success btn-sm">{{ 'admin.templates.save'|trans }}</button>
-                </form>
+                    {{ form_start(save_forms[page.pageKey], { attr: { class: 'd-flex flex-wrap gap-2 align-items-end' } }) }}
+                        {% for child in save_forms[page.pageKey] %}
+                            {% if not child.rendered %}
+                                {{ form_row(child) }}
+                            {% endif %}
+                        {% endfor %}
+                        <button type="submit" class="btn btn-success btn-sm">{{ 'admin.templates.save'|trans }}</button>
+                    {{ form_end(save_forms[page.pageKey]) }}
+                </div>
             {% endfor %}
         {% endif %}
     </section>
@@ -33,11 +35,14 @@
     <section class="mb-4">
         <h2 class="h5">{{ 'admin.templates.import'|trans }}</h2>
         <p class="text-muted small">{{ 'admin.templates.import_hint'|trans }}</p>
-        <form method="post" action="{{ path('admin_page_builder_templates_import') }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <textarea name="payload" class="form-control font-monospace small mb-2" rows="6" required placeholder="{{ 'admin.templates.payload'|trans }}"></textarea>
+        {{ form_start(import_form) }}
+            {% for child in import_form %}
+                {% if not child.rendered %}
+                    {{ form_row(child) }}
+                {% endif %}
+            {% endfor %}
             <button type="submit" class="btn btn-primary btn-sm">{{ 'admin.templates.import_submit'|trans }}</button>
-        </form>
+        {{ form_end(import_form) }}
     </section>
 
     {% if templates is empty %}
@@ -59,31 +64,27 @@
                             <td>{{ template.label }}</td>
                             <td class="text-end">
                                 <a class="btn btn-outline-secondary btn-sm mb-1" href="{{ path('admin_page_builder_templates_export', {templateKey: template.templateKey}) }}">{{ 'admin.templates.export'|trans }}</a>
-                                <form method="post" action="{{ path('admin_page_builder_templates_apply', {templateKey: template.templateKey}) }}" class="d-inline-flex flex-wrap gap-1 align-items-center mb-1">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                                    <input class="form-control form-control-sm" name="pageKey" placeholder="{{ 'form.page_key'|trans }}" required pattern="[a-z0-9_-]+">
-                                    <input class="form-control form-control-sm" name="title" placeholder="{{ 'form.page_title'|trans }}">
-                                    <div class="form-check form-check-inline m-0">
-                                        <input type="hidden" name="include_field_schema" value="0">
-                                        <input class="form-check-input" type="checkbox" name="include_field_schema" value="1" id="tpl-schema-{{ template.templateKey }}" checked>
-                                        <label class="form-check-label small" for="tpl-schema-{{ template.templateKey }}">{{ 'admin.templates.include_field_schema'|trans }}</label>
-                                    </div>
-                                    <div class="form-check form-check-inline m-0">
-                                        <input type="hidden" name="include_field_values" value="0">
-                                        <input class="form-check-input" type="checkbox" name="include_field_values" value="1" id="tpl-values-{{ template.templateKey }}">
-                                        <label class="form-check-label small" for="tpl-values-{{ template.templateKey }}">{{ 'admin.templates.include_field_values'|trans }}</label>
-                                    </div>
-                                    <div class="form-check form-check-inline m-0">
-                                        <input type="hidden" name="include_seo" value="0">
-                                        <input class="form-check-input" type="checkbox" name="include_seo" value="1" id="tpl-seo-{{ template.templateKey }}">
-                                        <label class="form-check-label small" for="tpl-seo-{{ template.templateKey }}">{{ 'admin.templates.include_seo'|trans }}</label>
-                                    </div>
+                                {{ form_start(apply_forms[template.templateKey], { attr: { class: 'd-inline-flex flex-wrap gap-1 align-items-center mb-1' } }) }}
+                                    {% for child in apply_forms[template.templateKey] %}
+                                        {% if not child.rendered %}
+                                            {{ form_row(child) }}
+                                        {% endif %}
+                                    {% endfor %}
                                     <button class="btn btn-primary btn-sm" type="submit">{{ 'admin.templates.apply'|trans }}</button>
-                                </form>
-                                <form method="post" action="{{ path('admin_page_builder_templates_delete', {templateKey: template.templateKey}) }}" class="d-inline" onsubmit="return confirm({{ ('admin.templates.delete_confirm')|trans|json_encode|raw }});">
-                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                {{ form_end(apply_forms[template.templateKey]) }}
+                                {{ form_start(delete_forms[template.templateKey], {
+                                    attr: {
+                                        class: 'd-inline',
+                                        onsubmit: 'return confirm(' ~ ('admin.templates.delete_confirm'|trans|json_encode|raw) ~ ');'
+                                    }
+                                }) }}
+                                    {% for child in delete_forms[template.templateKey] %}
+                                        {% if not child.rendered %}
+                                            {{ form_row(child) }}
+                                        {% endif %}
+                                    {% endfor %}
                                     <button class="btn btn-outline-danger btn-sm" type="submit">{{ 'admin.templates.delete'|trans }}</button>
-                                </form>
+                                {{ form_end(delete_forms[template.templateKey]) }}
                             </td>
                         </tr>
                     {% endfor %}

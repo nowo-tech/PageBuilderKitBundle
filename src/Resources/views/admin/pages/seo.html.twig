@@ -35,8 +35,11 @@
             <div class="card-header fw-semibold">{{ 'admin.seo.section_page'|trans }}</div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-6">{{ form_row(form.title) }}</div>
-                    <div class="col-md-6">{{ form_row(form.slug) }}</div>
+                    {% for child in form %}
+                        {% if not child.rendered and child.vars.name in ['title', 'slug'] %}
+                            <div class="col-md-6">{{ form_row(child) }}</div>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -45,10 +48,13 @@
             <div class="card-header fw-semibold">{{ 'admin.seo.section_meta'|trans }}</div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-8">{{ form_row(form.metaTitle) }}</div>
-                    <div class="col-md-4">{{ form_row(form.robots) }}</div>
-                    <div class="col-12">{{ form_row(form.metaDescription) }}</div>
-                    <div class="col-12">{{ form_row(form.canonicalUrl) }}</div>
+                    {% for child in form %}
+                        {% if not child.rendered and child.vars.name in ['metaTitle', 'robots', 'metaDescription', 'canonicalUrl'] %}
+                            <div class="col-md-{% if child.vars.name == 'robots' %}4{% elseif child.vars.name == 'metaTitle' %}8{% else %}12{% endif %}">
+                                {{ form_row(child) }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -57,12 +63,22 @@
             <div class="card-header fw-semibold">{{ 'admin.seo.section_social'|trans }}</div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-6">{{ form_row(form.ogTitle) }}</div>
-                    <div class="col-md-6">{{ form_row(form.ogImage) }}</div>
-                    <div class="col-12">{{ form_row(form.ogDescription) }}</div>
+                    {% for child in form %}
+                        {% if not child.rendered and child.vars.name in ['ogTitle', 'ogImage', 'ogDescription'] %}
+                            <div class="col-md-{% if child.vars.name == 'ogDescription' %}12{% else %}6{% endif %}">
+                                {{ form_row(child) }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
         </div>
+
+        {% for child in form %}
+            {% if not child.rendered %}
+                {{ form_row(child) }}
+            {% endif %}
+        {% endfor %}
 
         <div class="d-flex justify-content-end gap-2">
             <button type="submit" class="btn btn-success">{{ 'admin.seo.save'|trans }}</button>

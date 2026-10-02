@@ -1,6 +1,6 @@
 # Page Builder Kit Bundle
 
-[![CI](https://github.com/nowo-tech/PageBuilderKitBundle/actions/workflows/ci.yml/badge.svg)](https://github.com/nowo-tech/PageBuilderKitBundle/actions/workflows/ci.yml) [![Packagist Version](https://img.shields.io/packagist/v/nowo-tech/page-builder-kit-bundle.svg?style=flat)](https://packagist.org/packages/nowo-tech/page-builder-kit-bundle) [![Packagist Downloads](https://img.shields.io/packagist/dt/nowo-tech/page-builder-kit-bundle.svg)](https://packagist.org/packages/nowo-tech/page-builder-kit-bundle) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![PHP](https://img.shields.io/badge/PHP-8.4%2B-777BB4?logo=php)](https://php.net) [![Symfony](https://img.shields.io/badge/Symfony-7.4%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com) [![GitHub stars](https://img.shields.io/github/stars/nowo-tech/PageBuilderKitBundle.svg?style=social&label=Star)](https://github.com/nowo-tech/PageBuilderKitBundle) [![Coverage](https://img.shields.io/badge/Coverage-%E2%89%A590%25-brightgreen)](#tests-and-coverage)
+[![CI](https://github.com/nowo-tech/PageBuilderKitBundle/actions/workflows/ci.yml/badge.svg)](https://github.com/nowo-tech/PageBuilderKitBundle/actions/workflows/ci.yml) [![Packagist Version](https://img.shields.io/packagist/v/nowo-tech/page-builder-kit-bundle.svg?style=flat)](https://packagist.org/packages/nowo-tech/page-builder-kit-bundle) [![Packagist Downloads](https://img.shields.io/packagist/dt/nowo-tech/page-builder-kit-bundle.svg)](https://packagist.org/packages/nowo-tech/page-builder-kit-bundle) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![PHP](https://img.shields.io/badge/PHP-8.4%2B-777BB4?logo=php)](https://php.net) [![Symfony](https://img.shields.io/badge/Symfony-7.4%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com) [![GitHub stars](https://img.shields.io/github/stars/nowo-tech/PageBuilderKitBundle.svg?style=social&label=Star)](https://github.com/nowo-tech/PageBuilderKitBundle) [![Coverage](https://img.shields.io/badge/Coverage-%E2%89%A599%25-brightgreen)](#tests-and-coverage)
 
 > ⭐ **Found this useful?** Give it a star on GitHub! It helps us maintain and improve the project.
 
@@ -100,8 +100,9 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
 | **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
 | **Phase 5–7** | **Shipped (v1.4.0)** | Content fields + ACL capabilities, hardening/slots, media library + tags |
+| **Phase 9** | **Done (v1.4.3)** | Org compliance: ≥99% PHP elements, Symfony Form Twig (TWIG-003/005), README coverage |
 
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`008` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**).
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`009` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**; polish + compliance in **v1.4.1–v1.4.3**).
 
 ## Development
 
@@ -155,13 +156,16 @@ Demo default URL: `http://localhost:8137`.
 
 | Area | Status | Command |
 | --- | --- | --- |
-| PHP `src/` coverage target | ≥90% (CI gate) | `make test-coverage` |
-| Unit and bundle QA | Enabled | `make test` |
+| PHP `src/` coverage | **99.73%** elements (CI gate **≥99%**) | `make test-coverage` |
+| TS/JS | **N/A** (canvas/typecheck only; no Vitest coverage suite yet) | `pnpm typecheck` |
+| Python | **N/A** | — |
+| Unit / bundle QA | Enabled | `make test` |
 | Full release checks | Enabled | `make release-check` |
 
 ```bash
 make test
 make test-coverage
+pnpm typecheck
 make release-check
 ```
 

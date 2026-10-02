@@ -18,21 +18,14 @@
                     Credentials: <code>admin</code> / <code>admin</code>
                 </div>
 
-                <form method="post" action="{{ path('app_login') }}">
-                    <div class="mb-3">
-                        <label class="form-label" for="username">Username</label>
-                        <input id="username" name="_username" type="text" class="form-control" value="{{ last_username }}" autocomplete="username" required autofocus>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label" for="password">Password</label>
-                        <input id="password" name="_password" type="password" class="form-control" autocomplete="current-password" required>
-                    </div>
-
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
-
+                {{ form_start(login_form, { action: path('app_login'), attr: { class: 'pbk-demo-login' } }) }}
+                    {% for child in login_form %}
+                        {% if not child.rendered %}
+                            <div class="mb-3">{{ form_row(child) }}</div>
+                        {% endif %}
+                    {% endfor %}
                     <button class="btn btn-primary w-100" type="submit">Sign in</button>
-                </form>
+                {{ form_end(login_form) }}
             </div>
         </div>
     </div>

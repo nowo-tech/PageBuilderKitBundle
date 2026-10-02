@@ -50,11 +50,14 @@
                         </a>
                         {% endif %}
                         {% if nowo_page_builder_can('layout') %}
-                        <form method="post" action="{{ path('admin_page_builder_document_duplicate', {pageKey: page.pageKey}) }}" class="d-inline">
-                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('page_builder_document') }}">
-                            <input type="hidden" name="pageKey" value="{{ page.pageKey }}-copy">
+                        {{ form_start(duplicate_forms[page.pageKey], { attr: { class: 'd-inline' } }) }}
+                            {% for child in duplicate_forms[page.pageKey] %}
+                                {% if not child.rendered %}
+                                    {{ form_widget(child) }}
+                                {% endif %}
+                            {% endfor %}
                             <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'admin.pages.duplicate'|trans }}</button>
-                        </form>
+                        {{ form_end(duplicate_forms[page.pageKey]) }}
                         {% endif %}
                         {% if nowo_page_builder_revisions_enabled() and nowo_page_builder_can('layout') %}
                             <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_revisions', {pageKey: page.pageKey}) }}">
@@ -89,8 +92,11 @@
         <div class="card-header fw-semibold">{{ 'admin.pages.create'|trans }}</div>
         <div class="card-body">
             {{ form_start(create_form, { attr: { class: 'pbk-create-form row g-3' } }) }}
-                <div class="col-md-4">{{ form_row(create_form.pageKey) }}</div>
-                <div class="col-md-5">{{ form_row(create_form.title) }}</div>
+                {% for child in create_form %}
+                    {% if not child.rendered %}
+                        <div class="col-md-4">{{ form_row(child) }}</div>
+                    {% endif %}
+                {% endfor %}
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-success w-100">{{ 'admin.pages.create_submit'|trans }}</button>
                 </div>

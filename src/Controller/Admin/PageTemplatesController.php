@@ -8,10 +8,15 @@ use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Form\CsrfPostType;
+use Nowo\PageBuilderKitBundle\Form\TemplateApplyType;
+use Nowo\PageBuilderKitBundle\Form\TemplateImportType;
+use Nowo\PageBuilderKitBundle\Form\TemplateSaveType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,10 +47,44 @@ final class PageTemplatesController extends AbstractController
     #[Route('/templates', name: 'admin_page_builder_templates', methods: ['GET'])]
     public function index(): Response
     {
+        $pages = $this->pageRepository->findAllOrdered();
+        /** @var array<string, FormView> $saveForms */
+        $saveForms = [];
+        foreach ($pages as $page) {
+            $key             = $page->getPageKey();
+            $saveForms[$key] = $this->createForm(TemplateSaveType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_templates_save', ['pageKey' => $key]),
+                'method' => 'POST',
+            ])->createView();
+        }
+
+        $templates = $this->templateService->list();
+        /** @var array<string, FormView> $applyForms */
+        $applyForms = [];
+        /** @var array<string, FormView> $deleteForms */
+        $deleteForms = [];
+        foreach ($templates as $template) {
+            $key              = $template->getTemplateKey();
+            $applyForms[$key] = $this->createForm(TemplateApplyType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_templates_apply', ['templateKey' => $key]),
+                'method' => 'POST',
+            ])->createView();
+            $deleteForms[$key] = $this->createForm(CsrfPostType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_templates_delete', ['templateKey' => $key]),
+                'method' => 'POST',
+            ])->createView();
+        }
+
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/templates.html.twig', [
-            'templates'  => $this->templateService->list(),
-            'csrf_token' => $this->csrfTokenManager->getToken(self::CSRF_TOKEN_ID)->getValue(),
-            'pages'      => $this->pageRepository->findAllOrdered(),
+            'templates'   => $templates,
+            'pages'       => $pages,
+            'save_forms'  => $saveForms,
+            'import_form' => $this->createForm(TemplateImportType::class, null, [
+                'action' => $this->generateUrl('admin_page_builder_templates_import'),
+                'method' => 'POST',
+            ])->createView(),
+            'apply_forms'  => $applyForms,
+            'delete_forms' => $deleteForms,
         ]);
     }
 
@@ -109,7 +148,9 @@ final class PageTemplatesController extends AbstractController
 
         $includeFieldSchema = array_key_exists('include_field_schema', $payload)
             ? (bool) $payload['include_field_schema']
-            : $request->request->getBoolean('include_field_schema', true);
+            : ($request->request->has('include_field_schema')
+                ? $request->request->getBoolean('include_field_schema')
+                : (!$request->request->has('pageKey')));
         $includeFieldValues = array_key_exists('include_field_values', $payload)
             ? (bool) $payload['include_field_values']
             : $request->request->getBoolean('include_field_values', false);

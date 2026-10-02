@@ -4,18 +4,22 @@
 **Namespace:** `Nowo\PageBuilderKitBundle`  
 **Bundle class:** `Nowo\PageBuilderKitBundle\NowoPageBuilderKitBundle`  
 **Config alias:** `nowo_page_builder_kit`  
-**Status:** Phase 1 shipped (v1.0.0). Phases 2–4 are shipped (2–3 full; 4 baseline) and documented in sibling Spec Kit dirs (not out of scope).
+**Status:** Phase 1 shipped (v1.0.0). Phases 2–7 and product polish (Phase 9 / v1.4.x) are documented in sibling Spec Kit dirs.
 
 ## Overview
 
 Page Builder Kit Bundle is a reusable Symfony visual page builder backed by Doctrine. Phase 1 delivers a section/column/widget document model, admin canvas with drag-and-drop, CSRF-protected JSON document API, locale-specific widget props, publish workflow, and Twig-based public rendering for six core widget types.
 
-Later phases (shipped):
+Later phases (shipped / in progress):
 
 - Phase 2 — GrapesJS canvas / schema v2: [`specs/002-phase2-grapesjs/spec.md`](../002-phase2-grapesjs/spec.md)
 - Phase 3 — Revisions and templates: [`specs/003-phase3-revisions-templates/spec.md`](../003-phase3-revisions-templates/spec.md)
 - Phase 4 — External classic widget packs (baseline): [`specs/004-phase4-external-widgets/spec.md`](../004-phase4-external-widgets/spec.md)
 - Phase 5 — Content fields + capabilities (MVP): [`specs/005-content-fields-i18n/spec.md`](../005-content-fields-i18n/spec.md)
+- Phase 6 — Content hardening: [`specs/006-phase6-content-hardening/spec.md`](../006-phase6-content-hardening/spec.md)
+- Phase 6b — Content wave 2: [`specs/007-phase6b-content-wave2/spec.md`](../007-phase6b-content-wave2/spec.md)
+- Phase 7 — Media library, dynamic tags, nesting: [`specs/008-phase7-media-tags-nesting/spec.md`](../008-phase7-media-tags-nesting/spec.md)
+- Phase 9 — Product polish + standards compliance: [`specs/009-product-polish-compliance/spec.md`](../009-product-polish-compliance/spec.md)
 
 Roadmap and optional follow-ups: [SPEC-DRIVEN-DEVELOPMENT.md](../../docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap).
 

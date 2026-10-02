@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Demo\DemoPageSeeder;
 use App\Demo\DemoUseCases;
+use App\Form\DemoLoginType;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use RuntimeException;
@@ -217,9 +218,17 @@ final class DemoController extends AbstractController
             return $this->redirectToRoute('home');
         }
 
+        $form = $this->createForm(\App\Form\DemoLoginType::class, [
+            '_username' => $authenticationUtils->getLastUsername(),
+        ], [
+            'action' => $this->generateUrl('app_login'),
+            'method' => 'POST',
+        ]);
+
         return $this->render('security/login.html.twig', [
             'last_username' => $authenticationUtils->getLastUsername(),
             'error'         => $authenticationUtils->getLastAuthenticationError(),
+            'login_form'    => $form->createView(),
         ]);
     }
 

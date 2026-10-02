@@ -6,6 +6,8 @@ namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Form\CsrfPostType;
+use Nowo\PageBuilderKitBundle\Form\SectionsEditType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
@@ -65,17 +67,15 @@ final class PageSectionsController extends AbstractController
         $propsByLocale = $this->collectPropsByLocale($page, $locales);
         $sectionsTree  = $this->buildSectionsTree($structure, $propsByLocale[$locale] ?? []);
 
-        if ($request->isMethod('POST')) {
-            if (!$this->isCsrfTokenValid('page_builder_sections', (string) $request->request->get('_token'))) {
-                $this->addFlash('error', 'admin.sections.invalid_csrf');
+        $form = $this->createForm(SectionsEditType::class, null, [
+            'sections_tree' => $sectionsTree,
+        ]);
+        $form->handleRequest($request);
 
-                return $this->redirectToRoute('admin_page_builder_sections', [
-                    'pageKey' => $pageKey,
-                    'locale'  => $locale,
-                ]);
-            }
-
-            $submitted              = $request->request->all('widgets');
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var array{widgets?: array<string, array<string, mixed>>} $data */
+            $data                   = $form->getData() ?? [];
+            $submitted              = is_array($data['widgets'] ?? null) ? $data['widgets'] : [];
             $propsByLocale[$locale] = $this->normalizeSubmittedProps($submitted);
 
             try {
@@ -91,6 +91,11 @@ final class PageSectionsController extends AbstractController
             ]);
         }
 
+        $redirect = $this->generateUrl('admin_page_builder_sections', [
+            'pageKey' => $pageKey,
+            'locale'  => $locale,
+        ]);
+
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/sections.html.twig', [
             'page'          => $page,
             'page_key'      => $pageKey,
@@ -98,6 +103,15 @@ final class PageSectionsController extends AbstractController
             'locale'        => $locale,
             'sections_tree' => $sectionsTree,
             'is_classic'    => true,
+            'form'          => $form->createView(),
+            'publish_form'  => $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
+                'action' => $this->generateUrl('admin_page_builder_document_publish', ['pageKey' => $pageKey]),
+                'method' => 'POST',
+            ])->createView(),
+            'unpublish_form' => $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
+                'action' => $this->generateUrl('admin_page_builder_document_unpublish', ['pageKey' => $pageKey]),
+                'method' => 'POST',
+            ])->createView(),
         ]);
     }
 

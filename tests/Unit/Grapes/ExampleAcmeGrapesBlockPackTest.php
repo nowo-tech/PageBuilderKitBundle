@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Grapes;
 
 use Acme\GrapesBlockPack\AcmeMarketingBlockPack;
-use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +20,6 @@ final class ExampleAcmeGrapesBlockPackTest extends TestCase
     {
         require_once dirname(__DIR__, 3) . '/examples/acme-grapes-block-pack/src/AcmeMarketingBlockPack.php';
 
-        /** @var GrapesBlockPackInterface $pack */
         $pack = new AcmeMarketingBlockPack();
 
         self::assertSame('acme/marketing-blocks', $pack->getName());

@@ -1585,7 +1585,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "38afac49ba891cc8c5a486815e9fe1b2089280a8"
+                "reference": "9ae11293a09c2a2b184cbfbcb0f772fb5aa32ee2"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",

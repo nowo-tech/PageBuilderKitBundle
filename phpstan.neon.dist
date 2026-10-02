@@ -9,6 +9,8 @@ parameters:
         - demo/*
     treatPhpDocTypesAsCertain: false
     ignoreErrors: []
+    scanFiles:
+        - examples/acme-grapes-block-pack/src/AcmeMarketingBlockPack.php
 
 services:
     -

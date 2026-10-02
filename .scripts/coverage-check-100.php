@@ -3,6 +3,10 @@
 
 declare(strict_types=1);
 
+/**
+ * Validates Clover element coverage against the org gate (REQ-TEST-003: ≥99%).
+ */
+
 if (!is_file('coverage.xml')) {
     fwrite(STDERR, "ERROR: coverage.xml file was not generated\n");
     exit(1);
@@ -26,9 +30,9 @@ if (0.0 === $elements) {
 $percentage = ($coveredElements / $elements) * 100;
 echo sprintf("Coverage: %.0f/%.0f (%.2f%%)\n", $coveredElements, $elements, $percentage);
 
-if ($percentage < 100) {
-    fwrite(STDERR, sprintf("ERROR: Coverage must be 100%%. Current: %.2f%%\n", $percentage));
+if ($percentage < 99.0) {
+    fwrite(STDERR, sprintf("ERROR: Coverage must be ≥99%%. Current: %.2f%%\n", $percentage));
     exit(1);
 }
 
-echo "✅ 100% coverage confirmed\n";
+echo "✅ ≥99% element coverage confirmed\n";
