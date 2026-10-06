@@ -17,6 +17,8 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+Optional: after rendering Grapes HTML, run `PublicHtmlNormalizer::normalize()` (or inject the service) so Nu Html Checker does not fail on DOMDocument `</source>` wrappers or skeleton images without `src`. Pass `webpPictureUpgrades` only for host-owned PNG→WebP pairs.
+
 ## 1.4.3
 
 From **1.4.2**:

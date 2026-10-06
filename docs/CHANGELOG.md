@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` — strips invalid `</source>` around `<picture>` images, adds a 1×1 GIF `src` on skeleton lazy images, and optional host WebP `<picture>` upgrades (clinic asset paths stay in the host).
+
 ## [1.4.3] - 2026-10-02
 
 ### Added

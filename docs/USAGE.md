@@ -146,6 +146,8 @@ return $this->render('site/page.html.twig', ['page_tree' => $tree]);
 
 Published pages are available at `/p/{pageKey}` when routes are imported. Locale comes from `$request->getLocale()` (Symfony), not from the path segment.
 
+**Public HTML cleanup:** `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` fixes Grapes sanitizer artifacts (`</source>` wrapping `<img>` inside `<picture>`, skeleton images missing `src`). Hosts can inject optional `webpPictureUpgrades` (`png` / `webp` / `classContains`) for PNG→WebP `<picture>` swaps without putting clinic paths in the kit.
+
 ## Associating pages with public routes (i18n)
 
 The bundle stores **one page entity per logical page**, not one page per language.
