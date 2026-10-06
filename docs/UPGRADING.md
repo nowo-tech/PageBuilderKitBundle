@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.4.4](#144)
 - [1.4.3](#143)
 - [1.4.2](#142)
 - [1.4.1](#141)
@@ -17,7 +18,15 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
-Optional: after rendering Grapes HTML, run `PublicHtmlNormalizer::normalize()` (or inject the service) so Nu Html Checker does not fail on DOMDocument `</source>` wrappers or skeleton images without `src`. Pass `webpPictureUpgrades` only for host-owned PNG→WebP pairs.
+## 1.4.4
+
+From **1.4.3**:
+
+1. Optional — after rendering Grapes HTML, inject `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` and call `normalize()` so Nu Html Checker does not fail on DOMDocument `</source>` wrappers or skeleton images without `src`.
+2. Optional — bind constructor `$webpPictureUpgrades` (`png` / `webp` / `classContains`) only for host-owned PNG→WebP pairs. Do not put clinic-specific paths in the kit.
+3. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#144---2026-10-06) and [USAGE.md](USAGE.md#public-html-cleanup).
 
 ## 1.4.3
 

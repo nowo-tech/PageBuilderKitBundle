@@ -109,7 +109,7 @@ Spec Kit: [`specs/008-phase7-media-tags-nesting/spec.md`](../specs/008-phase7-me
 
 ### Phase 9 — Product polish + standards compliance (shipped)
 
-**Shipped (v1.4.1 / v1.4.2 / v1.4.3):** legacy UX badges/banners, COOKBOOK + `examples/acme-grapes-block-pack/`, engine extract (`DocumentStructureValidator`, `ClassicPageTreeBuilder`), typed Grapes canvas (no `@ts-nocheck`), PHP Clover **elements ≥99%**, Symfony Form Twig (`form_start` + children loop; no raw `<form>`/`<input>`), README Tests numeric percentages.
+**Shipped (v1.4.1 / v1.4.2 / v1.4.3 / v1.4.4):** legacy UX badges/banners, COOKBOOK + `examples/acme-grapes-block-pack/`, engine extract (`DocumentStructureValidator`, `ClassicPageTreeBuilder`), typed Grapes canvas (no `@ts-nocheck`), PHP Clover **elements ≥99%**, Symfony Form Twig (`form_start` + children loop; no raw `<form>`/`<input>`), README Tests numeric percentages, optional `PublicHtmlNormalizer` for public Grapes HTML.
 
 Spec Kit: [`specs/009-product-polish-compliance/spec.md`](../specs/009-product-polish-compliance/spec.md).
 

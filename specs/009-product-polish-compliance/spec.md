@@ -1,10 +1,10 @@
-# Phase 9 — Product polish, DX, and standards compliance (v1.4.1–v1.4.3)
+# Phase 9 — Product polish, DX, and standards compliance (v1.4.1–v1.4.4)
 
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Status:** **Shipped** (product polish **v1.4.1** / **v1.4.2**; org-standards compliance **v1.4.3**)  
+**Status:** **Shipped** (product polish **v1.4.1** / **v1.4.2**; org-standards compliance **v1.4.3**; public HTML normalizer **v1.4.4**)  
 **Depends on:** [Phase 7](../008-phase7-media-tags-nesting/spec.md)  
 **Inventory:** [`../001-baseline/code-inventory.md`](../001-baseline/code-inventory.md)  
-**Changelog:** [CHANGELOG.md](../../docs/CHANGELOG.md#143---2026-10-02) · [UPGRADING.md](../../docs/UPGRADING.md#143)
+**Changelog:** [CHANGELOG.md](../../docs/CHANGELOG.md#144---2026-10-06) · [UPGRADING.md](../../docs/UPGRADING.md#144)
 
 ## Overview
 
@@ -17,6 +17,7 @@ Shipped:
 3. Engine extraction (`DocumentStructureValidator`, `ClassicPageTreeBuilder`).
 4. Typed Grapes canvas TypeScript (no `@ts-nocheck`) + `grapes-types.ts`.
 5. PHP Clover **element** coverage ≥99% (`REQ-TEST-003`) + Twig forms (`REQ-TWIG-003` / `REQ-TWIG-005`) + README Tests (`REQ-TEST-007`).
+6. Optional public Grapes HTML cleanup (`PublicHtmlNormalizer`) for Nu Html Checker artifacts.
 
 ## User scenarios (`US-P9-*`)
 
@@ -35,6 +36,10 @@ As a maintainer, I typecheck canvas TS with `pnpm typecheck` without `@ts-nochec
 ### US-P9-04 — Meet org coverage and Twig form standards (Priority: P0) — shipped
 
 As a maintainer, CI stays green (≥99% PHP coverage) and admin mutations use Symfony forms (`form_start` / children loop), not raw HTML forms.
+
+### US-P9-05 — Publish Grapes HTML that validators accept (Priority: P2) — shipped
+
+As an integrator, I can run `PublicHtmlNormalizer::normalize()` on public Grapes HTML to drop invalid `</source>` wrappers, fill skeleton `img` `src`, and optionally upgrade host PNG→WebP `<picture>` pairs.
 
 ## Functional requirements (`FR-P9-*`)
 
@@ -65,6 +70,15 @@ As a maintainer, CI stays green (≥99% PHP coverage) and admin mutations use Sy
 | FR-P9-STD-004 | No raw `<form` / `<input` in bundle/demo Twig submitting data; use `form_start` / `form_row` / `form_end` | REQ-TWIG-005 | Done |
 | FR-P9-STD-005 | README `## Tests and coverage` lists numeric PHP % and TS/JS (or N/A) | REQ-TEST-007 | Done |
 
+### Public HTML cleanup (`FR-P9-HTML-*`) — shipped in v1.4.4
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| FR-P9-HTML-001 | `Html/PublicHtmlNormalizer` strips invalid `</source>` wrapping `<img>` inside `<picture>` | Done |
+| FR-P9-HTML-002 | Skeleton lazy images (default class `site-skeleton__img`) without `src` receive a 1×1 GIF placeholder `src` | Done |
+| FR-P9-HTML-003 | Optional host-owned PNG→WebP `<picture>` upgrades via constructor `$webpPictureUpgrades` (no clinic paths in the kit) | Done |
+| FR-P9-HTML-004 | Service is autowired; hosts call `normalize()` after public Grapes render (not applied automatically on `/p/{pageKey}`) | Done |
+
 ## Non-goals
 
 - Rewriting GrapesJS itself or vendoring official Grapes types
@@ -81,9 +95,10 @@ As a maintainer, CI stays green (≥99% PHP coverage) and admin mutations use Sy
 | SC-P9-04 | CI coverage job passes ≥99% on `main` | Met (local ≥99.73%; CI on release) |
 | SC-P9-05 | Admin mutation Twig complies with TWIG-003/005 | Met |
 | SC-P9-06 | README Tests section satisfies TEST-007 | Met |
+| SC-P9-07 | Unit tests cover `</source>` strip, skeleton `src`, and WebP picture upgrade | Met |
 
 ## Implementation notes
 
-- Releases: **v1.4.1** (UX/cookbook/engine extract/grapes-types), **v1.4.2** (typed canvas, example pack), **v1.4.3** (forms Twig + ≥99% elements).
+- Releases: **v1.4.1** (UX/cookbook/engine extract/grapes-types), **v1.4.2** (typed canvas, example pack), **v1.4.3** (forms Twig + ≥99% elements), **v1.4.4** (`PublicHtmlNormalizer`).
 - Example pack lives under `examples/` (repo root; kept in Packagist dist unless archive.exclude says otherwise).
 - Compliance audit artifact: Cursor canvas `pagebuilder-kit-specs-compliance.canvas.tsx` (IDE-only; not shipped in package).

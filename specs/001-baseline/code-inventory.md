@@ -2,11 +2,11 @@
 
 **Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md) · [Phase 7](../008-phase7-media-tags-nesting/spec.md) · [Phase 9](../009-product-polish-compliance/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-10-02 (post **v1.4.3**)
+**Last audited:** 2026-10-06 (post **v1.4.4**)
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **152** files  
+**Total production sources:** **153** files  
 (`find src -type f \( -name '*.php' -o -name '*.twig' -o -name '*.yaml' -o -name '*.js' -o -name '*.ts' -o -name '*.css' \)`)
 
 ## Bundle entry
@@ -156,6 +156,12 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Service/GrapesTwigRenderer.php` | Sandboxed Twig in Grapes HTML | FR-P2-REN-002 |
 | `Service/GrapesTwigContextProviderInterface.php` | Host Twig context hook | FR-P2-REN-002 |
 
+## HTML
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Html/PublicHtmlNormalizer.php` | Optional public Grapes HTML cleanup (invalid `</source>`, skeleton `src`, host WebP pictures) | FR-P9-HTML-001, FR-P9-HTML-002, FR-P9-HTML-003, FR-P9-HTML-004 |
+
 ## Security
 
 | Source file | Purpose | Requirement IDs |
@@ -267,8 +273,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Category | File count |
 | --- | ---: |
-| PHP (excluding Resources subtree) | 100 |
+| PHP (excluding Resources subtree) | 112 |
 | Twig views | 25 |
 | YAML (config + translations) | 9 |
 | TS/JS/CSS assets | 7 |
-| **Total** | **141** |
+| **Total** | **153** |

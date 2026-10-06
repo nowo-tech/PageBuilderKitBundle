@@ -21,6 +21,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [DocumentService](#documentservice)
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
+- [Public HTML cleanup](#public-html-cleanup)
 - [Associating pages with public routes i18n](#associating-pages-with-public-routes-i18n)
 - [Widget types](#widget-types)
 - [Elementor-like Style and Advanced](#elementor-like-style-and-advanced)
@@ -146,7 +147,30 @@ return $this->render('site/page.html.twig', ['page_tree' => $tree]);
 
 Published pages are available at `/p/{pageKey}` when routes are imported. Locale comes from `$request->getLocale()` (Symfony), not from the path segment.
 
-**Public HTML cleanup:** `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` fixes Grapes sanitizer artifacts (`</source>` wrapping `<img>` inside `<picture>`, skeleton images missing `src`). Hosts can inject optional `webpPictureUpgrades` (`png` / `webp` / `classContains`) for PNG→WebP `<picture>` swaps without putting clinic paths in the kit.
+## Public HTML cleanup
+
+`Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` is autowired. Call it on Grapes HTML after `PageRenderProvider` (or your host renderer) so public markup passes the Nu Html Checker:
+
+- strip invalid `</source>` wrapping `<img>` inside `<picture>` (DOMDocument artifact)
+- add a 1×1 GIF `src` on skeleton lazy images that only have a class (default `site-skeleton__img`)
+- optional host PNG→WebP `<picture>` upgrades (`webpPictureUpgrades`: `png` / `webp` / `classContains`) — keep clinic/host asset paths in the host app
+
+```php
+use Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer;
+
+$tree = $pageRenderProvider->getRenderedTree('landing', $request->getLocale());
+$tree['html'] = $publicHtmlNormalizer->normalize((string) ($tree['html'] ?? ''));
+```
+
+Override constructor args in the host:
+
+```yaml
+Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer:
+    arguments:
+        $skeletonImgClass: 'site-skeleton__img'
+        $webpPictureUpgrades:
+            - { png: '/build/images/hero.png', webp: '/build/images/hero.webp', classContains: 'hero' }
+```
 
 ## Associating pages with public routes (i18n)
 

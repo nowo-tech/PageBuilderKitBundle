@@ -20,7 +20,7 @@ use const ENT_SUBSTITUTE;
  * Each upgrade row is `{png, webp, classContains?}`: replace a PNG img with a picture when the PNG path
  * is present and the WebP path is not. Optional classContains limits the match to that class token.
  */
-final class PublicHtmlNormalizer
+final readonly class PublicHtmlNormalizer
 {
     private const string PLACEHOLDER_SRC = 'src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"';
 
@@ -28,8 +28,8 @@ final class PublicHtmlNormalizer
      * @param list<array{png: string, webp: string, classContains?: string}> $webpPictureUpgrades
      */
     public function __construct(
-        private readonly string $skeletonImgClass = 'site-skeleton__img',
-        private readonly array $webpPictureUpgrades = [],
+        private string $skeletonImgClass = 'site-skeleton__img',
+        private array $webpPictureUpgrades = [],
     ) {
     }
 

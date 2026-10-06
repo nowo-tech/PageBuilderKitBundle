@@ -15,7 +15,7 @@ This bundle uses [GitHub Spec Kit](https://github.com/github/spec-kit) with **Cu
 | `specs/006-phase6-content-hardening/spec.md` | Phase 6 composites + publish validation (**shipped** v1.4.0) |
 | `specs/007-phase6b-content-wave2/spec.md` | Phase 6b slots + content admin UX (**shipped** v1.4.0) |
 | `specs/008-phase7-media-tags-nesting/spec.md` | Phase 7 media library + dynamic tags (**shipped** v1.4.0) |
-| `specs/009-product-polish-compliance/spec.md` | Phase 9 polish + org-standards compliance (**shipped** v1.4.1–v1.4.3) |
+| `specs/009-product-polish-compliance/spec.md` | Phase 9 polish + org-standards compliance + public HTML normalizer (**shipped** v1.4.1–v1.4.4) |
 | `docs/SPEC-DRIVEN-DEVELOPMENT.md` | User stories, scope, roadmap, `REQ-*` anchors |
 | `.specify/` | Templates and constitution (after `specify init`) |
 | `.cursor/skills/speckit-*/` | Cursor slash commands |

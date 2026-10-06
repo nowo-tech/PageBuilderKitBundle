@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.4] - 2026-10-06](#144---2026-10-06)
 - [[1.4.3] - 2026-10-02](#143---2026-10-02)
 - [[1.4.2] - 2026-10-02](#142---2026-10-02)
 - [[1.4.1] - 2026-10-02](#141---2026-10-02)
@@ -24,9 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-10-06
+
 ### Added
 
-- `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` — strips invalid `</source>` around `<picture>` images, adds a 1×1 GIF `src` on skeleton lazy images, and optional host WebP `<picture>` upgrades (clinic asset paths stay in the host).
+- `Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer` — strips invalid `</source>` around `<picture>` images, adds a 1×1 GIF `src` on skeleton lazy images, and optional host WebP `<picture>` upgrades (host asset paths stay out of the kit).
+
+### Notes
+
+- Backward compatible for hosts on `^1.4`. **No** Doctrine schema changes. Optional: inject the autowired service after Grapes public HTML render. See [UPGRADING.md](UPGRADING.md#144).
 
 ## [1.4.3] - 2026-10-02
 
