@@ -8,6 +8,8 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
+use Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface;
+use Nowo\PageBuilderKitBundle\Util\ContentSectionFilter;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use Twig\Extension\AbstractExtension;
@@ -23,6 +25,7 @@ final class PageBuilderKitExtension extends AbstractExtension
         private readonly PageBuilderKitAccessCheckerInterface $accessChecker,
         private readonly InlineContentFieldRendererInterface $inlineContentFieldRenderer,
         private readonly ?PageRevisionStore $pageRevisionStore = null,
+        private readonly ?PublicBindHydratorInterface $publicBindHydrator = null,
     ) {
     }
 
@@ -37,6 +40,9 @@ final class PageBuilderKitExtension extends AbstractExtension
             new TwigFunction('nowo_page_builder_can', $this->can(...)),
             new TwigFunction('nowo_page_builder_revisions_enabled', $this->revisionsEnabled(...)),
             new TwigFunction('nowo_page_builder_field', $this->field(...), ['is_safe' => ['html']]),
+            new TwigFunction('nowo_page_builder_hydrate_binds', $this->hydrateBinds(...), ['is_safe' => ['html']]),
+            new TwigFunction('nowo_page_builder_sanitize_section', ContentSectionFilter::sanitize(...)),
+            new TwigFunction('nowo_page_builder_filter_schema_by_section', ContentSectionFilter::filterSchema(...)),
         ];
     }
 
@@ -80,6 +86,15 @@ final class PageBuilderKitExtension extends AbstractExtension
     public function field(string $pageKey, string $fieldKey, array $options = []): string
     {
         return $this->inlineContentFieldRenderer->render($pageKey, $fieldKey, $options);
+    }
+
+    /**
+     * Wrap `data-pbk-bind` slots in public Grapes HTML with inline-edit controls for editors.
+     * Returns the HTML unchanged when no hydrator is wired.
+     */
+    public function hydrateBinds(string $html, string $pageKey): string
+    {
+        return $this->publicBindHydrator?->hydrate($html, $pageKey) ?? $html;
     }
 
     /**

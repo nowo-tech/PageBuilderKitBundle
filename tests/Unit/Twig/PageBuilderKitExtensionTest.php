@@ -9,6 +9,7 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface;
 use Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
@@ -128,7 +129,8 @@ final class PageBuilderKitExtensionTest extends TestCase
             ],
             $extension->widgetTypes(),
         );
-        self::assertCount(8, $extension->getFunctions());
+        self::assertCount(11, $extension->getFunctions());
+        self::assertSame('<p>x</p>', $extension->hydrateBinds('<p>x</p>', 'home'));
         self::assertTrue($extension->can('layout'));
         self::assertSame('<span>field</span>', $extension->field('home', 'hero_title', ['type' => 'string']));
 
@@ -136,5 +138,30 @@ final class PageBuilderKitExtensionTest extends TestCase
             ['pageKey' => 'home', 'sections' => [], 'context' => ['x' => 1]],
             $extension->renderPage('home', 'es', ['x' => 1]),
         );
+    }
+
+    #[Test]
+    public function hydrateBindsDelegatesToHydrator(): void
+    {
+        $hydrator = $this->createMock(PublicBindHydratorInterface::class);
+        $hydrator->expects(self::once())->method('hydrate')->with('<span data-pbk-bind="a">x</span>', 'home')->willReturn('HYDRATED');
+
+        $extension = new PageBuilderKitExtension(
+            'layout.html.twig',
+            'tailwind',
+            $this->createStub(PageRenderProviderInterface::class),
+            new WidgetTypeRegistry([]),
+            $this->createStub(PageBuilderKitAccessCheckerInterface::class),
+            $this->createStub(InlineContentFieldRendererInterface::class),
+            null,
+            $hydrator,
+        );
+
+        self::assertSame('HYDRATED', $extension->hydrateBinds('<span data-pbk-bind="a">x</span>', 'home'));
+
+        $names = array_map(static fn ($f): string => $f->getName(), $extension->getFunctions());
+        self::assertContains('nowo_page_builder_hydrate_binds', $names);
+        self::assertContains('nowo_page_builder_sanitize_section', $names);
+        self::assertContains('nowo_page_builder_filter_schema_by_section', $names);
     }
 }

@@ -100,7 +100,7 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 | **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
 | **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
 | **Phase 5–7** | **Shipped (v1.4.0)** | Content fields + ACL capabilities, hardening/slots, media library + tags |
-| **Phase 9** | **Done (v1.4.4)** | Org compliance (v1.4.3) + optional `PublicHtmlNormalizer` for public Grapes HTML |
+| **Phase 9** | **Done (v1.5.0)** | Org compliance (v1.4.3) + optional `PublicHtmlNormalizer` (v1.4.4) + public bind hydrator, section filter and status query (v1.5.0) |
 
 Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`009` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**; polish + compliance + HTML cleanup in **v1.4.1–v1.4.4**).
 

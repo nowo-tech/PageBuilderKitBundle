@@ -22,6 +22,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
 - [Public HTML cleanup](#public-html-cleanup)
+- [Public bind hydration, section filter and status query](#public-bind-hydration-section-filter-and-status-query)
 - [Associating pages with public routes i18n](#associating-pages-with-public-routes-i18n)
 - [Widget types](#widget-types)
 - [Elementor-like Style and Advanced](#elementor-like-style-and-advanced)
@@ -701,3 +702,21 @@ In `dev` (`kernel.debug=true`), the toolbar shows a **Page Builder** panel (layo
 Render count is **per HTTP request**. The FrankenPHP demo route `/multi-render` calls `getRenderedTree()` three times so the toolbar shows ≥ 3.
 
 See [CONFIGURATION.md](CONFIGURATION.md#debug).
+
+## Public bind hydration, section filter and status query
+
+**Bind hydration.** Grapes public HTML may contain `<span data-pbk-bind="hero_title">Resolved text</span>` slots. For users with the `content` capability, `PublicBindHydratorInterface::hydrate($html, $pageKey)` (or `{{ nowo_page_builder_hydrate_binds(html, pageKey)|raw }}`) wraps each slot with the inline-edit pencil/modal, using the slot inner HTML as value (no page query). Visitors receive the HTML unchanged. Field types and labels come from your `ContentFieldDefinitionProviderInterface`:
+
+```php
+final class ClinicContentFieldDefinitionProvider implements ContentFieldDefinitionProviderInterface
+{
+    public function definitions(string $pageKey): array
+    {
+        return [['key' => 'hero_title', 'type' => 'string', 'label' => 'content.hero.title']];
+    }
+}
+```
+
+**Section filter.** `ContentSectionFilter::sanitize($request->query->get('section'))` returns a lowercase `[a-z0-9_]+` slug or `null`; `ContentSectionFilter::filterSchema($schema, $section)` keeps rows whose `key` equals the section or starts with `{section}_`.
+
+**Status query.** `BuilderPageStatusQueryInterface::findStatusByPageKey($pageKey)` returns `?PageStatus` with a scalar `SELECT p.status` (no document JSON hydrated) — use it in public controllers to decide 404 vs render.

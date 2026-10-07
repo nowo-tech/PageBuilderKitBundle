@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.5.0](#150)
 - [1.4.4](#144)
 - [1.4.3](#143)
 - [1.4.2](#142)
@@ -17,6 +18,27 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.5.0
+
+From **1.4.4**:
+
+1. Optional — replace host copies of the bind hydrator / section filter / status query:
+   - `PbkBindHydrator` → inject `Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface` and call `hydrate($html, $pageKey)` (the Twig `Environment` is now injected; it is no longer a method argument), or use the Twig function `nowo_page_builder_hydrate_binds(html, pageKey)`.
+   - `PbkSectionFilter` → `Nowo\PageBuilderKitBundle\Util\ContentSectionFilter::sanitize()` / `filterSchema()`, or Twig `nowo_page_builder_sanitize_section` / `nowo_page_builder_filter_schema_by_section`.
+   - `BuilderPageStatusQuery::find()` → `Nowo\PageBuilderKitBundle\Repository\BuilderPageStatusQueryInterface::findStatusByPageKey()`.
+2. Required for bind pencils to show the right type/label — implement `Nowo\PageBuilderKitBundle\Content\ContentFieldDefinitionProviderInterface::definitions(string $pageKey)` (return `list<array{key, type, label}>`; `label` is a translation id) and alias it in the host:
+
+   ```yaml
+   Nowo\PageBuilderKitBundle\Content\ContentFieldDefinitionProviderInterface:
+       alias: App\Site\PageBuilder\ClinicContentFieldDefinitionProvider
+   ```
+
+   Without it, binds fall back to type `string` and the field key as label.
+3. If you construct `PageBuilderKitExtension` manually, note the new optional last argument `?PublicBindHydratorInterface`.
+4. Clear Symfony cache after deploy.
+
+See [CHANGELOG.md](CHANGELOG.md#150---2026-10-07) and [USAGE.md](USAGE.md#public-bind-hydration-section-filter-and-status-query).
 
 ## 1.4.4
 

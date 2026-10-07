@@ -114,6 +114,19 @@ services:
         arguments:
             $assetBasePath: '/bundles/nowopagebuilderkit'
 
+    Nowo\PageBuilderKitBundle\Content\ContentFieldDefinitionProviderInterface:
+        alias: Nowo\PageBuilderKitBundle\Content\NullContentFieldDefinitionProvider
+
+    Nowo\PageBuilderKitBundle\Repository\BuilderPageStatusQueryInterface:
+        alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageStatusQuery
+
+    Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface:
+        alias: Nowo\PageBuilderKitBundle\Service\PublicBindHydrator
+
+    Nowo\PageBuilderKitBundle\Service\PublicBindHydrator:
+        arguments:
+            $assetBasePath: '/bundles/nowopagebuilderkit'
+
     Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension:
         arguments:
             $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
@@ -121,4 +134,5 @@ services:
             $accessChecker: '@Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface'
             $inlineContentFieldRenderer: '@Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface'
             $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
+            $publicBindHydrator: '@Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface'
         tags: ['twig.extension']

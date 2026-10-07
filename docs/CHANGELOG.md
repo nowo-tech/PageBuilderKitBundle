@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.5.0] - 2026-10-07](#150---2026-10-07)
 - [[1.4.4] - 2026-10-06](#144---2026-10-06)
 - [[1.4.3] - 2026-10-02](#143---2026-10-02)
 - [[1.4.2] - 2026-10-02](#142---2026-10-02)
@@ -24,6 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.5.0] - 2026-10-07
+
+### Added
+
+- `Nowo\PageBuilderKitBundle\Service\PublicBindHydrator` (+ `PublicBindHydratorInterface`) — wraps public Grapes `<span data-pbk-bind="key">` slots with the inline-edit pencil/modal (`public/_editable_field.html.twig`, `InlineFieldModalType`) for users with the `content` capability; visitors get the HTML back untouched. No page SELECT.
+- `Nowo\PageBuilderKitBundle\Content\ContentFieldDefinitionProviderInterface` — host catalogue of field `key` / `type` / `label` per page key. Default `NullContentFieldDefinitionProvider` (empty); alias the interface to a host service to override.
+- `Nowo\PageBuilderKitBundle\Util\ContentSectionFilter` — static `sanitize()` and `filterSchema()` for `?section=` deep-links.
+- `Nowo\PageBuilderKitBundle\Repository\BuilderPageStatusQueryInterface` / `BuilderPageStatusQuery` — `findStatusByPageKey()` returns the `PageStatus` scalar without hydrating the document.
+- Twig functions `nowo_page_builder_hydrate_binds(html, pageKey)`, `nowo_page_builder_sanitize_section(raw)` and `nowo_page_builder_filter_schema_by_section(schema, section)`.
+
+### Notes
+
+- Backward compatible for hosts on `^1.4`. **No** Doctrine schema changes. `BuilderPageRepositoryInterface` is unchanged. See [UPGRADING.md](UPGRADING.md#150).
 
 ## [1.4.4] - 2026-10-06
 
