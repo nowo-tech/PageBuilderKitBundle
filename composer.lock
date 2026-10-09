@@ -930,21 +930,22 @@
         },
         {
             "name": "nowo-tech/form-kit-bundle",
-            "version": "v2.6.1",
+            "version": "v2.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/FormKitBundle.git",
-                "reference": "babcfabf614f0ae2876df4fb16db9e94b9a27506"
+                "reference": "d1b710110c05972354e398a9198baa7dc3d746f8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/babcfabf614f0ae2876df4fb16db9e94b9a27506",
-                "reference": "babcfabf614f0ae2876df4fb16db9e94b9a27506",
+                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/d1b710110c05972354e398a9198baa7dc3d746f8",
+                "reference": "d1b710110c05972354e398a9198baa7dc3d746f8",
                 "shasum": ""
             },
             "require": {
                 "doctrine/collections": "^2.2",
                 "php": ">=8.2 <8.6",
+                "symfony/asset": "^7.4 || ^8.0",
                 "symfony/config": "^7.4 || ^8.0",
                 "symfony/dependency-injection": "^7.4 || ^8.0",
                 "symfony/form": "^7.4 || ^8.0",
@@ -966,6 +967,7 @@
                 "phpunit/phpunit": "^10.0",
                 "rector/rector": "^2.0",
                 "symfony/framework-bundle": "^7.4 || ^8.0",
+                "symfony/security-csrf": "^7.4 || ^8.0",
                 "vincentlanglet/twig-cs-fixer": "^4.0"
             },
             "suggest": {
@@ -1033,20 +1035,20 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-09T07:42:29+00:00"
+            "time": "2026-10-09T09:02:22+00:00"
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v1.9.1",
+            "version": "v1.10.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "e36b3cf6b84c7625455ec6c74cc27b96798e58c8"
+                "reference": "5987cef95af756af5577e4b9a3b6a74e6942383c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/e36b3cf6b84c7625455ec6c74cc27b96798e58c8",
-                "reference": "e36b3cf6b84c7625455ec6c74cc27b96798e58c8",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/5987cef95af756af5577e4b9a3b6a74e6942383c",
+                "reference": "5987cef95af756af5577e4b9a3b6a74e6942383c",
                 "shasum": ""
             },
             "require": {
@@ -1072,10 +1074,12 @@
                 "phpstan/phpstan-symfony": "^2.0",
                 "phpunit/phpunit": "^10.5 || ^11.0",
                 "rector/rector": "^2.0",
+                "symfony/http-client": "^6.0 || ^7.0 || ^8.0",
                 "symfony/yaml": "^6.0 || ^7.0 || ^8.0",
                 "vincentlanglet/twig-cs-fixer": "^3.0"
             },
             "suggest": {
+                "symfony/http-client": "For the optional release_check feature (GitHub release-version dialog)",
                 "symfony/ux-icons": "For icon_set: ux_icon in row actions and icons"
             },
             "type": "symfony-bundle",
@@ -1118,7 +1122,7 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-10-07T17:36:10+00:00"
+            "time": "2026-10-09T09:02:15+00:00"
         },
         {
             "name": "psr/cache",
