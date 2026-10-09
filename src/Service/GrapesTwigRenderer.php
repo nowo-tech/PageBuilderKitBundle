@@ -37,11 +37,22 @@ final readonly class GrapesTwigRenderer
      */
     public function render(string $html, array $context): array
     {
-        $html = $this->sanitizer->sanitizeHtml($html);
+        // Twig source: entities inside {{ }} / {% %} / {# #} are decoded so the lexer sees real operators.
+        // This string is NEVER returned to the caller — `{{ &lt;script&gt; }}` would become a live <script>.
+        $source = $this->sanitizer->sanitizeHtml($html);
 
-        if (!$this->enabled || $html === '' || !$this->looksLikeTwig($html)) {
+        if ($source === '' || !$this->looksLikeTwig($source)) {
+            // No Twig token → nothing was decoded: the sanitized source is plain safe HTML.
             return [
-                'html'        => $html,
+                'html'        => $source,
+                'twigApplied' => false,
+                'twigError'   => null,
+            ];
+        }
+
+        if (!$this->enabled) {
+            return [
+                'html'        => $this->literalFallback($html),
                 'twigApplied' => false,
                 'twigError'   => null,
             ];
@@ -54,21 +65,32 @@ final readonly class GrapesTwigRenderer
                 'cache'            => false,
             ]);
             $twig->addExtension(new SandboxExtension($this->securityPolicy(), true));
-            $template = $twig->createTemplate($html, 'pbk_grapes');
+            $template = $twig->createTemplate($source, 'pbk_grapes');
             $rendered = $template->render($context);
 
+            // Output pass: do not restore Twig delimiters, otherwise an autoescaped context value such as
+            // "{{ <img onerror=…> }}" (printed as `{{ &lt;img …&gt; }}`) would be decoded back into markup.
             return [
-                'html'        => $this->sanitizer->sanitizeHtml($rendered),
+                'html'        => $this->sanitizer->sanitizeHtml($rendered, false),
                 'twigApplied' => true,
                 'twigError'   => null,
             ];
         } catch (Throwable $exception) {
             return [
-                'html'        => $html,
+                'html'        => $this->literalFallback($html),
                 'twigApplied' => false,
                 'twigError'   => $exception->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Twig disabled or failed: print the sanitized markup with Twig tokens left as (still encoded) text.
+     * Never return the decoded Twig source here.
+     */
+    private function literalFallback(string $html): string
+    {
+        return $this->sanitizer->sanitizeHtml($html, false);
     }
 
     /**

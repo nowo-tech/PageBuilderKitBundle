@@ -16,6 +16,7 @@
 {% endblock %}
 
 {% block admin %}
+{% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
     <p class="text-muted">{{ 'admin.content.hint'|trans }}</p>
 
     {% if can_edit_schema %}
@@ -180,7 +181,7 @@
                 </div>
             </div>
         </div>
-        <script>
+        <script{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>
             (function () {
                 function setFieldUrl(target, url) {
                     if (!target || !url) return;

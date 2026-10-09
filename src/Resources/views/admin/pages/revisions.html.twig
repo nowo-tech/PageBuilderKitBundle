@@ -57,7 +57,7 @@
                                 </a>
                                 {{ form_start(restore_forms[revision.id|default('')], {
                                     attr: {
-                                        onsubmit: 'return confirm(' ~ ('admin.revisions.restore_confirm'|trans|json_encode|raw) ~ ');'
+                                        'data-pbk-confirm': 'admin.revisions.restore_confirm'|trans
                                     }
                                 }) }}
                                     {% for child in restore_forms[revision.id] %}
@@ -74,4 +74,7 @@
             </table>
         </div>
     {% endif %}
+    {# data-pbk-confirm forms: confirm() via listener (no inline onsubmit; strict CSP friendly). #}
+    {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
+    <script src="{{ asset('js/page-builder-admin.js', 'nowo_page_builder_kit') }}" defer{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}></script>
 {% endblock %}

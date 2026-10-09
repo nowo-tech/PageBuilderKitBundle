@@ -98,4 +98,14 @@ final class GrapesDocumentSanitizerTest extends TestCase
     {
         self::assertSame('', (new GrapesDocumentSanitizer())->sanitizeCss('div{color:expression(alert(1))}'));
     }
+
+    #[Test]
+    public function withoutTwigRestoreEncodedTokenContentStaysEncoded(): void
+    {
+        $sanitizer = new GrapesDocumentSanitizer();
+        $input     = '<p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p>';
+
+        self::assertStringContainsString('<script>', $sanitizer->sanitizeHtml($input), 'Twig source (decoded by design).');
+        self::assertSame('<p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p>', $sanitizer->sanitizeHtml($input, false));
+    }
 }

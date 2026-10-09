@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Twig;
 
+use Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
@@ -13,6 +14,7 @@ use Nowo\PageBuilderKitBundle\Util\ContentSectionFilter;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 final class PageBuilderKitExtension extends AbstractExtension
@@ -26,7 +28,18 @@ final class PageBuilderKitExtension extends AbstractExtension
         private readonly InlineContentFieldRendererInterface $inlineContentFieldRenderer,
         private readonly ?PageRevisionStore $pageRevisionStore = null,
         private readonly ?PublicBindHydratorInterface $publicBindHydrator = null,
+        private readonly PublicHtmlHardener $publicHtmlHardener = new PublicHtmlHardener(),
     ) {
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            // Editor HTML printed with |raw (Grapes pages, /p/{pageKey}, classic text/html widgets): HTML5 final gate.
+            new TwigFilter('pbk_harden_html', $this->publicHtmlHardener->harden(...), ['is_safe' => ['html']]),
+            // GrapesJS CSS printed inside <style>: escape `<` so it can never close the element.
+            new TwigFilter('pbk_harden_css', $this->publicHtmlHardener->hardenCss(...), ['is_safe' => ['html']]),
+        ];
     }
 
     public function getFunctions(): array

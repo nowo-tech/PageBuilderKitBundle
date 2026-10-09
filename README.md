@@ -44,7 +44,8 @@ Page Builder Kit Bundle gives Symfony applications a reusable visual page builde
 - Sandboxed Twig in Grapes HTML; page SEO / Open Graph; asset uploads (local / S3)
 - Dev **Web Profiler** panel (`debug.collector`); classic **widget packs** for host extensions
 - `DocumentService`, `PageRenderProvider`, Twig `nowo_page_builder_render()`
-- Configurable access guard and HTML sanitization
+- Configurable access guard and HTML sanitization, plus an always-on HTML5 final hardener for public output (`|pbk_harden_html`, `|pbk_harden_css`; PHP 8.4 `Dom\HTMLDocument`)
+- CSP-friendly templates: `nonce` from the request attribute `csp_nonce` on every `<script>` / `<style>`, no inline event handlers
 - Symfony 8 FrankenPHP demo in `demo/symfony8` (default port **8137**)
 
 ## Quick start

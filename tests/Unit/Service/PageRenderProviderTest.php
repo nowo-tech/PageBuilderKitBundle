@@ -303,6 +303,34 @@ final class PageRenderProviderTest extends TestCase
         self::assertStringContainsString('Sale', $tree['html']);
     }
 
+    #[Test]
+    public function hardensGrapesHtmlAndCssEvenWhenTwigFails(): void
+    {
+        $page = (new BuilderPage())
+            ->setPageKey('xss')
+            ->setStatus(PageStatus::Published);
+        $page->addTranslation((new BuilderPageTranslation())->setLocale('es')->setTitle('XSS')->setSlug('xss'));
+        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+            'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
+            'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
+            'html'          => '<p>ok</p><p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p><a href="data:text/html;base64,PHNjcmlwdD4=">x</a><iframe srcdoc="x"></iframe>',
+            'css'           => '.a{color:red}</sty</stylele><img src=x onerror=alert(1)>',
+            'grapes'        => [],
+            'localeContent' => [],
+            'sections'      => [],
+        ]));
+
+        $tree = $this->createProvider($page)->getRenderedTree('xss', 'es');
+
+        self::assertFalse($tree['twigApplied']);
+        self::assertNotNull($tree['twigError']);
+        self::assertStringContainsString('<p>ok</p>', $tree['html']);
+        self::assertStringNotContainsStringIgnoringCase('<script', $tree['html']);
+        self::assertStringNotContainsString('data:text/html', $tree['html']);
+        self::assertStringNotContainsString('srcdoc', $tree['html']);
+        self::assertStringNotContainsString('<', $tree['css']);
+    }
+
     private function createProvider(?BuilderPage $page): PageRenderProvider
     {
         $repository = new class($page) implements BuilderPageRepositoryInterface {

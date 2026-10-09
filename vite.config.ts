@@ -4,7 +4,7 @@
  */
 import { defineConfig } from 'vite';
 
-type Entry = 'canvas' | 'inline-edit';
+type Entry = 'canvas' | 'inline-edit' | 'admin';
 
 const entry = process.env.VITE_ENTRY as Entry | undefined;
 
@@ -34,6 +34,21 @@ const configs: Record<Entry, { build: object }> = {
         output: {
           format: 'iife' as const,
           entryFileNames: 'js/page-builder-inline-edit.js',
+        },
+      },
+      minify: true,
+      sourcemap: false,
+    },
+  },
+  admin: {
+    build: {
+      outDir: 'src/Resources/public',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: 'src/Resources/assets/src/page-builder-admin.ts',
+        output: {
+          format: 'iife' as const,
+          entryFileNames: 'js/page-builder-admin.js',
         },
       },
       minify: true,

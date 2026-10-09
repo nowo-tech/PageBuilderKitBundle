@@ -1,0 +1,1 @@
+(function(){"use strict";function e(){window.__pbkAdminInit||(window.__pbkAdminInit=!0,document.addEventListener("submit",t=>{const i=t.target;if(!(i instanceof HTMLFormElement))return;const n=i.getAttribute("data-pbk-confirm");n===null||n===""||window.confirm(n)||(t.preventDefault(),t.stopImmediatePropagation())},!0))}e()})();

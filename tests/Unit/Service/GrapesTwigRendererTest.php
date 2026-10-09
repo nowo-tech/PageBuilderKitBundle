@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Service;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -93,5 +94,68 @@ final class GrapesTwigRendererTest extends TestCase
         self::assertFalse($result['twigApplied']);
         self::assertNotNull($result['twigError']);
         self::assertStringContainsString('{{ missingVar }}', $result['html']);
+    }
+
+    /**
+     * Security regression: a Twig syntax error used to return the entity-decoded Twig source,
+     * turning `{{ &lt;script&gt;… }}` into a live <script>.
+     */
+    #[Test]
+    public function syntaxErrorFallbackNeverReturnsDecodedMarkup(): void
+    {
+        $renderer = new GrapesTwigRenderer();
+        $result   = $renderer->render('<p>{{ &lt;script&gt;alert(document.domain)&lt;/script&gt; }}</p>', []);
+
+        self::assertFalse($result['twigApplied']);
+        self::assertNotNull($result['twigError']);
+        self::assertStringNotContainsStringIgnoringCase('<script', $result['html']);
+        self::assertStringContainsString('&lt;script&gt;', $result['html']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function encodedPayloads(): iterable
+    {
+        yield 'script in token' => ['<p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p>'];
+        yield 'img onerror in token' => ['<p>{{ &lt;img src=x onerror=alert(1)&gt; }}</p>'];
+        yield 'encoded closing delimiter' => ['<p>{{ a &#125;&#125; &lt;img src=x onerror=alert(1)&gt; {{ }}</p>'];
+        yield 'comment token' => ['<p>{# &lt;svg onload=alert(1)&gt; </p>'];
+        yield 'block token' => ['<div>{% &lt;img src=x onerror=alert(1)&gt; %}</div>'];
+    }
+
+    #[Test]
+    #[DataProvider('encodedPayloads')]
+    public function encodedMarkupInsideTokensIsNeverDecodedIntoOutput(string $html): void
+    {
+        foreach ([new GrapesTwigRenderer(), new GrapesTwigRenderer(false), new GrapesTwigRenderer(true, true)] as $renderer) {
+            $out = strtolower($renderer->render($html, ['a' => 'x'])['html']);
+
+            self::assertStringNotContainsString('<script', $out);
+            self::assertStringNotContainsString('<img', $out);
+            self::assertStringNotContainsString('<svg', $out);
+        }
+    }
+
+    #[Test]
+    public function renderedContextValuesAreNotDecodedByTheOutputSanitizer(): void
+    {
+        $renderer = new GrapesTwigRenderer();
+        $result   = $renderer->render('<p>{{ name }}</p>', ['name' => '{{ <img src=x onerror=alert(1)> }}']);
+
+        self::assertTrue($result['twigApplied']);
+        self::assertStringNotContainsString('<img', $result['html']);
+        self::assertStringContainsString('&lt;img', $result['html']);
+    }
+
+    #[Test]
+    public function disabledTwigKeepsAttributeTokensAsInertText(): void
+    {
+        $renderer = new GrapesTwigRenderer(false);
+        $result   = $renderer->render('<a href="{{ url }}" title="{{ &quot;x&quot; }}">x</a>', []);
+
+        self::assertFalse($result['twigApplied']);
+        self::assertStringNotContainsString('title="{{ "x" }}"', $result['html']);
+        self::assertStringContainsString('<a ', $result['html']);
     }
 }

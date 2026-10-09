@@ -8,6 +8,9 @@ Security considerations for page builder admin, document API, and public renderi
 - [Admin access guard (REQ-UI-002)](#admin-access-guard-req-ui-002)
 - [Document API and CSRF](#document-api-and-csrf)
 - [Rich text and HTML widgets](#rich-text-and-html-widgets)
+- [Public HTML final hardening](#public-html-final-hardening)
+- [Grapes Twig fallback](#grapes-twig-fallback)
+- [Content Security Policy (nonce)](#content-security-policy-nonce)
 - [Operational guidance](#operational-guidance)
 - [Release security checklist](#release-security-checklist)
 - [REQ-SEC-004 (AI security audit)](#req-sec-004-ai-security-audit)
@@ -19,7 +22,9 @@ Security considerations for page builder admin, document API, and public renderi
 | Unauthorized users reach admin or document API | `access_roles` / `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`, custom `access_checker` (guard), Symfony Security (REQ-UI-002) |
 | CSRF on document save or publish | `X-CSRF-TOKEN` validated against intention `page_builder_document` |
 | CSRF on content field forms | `_csrf_token` intention `page_builder_content` |
-| Stored XSS through `text` / `html` widgets / richtext fields | Twig auto-escaping; default `html.sanitize: allowlist` (DOM tag/attr allowlist); Grapes sanitizer on persist/render |
+| Stored XSS through `text` / `html` widgets / richtext fields | Twig auto-escaping; default `html.sanitize: allowlist` (DOM tag/attr allowlist); Grapes sanitizer on persist/render; always-on HTML5 `PublicHtmlHardener` before output |
+| XSS via Grapes Twig errors / decoded Twig tokens | Twig source (entity-decoded tokens) is never printed; fallback keeps tokens encoded |
+| Inline script injection when a CSP is enforced | Kit `<script>` / `<style>` carry `csp_nonce`; no inline event handlers |
 | Layout vs content privilege escalation | Capabilities via roles or custom `PageBuilderKitAccessCheckerInterface`; `PageBuilderKitAccessGuard` in controllers |
 | Overly broad demo access | `allow_unauthenticated` defaults to `false` |
 | Shared-database table collisions | Optional `doctrine.table_prefix` |
@@ -91,10 +96,55 @@ nowo_page_builder_kit:
 
 Only trusted editors should receive roles covered by the access checker.
 
+## Public HTML final hardening
+
+`Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener` is the **always-on last step** before editor HTML is printed:
+
+- `PageRenderProvider` hardens Grapes `html` (after Twig and `[[fields.*]]` slots) and `css`;
+- kit templates use `|pbk_harden_html` (public page / `/p/{pageKey}`, classic `text` / `html` widgets, inline HTML fields) and `|pbk_harden_css` (Grapes `<style>`).
+
+It parses with PHP 8.4 `Dom\HTMLDocument` (the HTML5 algorithm browsers use) and always re-serializes, so there is no parser differential with libxml-based sanitizers (`&colon;` / `&Tab;` entities, `<!-->` comments, `<xmp>` / `<noembed>` / `<noscript>` raw text, `<svg/onload>` …). It removes:
+
+| Removed | Items |
+| --- | --- |
+| Elements (with content) | `script`, `style`, `iframe`, `frame(set)`, `object`, `embed`, `applet`, `base`, `meta`, `link`, `form`, `math`, `portal`, `noscript`, `template`, `xmp`, `noembed`, `noframes`, `plaintext`, SVG `animate*`, `set`, `foreignObject`, `handler`, `listener` |
+| Attributes | `on*`, `formaction`, `srcdoc`, `action` |
+| URL values | `javascript:` / `vbscript:` / non-image `data:` in `href`, `src`, `xlink:href`, `srcset` (each candidate), `poster`, `data-src`, SVG `values`/`from`/`to`/`by`, … (ASCII whitespace/control chars ignored) |
+
+CSS: every `<` becomes the CSS escape `\3C `, so nested `</sty</stylele>` can never close the element. It runs regardless of `html.sanitize.strategy` (also `none`). `grapesjs.allow_scripts: true` keeps `<script>` elements only. The pass is idempotent. PHP 8.4 is the bundle minimum, so there is no non-HTML5 fallback.
+
+Use the filters in host overrides that print editor HTML: `{{ html|pbk_harden_html }}`, `<style>{{ css|pbk_harden_css }}</style>`.
+
+## Grapes Twig fallback
+
+`GrapesDocumentSanitizer::sanitizeHtml()` decodes HTML/URL encoding inside `{{ }}`, `{% %}` and `{# #}` so the sandbox can compile editor templates; that string is Twig **source**, not safe HTML. Since v1.6.0 `GrapesTwigRenderer` never returns it: on a Twig error (or with Twig disabled) it returns `sanitizeHtml($html, false)` — tokens remain encoded, inert text — and Twig output is re-sanitized without restoring delimiters. Before v1.6.0 `{{ &lt;script&gt;… }}` with a syntax error rendered a live `<script>`.
+
+## Content Security Policy (nonce)
+
+Nowo-tech kit convention: when the request attribute `csp_nonce` is set, every `<script>` / `<style>` emitted by kit templates carries `nonce="…"`:
+
+```twig
+{% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
+<script{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>…</script>
+```
+
+The kit templates contain **no inline event handlers**: confirmations use `form[data-pbk-confirm]` + `js/page-builder-admin.js`, and the inline-edit modal form is blocked by a `submit` listener in `js/page-builder-inline-edit.js`. Host sketch:
+
+```php
+#[AsEventListener(KernelEvents::REQUEST, priority: 512)]
+public function onRequest(RequestEvent $event): void
+{
+    $event->getRequest()->attributes->set('csp_nonce', base64_encode(random_bytes(16)));
+}
+// …then emit "script-src 'self' 'nonce-…'; style-src 'self' 'nonce-…'" on kernel.response.
+```
+
+Element `style="…"` attributes from GrapesJS still require `style-src-attr 'unsafe-inline'` (or `'unsafe-hashes'`).
+
 ## Operational guidance
 
 - Audit which users receive `ROLE_EDITOR` or custom-checker access.
-- Review Twig overrides that use `|raw` for widget output.
+- Review Twig overrides that use `|raw` for widget output — use `|pbk_harden_html` / `|pbk_harden_css`.
 - Use `doctrine.table_prefix` when multiple apps share one schema.
 - Leave `allow_unauthenticated: false` in production.
 - Never commit `.env` secrets or demo credentials into production configs.

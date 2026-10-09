@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+
+- [[1.6.0] - 2026-10-09](#160---2026-10-09)
 - [[1.5.1] - 2026-10-09](#151---2026-10-09)
 - [[1.5.0] - 2026-10-07](#150---2026-10-07)
 - [[1.4.4] - 2026-10-06](#144---2026-10-06)
@@ -26,6 +28,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.6.0] - 2026-10-09
+
+### Security
+
+- **Twig error fallback XSS (GrapesJS pages).** `GrapesDocumentSanitizer` HTML-decodes everything inside `{{ }}`, `{% %}` and `{# #}` so Twig can compile it. When the editor HTML had a Twig syntax/sandbox error (or Twig was disabled), `GrapesTwigRenderer` returned that decoded *source*, so `{{ &lt;script&gt;… }}` reached the page as a live `<script>`. The fallback now returns the sanitized markup with Twig tokens left encoded (inert text).
+- **Twig output re-decoding.** The post-render sanitize pass no longer restores Twig delimiters, so an autoescaped context/field value such as `{{ <img onerror=…> }}` can no longer be decoded back into markup.
+- **HTML5 final gate.** Public editor HTML (Grapes pages, `/p/{pageKey}` preview, classic `text` / `html` widgets, inline HTML fields) now always passes `PublicHtmlHardener` (PHP 8.4 `Dom\HTMLDocument`, the browser parsing algorithm) right before `|raw`-style output: drops `script`, `style`, `iframe`, `object`, `embed`, `form`, `math`, `template`, `noscript`, `xmp`, `noembed`, SVG `animate`/`set`/`foreignObject`, … plus `on*`, `srcdoc`, `formaction`, `action` and `javascript:` / `vbscript:` / non-image `data:` URLs (including `srcset` candidates and HTML5 entity obfuscation such as `&colon;` / `&Tab;`). Grapes CSS escapes `<` (`\3C `) so nested `</sty</stylele>` cannot close the `<style>` element.
+- **CSP.** Inline `<script>` / `<style>` in kit templates carry `nonce` from the request attribute `csp_nonce` (nowo-tech kit convention). Inline `onsubmit` handlers were removed (inline-edit modal form, template delete and revision restore confirmations).
+
+### Added
+
+- `Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener` service (`harden()`, `hardenCss()`; honours `grapesjs.allow_scripts`).
+- Twig filters `|pbk_harden_html` and `|pbk_harden_css` (registered by `PageBuilderKitExtension`).
+- `GrapesDocumentSanitizer::sanitizeHtml(string $html, bool $restoreTwigDelimiters = true)` — pass `false` for markup that will be printed.
+- `js/page-builder-admin.js` (`form[data-pbk-confirm]` confirmation listener) and a `submit` listener for the inline-edit modal form.
+- `PageRenderProvider` optional constructor argument `?PublicHtmlHardener $publicHtmlHardener`.
 
 ## [1.5.1] - 2026-10-09
 

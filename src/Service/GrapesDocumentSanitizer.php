@@ -36,7 +36,13 @@ final readonly class GrapesDocumentSanitizer
     ) {
     }
 
-    public function sanitizeHtml(string $html): string
+    /**
+     * @param bool $restoreTwigDelimiters When true (default), HTML/URL encoding inside `{{ }}`, `{% %}` and
+     *                                    `{# #}` is decoded so the result can be compiled as a Twig template.
+     *                                    The decoded output is Twig *source*, never safe HTML: pass false when the
+     *                                    result is printed to a browser (Twig output, Twig error fallback).
+     */
+    public function sanitizeHtml(string $html, bool $restoreTwigDelimiters = true): string
     {
         $html = trim($html);
         if ($html === '') {
@@ -108,8 +114,13 @@ final readonly class GrapesDocumentSanitizer
             $out .= $dom->saveHTML($child) ?: '';
         }
 
+        if (!$restoreTwigDelimiters) {
+            return $out;
+        }
+
         // DOMDocument URL-encodes spaces inside attribute values ("{{ p.url }}" → "{{%20p.url%20}}"),
         // which breaks Twig lexing. Restore Twig delimiters after serialization.
+        // SECURITY: entity-decoding turns `{{ &lt;script&gt; }}` into `{{ <script> }}` — only feed this to Twig.
         return $this->restoreTwigDelimiters($out);
     }
 

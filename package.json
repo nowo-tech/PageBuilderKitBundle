@@ -5,9 +5,10 @@
   "packageManager": "pnpm@9.14.2",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "pnpm run build:canvas && pnpm run build:inline-edit && pnpm run build:css",
+    "build": "pnpm run build:canvas && pnpm run build:inline-edit && pnpm run build:admin && pnpm run build:css",
     "build:canvas": "VITE_ENTRY=canvas vite build",
     "build:inline-edit": "VITE_ENTRY=inline-edit vite build",
+    "build:admin": "VITE_ENTRY=admin vite build",
     "build:css": "mkdir -p src/Resources/public/css && cp src/Resources/assets/src/page-builder.css src/Resources/public/css/page-builder.css",
     "typecheck": "tsc --noEmit",
     "dev:canvas": "VITE_ENTRY=canvas vite build --watch",

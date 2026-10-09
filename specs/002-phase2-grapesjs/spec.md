@@ -44,6 +44,8 @@ Phase 2 replaces the Phase 1 classic-only canvas with a **GrapesJS** admin edito
 | FR-P2-REN-001 | `PageRenderProvider` renders Grapes pages (HTML/CSS + locale content) |
 | FR-P2-REN-002 | Optional sandboxed Twig in Grapes HTML (`grapesjs.twig`) with host context provider |
 | FR-P2-REN-003 | `GrapesDocumentSanitizer` applies configured HTML sanitization on save/render |
+| FR-P2-REN-004 | Twig delimiter restoration (entity/URL decoding inside `{{ }}` / `{% %}` / `{# #}`) only produces Twig *source*; it is never returned as HTML. When Twig is disabled or fails (syntax/sandbox/strict-variable error) the renderer returns the sanitized markup with tokens left encoded (`sanitizeHtml($html, false)`); Twig output is re-sanitized without restoration (v1.6.0) |
+| FR-P2-REN-005 | `PublicHtmlHardener` (HTML5 `Dom\HTMLDocument`, PHP 8.4) is an always-on final gate: `PageRenderProvider` hardens Grapes `html` / `css`; kit templates print editor HTML with `\|pbk_harden_html` and Grapes CSS with `\|pbk_harden_css` (public page, `/p/{pageKey}`, classic `text` / `html` widgets, inline HTML fields). `grapesjs.allow_scripts: true` keeps only `<script>` (v1.6.0) |
 
 ## Success criteria (`SC-P2-*`)
 

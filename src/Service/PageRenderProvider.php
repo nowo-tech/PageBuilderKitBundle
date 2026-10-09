@@ -8,6 +8,7 @@ use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
@@ -38,6 +39,8 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
 
     private ClassicPageTreeBuilder $classicPageTreeBuilder;
 
+    private PublicHtmlHardener $publicHtmlHardener;
+
     /**
      * @param iterable<GrapesTwigContextProviderInterface> $twigContextProviders
      */
@@ -56,6 +59,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         ?ContentFieldsNormalizer $contentFieldsNormalizer = null,
         ?ContentFieldSlotReplacer $contentFieldSlotReplacer = null,
         ?ClassicPageTreeBuilder $classicPageTreeBuilder = null,
+        ?PublicHtmlHardener $publicHtmlHardener = null,
     ) {
         $providers = $twigContextProviders instanceof Traversable
             ? iterator_to_array($twigContextProviders, false)
@@ -69,6 +73,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             $protection,
             $widgetPropsMerger,
         );
+        $this->publicHtmlHardener = $publicHtmlHardener ?? new PublicHtmlHardener();
     }
 
     /**
@@ -201,8 +206,11 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         );
         $slotsApplied = $htmlOut !== $twigResult['html'];
 
-        $tSanitize           = hrtime(true);
-        $cssOut              = $this->grapesDocumentSanitizer->sanitizeCss($css);
+        $tSanitize = hrtime(true);
+        $cssOut    = $this->publicHtmlHardener->hardenCss($this->grapesDocumentSanitizer->sanitizeCss($css));
+        // Always-on final gate (HTML5 parser): whatever Twig, slots or a fallback produced, the tree
+        // handed to templates/hosts never carries executable markup.
+        $htmlOut             = $this->publicHtmlHardener->harden($htmlOut);
         $timings['sanitize'] = $this->msSince($tSanitize);
 
         return [

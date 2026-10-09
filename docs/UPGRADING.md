@@ -4,7 +4,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
-- [Unreleased](#unreleased)
+- [1.6.0](#160)
 - [1.5.1](#151)
 - [1.5.0](#150)
 - [1.4.4](#144)
@@ -18,7 +18,22 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
 
-## Unreleased
+## 1.6.0
+
+From **1.5.1** (suggested **1.6.0**):
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+php bin/console assets:install   # new js/page-builder-admin.js + rebuilt page-builder-inline-edit.js
+```
+
+1. **No breaking API changes**, but public output is stricter. The new always-on `PublicHtmlHardener` (requires PHP 8.4 `Dom\HTMLDocument` — already the bundle minimum, no fallback needed) removes from Grapes HTML, `/p/{pageKey}` and classic `text` / `html` widgets: `<style>`, `<form>`, `<math>`, `<template>`, `<noscript>`, SVG `<animate>` / `<set>` / `<foreignObject>`, `action` / `formaction` / `srcdoc` attributes and non-image `data:` URLs — even with `html.sanitize.strategy: none`. Put page CSS in the Grapes style manager (`page_tree.css`), not in `<style>` blocks inside HTML. `grapesjs.allow_scripts: true` still keeps `<script>` elements.
+2. **Twig fallback**: when Grapes Twig fails (`twigError` is set) or `grapesjs.twig.enabled` is false, tokens are now printed as encoded text (`{{ &quot;x&quot; }}` stays escaped) instead of the decoded source. Fix the template error rather than relying on the fallback.
+3. **Host template overrides** of `public/page.html.twig`, `widgets/text.html.twig`, `widgets/html.html.twig` or `public/_editable_field.html.twig` that print editor HTML with `|raw` should switch to `|pbk_harden_html` (and Grapes CSS to `|pbk_harden_css`). If your app registered its own `pbk_harden_html` / `pbk_harden_css` Twig filters, remove them (the kit now provides them; duplicate names would shadow one another).
+4. **CSP**: set the request attribute `csp_nonce` (e.g. in a `kernel.request` listener that also emits the `Content-Security-Policy` header) and the kit's `<script>` / `<style>` tags will carry it. Overrides of `admin/pages/templates.html.twig` / `revisions.html.twig` should use `attr: {'data-pbk-confirm': '...'|trans}` and load `js/page-builder-admin.js` instead of inline `onsubmit`.
+5. Callers of `GrapesDocumentSanitizer::sanitizeHtml()` that print the result should pass `false` as the second argument.
+
+See [CHANGELOG.md](CHANGELOG.md#unreleased).
 
 ## 1.5.1
 

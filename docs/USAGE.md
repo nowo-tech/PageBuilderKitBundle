@@ -22,6 +22,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
 - [Public HTML cleanup](#public-html-cleanup)
+- [Public HTML hardening and CSP](#public-html-hardening-and-csp)
 - [Public bind hydration, section filter and status query](#public-bind-hydration-section-filter-and-status-query)
 - [Associating pages with public routes i18n](#associating-pages-with-public-routes-i18n)
 - [Widget types](#widget-types)
@@ -172,6 +173,21 @@ Nowo\PageBuilderKitBundle\Html\PublicHtmlNormalizer:
         $webpPictureUpgrades:
             - { png: '/build/images/hero.png', webp: '/build/images/hero.webp', classContains: 'hero' }
 ```
+
+## Public HTML hardening and CSP
+
+`page_tree.html` / `page_tree.css` from `PageRenderProvider` are already hardened (HTML5 parser, see [SECURITY.md](SECURITY.md#public-html-final-hardening)). When your own templates print editor HTML or CSS, use the kit filters instead of `|raw`:
+
+```twig
+{% set _csp_nonce = app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
+<style{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>{{ page_tree.css|pbk_harden_css }}</style>
+<div class="content">{{ page_tree.html|pbk_harden_html }}</div>
+{{ widget.settings.html|default('')|pbk_harden_html }}
+```
+
+Run `PublicHtmlNormalizer` / bind hydration **after** hardening is fine (hydration adds trusted kit markup). The service is also injectable: `Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener::harden()` / `hardenCss()`.
+
+Set the request attribute `csp_nonce` to have kit `<script>` / `<style>` tags carry the nonce (nowo-tech kit convention, see [SECURITY.md](SECURITY.md#content-security-policy-nonce)).
 
 ## Associating pages with public routes (i18n)
 

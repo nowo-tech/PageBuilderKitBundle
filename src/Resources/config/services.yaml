@@ -89,6 +89,12 @@ services:
             $grapesTwigRenderer: '@Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer'
             $pageSeoBuilder: '@Nowo\PageBuilderKitBundle\Service\PageSeoBuilder'
             $twigContextProviders: !tagged_iterator nowo_page_builder_kit.grapes_twig_context
+            $publicHtmlHardener: '@Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener'
+
+    # Always-on final HTML5 gate for public output (|pbk_harden_html, |pbk_harden_css, PageRenderProvider).
+    Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener:
+        arguments:
+            $allowScripts: '%nowo_page_builder_kit.grapesjs.allow_scripts%'
 
     Nowo\PageBuilderKitBundle\Service\PageSeoBuilder:
         arguments:
@@ -135,4 +141,5 @@ services:
             $inlineContentFieldRenderer: '@Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface'
             $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'
             $publicBindHydrator: '@Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface'
+            $publicHtmlHardener: '@Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener'
         tags: ['twig.extension']

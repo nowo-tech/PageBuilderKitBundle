@@ -4,7 +4,7 @@
 
 {% block stylesheets %}
     {% if page_tree.engine|default('classic') == 'grapesjs' and page_tree.css|default('') %}
-        <style id="pbk-grapes-css">{{ page_tree.css|raw }}</style>
+        <style id="pbk-grapes-css">{{ page_tree.css|pbk_harden_css }}</style>
     {% endif %}
 {% endblock %}
 
@@ -52,7 +52,7 @@
         </div>
     {% else %}
         <div class="pbk-grapes-content">
-            {{ page_tree.html|raw }}
+            {{ page_tree.html|pbk_harden_html }}
         </div>
     {% endif %}
 {% elseif page_tree.sections is empty %}

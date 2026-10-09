@@ -67,5 +67,6 @@
 
 {% block javascripts %}
     {{ parent() }}
-    <script type="module" src="{{ asset('js/page-builder-canvas.js', 'nowo_page_builder_kit') }}"></script>
+    {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
+    <script type="module"{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %} src="{{ asset('js/page-builder-canvas.js', 'nowo_page_builder_kit') }}"></script>
 {% endblock %}

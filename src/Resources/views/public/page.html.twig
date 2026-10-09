@@ -1,4 +1,6 @@
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
+{# CSP: inline script and style tags carry the request attribute csp_nonce when the host sets one (nowo-tech kit convention). #}
+{% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
 <!DOCTYPE html>
 <html lang="{{ page_tree.locale|default('en') }}">
 <head>
@@ -8,7 +10,7 @@
     {% include '@NowoPageBuilderKitBundle/public/_seo_meta.html.twig' with { seo: page_tree.seo|default({}) } %}
     <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
     {% if page_tree.engine|default('classic') == 'grapesjs' and page_tree.css|default('') %}
-        <style id="pbk-grapes-css">{{ page_tree.css|raw }}</style>
+        <style id="pbk-grapes-css"{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>{{ page_tree.css|pbk_harden_css }}</style>
     {% endif %}
 </head>
 <body class="pbk-public{% if draft_preview|default(false) %} pbk-public--draft-preview{% endif %}">
@@ -23,7 +25,7 @@
         </header>
         {% if page_tree.engine|default('classic') == 'grapesjs' %}
             <div class="pbk-grapes-content">
-                {{ page_tree.html|default('')|raw }}
+                {{ page_tree.html|default('')|pbk_harden_html }}
             </div>
         {% else %}
             {% for section in page_tree.sections %}

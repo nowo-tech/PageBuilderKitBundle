@@ -92,6 +92,8 @@ As a maintainer, I boot the Symfony 8 FrankenPHP demo on port **8137** and run Q
 | FR-SEC-001 | Routes `admin_page_builder_*` require access checker (REQ-UI-002) |
 | FR-SEC-002 | `allow_unauthenticated` may relax access only when explicitly configured |
 | FR-SEC-003 | Configurable `html.sanitize` strategy sanitizes widget HTML on save/render |
+| FR-SEC-004 | CSP nonce convention (shared by nowo-tech kits): every `<script>` / `<style>` in kit templates carries `nonce` from the request attribute `csp_nonce` when present (guarded for missing `app.request`); kit templates use no inline event handlers (`onsubmit`, `onclick`, …) — behaviour lives in kit JS (`data-pbk-confirm`, inline-edit form listener) (v1.6.0) |
+| FR-SEC-005 | Public editor HTML output passes the HTML5 final hardener (see FR-P2-REN-005) regardless of `html.sanitize` strategy (v1.6.0) |
 | FR-WRK-001 | Shared services remain correct in FrankenPHP workers; `BuilderLocales` static bind cleared on terminate |
 
 ### Configuration and DI (`FR-CFG-*`, `FR-DI-*`)

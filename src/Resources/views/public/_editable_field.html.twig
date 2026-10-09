@@ -1,6 +1,7 @@
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 {# Multilingual content field: public value; pencil + modal when canContent(). #}
 {% set _tag = tag|default('span') %}
+{% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
 <span class="pbk-field{% if editable %} pbk-field--editable{% endif %}{% if attr_class %} {{ attr_class }}{% endif %}"
       data-pbk-field
       data-pbk-page="{{ page_key }}"
@@ -27,7 +28,7 @@
         {% elseif type == 'url' and value %}
             <a href="{{ value|e('html_attr') }}">{{ value }}</a>
         {% elseif is_html_output %}
-            {{ value|raw }}
+            {{ value|pbk_harden_html }}
         {% else %}
             {{ value }}
         {% endif %}
@@ -50,8 +51,7 @@
         {{ form_start(modal_form, {
             attr: {
                 class: 'pbk-field-modal__panel',
-                'data-pbk-field-form': '',
-                onsubmit: 'return false;'
+                'data-pbk-field-form': ''
             }
         }) }}
             <header class="pbk-field-modal__head">
@@ -71,5 +71,5 @@
             {% endfor %}
         {{ form_end(modal_form) }}
     </dialog>
-    <script src="{{ asset_base }}/js/page-builder-inline-edit.js" defer></script>
+    <script src="{{ asset_base }}/js/page-builder-inline-edit.js" defer{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}></script>
 {% endif %}

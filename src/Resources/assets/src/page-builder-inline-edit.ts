@@ -300,6 +300,14 @@ function initInlineEdit(): void {
     activeRoot = null;
     showError('');
   });
+
+  // The modal form never submits natively (saves go through fetch). Replaces the former inline
+  // `onsubmit="return false;"` so pages work under a strict CSP without 'unsafe-inline'.
+  modal.querySelectorAll<HTMLFormElement>('form[data-pbk-field-form]').forEach((form) => {
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+    });
+  });
 }
 
 initInlineEdit();
