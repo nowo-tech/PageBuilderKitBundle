@@ -62,16 +62,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.399.1",
+            "version": "3.400.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "cd7cf43b7d42e49579bf3f09ab58d4724d64152c"
+                "reference": "dc874b220df5ec8861fe826b436c19f919d27328"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/cd7cf43b7d42e49579bf3f09ab58d4724d64152c",
-                "reference": "cd7cf43b7d42e49579bf3f09ab58d4724d64152c",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/dc874b220df5ec8861fe826b436c19f919d27328",
+                "reference": "dc874b220df5ec8861fe826b436c19f919d27328",
                 "shasum": ""
             },
             "require": {
@@ -153,9 +153,9 @@
             "support": {
                 "forum": "https://github.com/aws/aws-sdk-php/discussions",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.399.1"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.400.0"
             },
-            "time": "2026-10-02T18:16:16+00:00"
+            "time": "2026-10-08T18:13:44+00:00"
         },
         {
             "name": "doctrine/collections",
@@ -1475,16 +1475,16 @@
         },
         {
             "name": "nowo-tech/form-kit-bundle",
-            "version": "v2.5.4",
+            "version": "v2.6.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/FormKitBundle.git",
-                "reference": "7729cd5d9a6a8c7a537b439991fd80794e09e1b6"
+                "reference": "babcfabf614f0ae2876df4fb16db9e94b9a27506"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/7729cd5d9a6a8c7a537b439991fd80794e09e1b6",
-                "reference": "7729cd5d9a6a8c7a537b439991fd80794e09e1b6",
+                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/babcfabf614f0ae2876df4fb16db9e94b9a27506",
+                "reference": "babcfabf614f0ae2876df4fb16db9e94b9a27506",
                 "shasum": ""
             },
             "require": {
@@ -1502,7 +1502,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.95.11",
-                "igor-php/igor-php": "^0.9.7",
+                "igor-php/igor-php": "^0.10.0",
                 "nowo-tech/phpstan-frankenphp": "^1.0",
                 "phpstan/extension-installer": "^1.2",
                 "phpstan/phpstan": "^2.0",
@@ -1578,7 +1578,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-27T16:22:13+00:00"
+            "time": "2026-10-09T07:42:29+00:00"
         },
         {
             "name": "nowo-tech/page-builder-kit-bundle",
@@ -1586,7 +1586,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "07ce1ac7f218abbb01e471252fec5bcec7313238"
+                "reference": "1b61e9c17bc80c407c9f82f58ac544a8362a491c"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",
@@ -1743,16 +1743,16 @@
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v1.8.5",
+            "version": "v1.9.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "20dc8d9c2aa14553d041904248495faaf2520d1b"
+                "reference": "e36b3cf6b84c7625455ec6c74cc27b96798e58c8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/20dc8d9c2aa14553d041904248495faaf2520d1b",
-                "reference": "20dc8d9c2aa14553d041904248495faaf2520d1b",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/e36b3cf6b84c7625455ec6c74cc27b96798e58c8",
+                "reference": "e36b3cf6b84c7625455ec6c74cc27b96798e58c8",
                 "shasum": ""
             },
             "require": {
@@ -1824,7 +1824,7 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-09-27T16:37:04+00:00"
+            "time": "2026-10-07T17:36:10+00:00"
         },
         {
             "name": "pentatrion/vite-bundle",
@@ -4430,16 +4430,16 @@
         },
         {
             "name": "symfony/polyfill-deepclone",
-            "version": "v1.43.0",
+            "version": "v1.43.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-deepclone.git",
-                "reference": "8db92c5508a3f7f82d8688d32f0a4868a26e58ad"
+                "reference": "aaba44b6ee7299ae65717811c55b57ab9bc0fedd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-deepclone/zipball/8db92c5508a3f7f82d8688d32f0a4868a26e58ad",
-                "reference": "8db92c5508a3f7f82d8688d32f0a4868a26e58ad",
+                "url": "https://api.github.com/repos/symfony/polyfill-deepclone/zipball/aaba44b6ee7299ae65717811c55b57ab9bc0fedd",
+                "reference": "aaba44b6ee7299ae65717811c55b57ab9bc0fedd",
                 "shasum": ""
             },
             "require": {
@@ -4493,7 +4493,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-deepclone/tree/v1.43.0"
+                "source": "https://github.com/symfony/polyfill-deepclone/tree/v1.43.1"
             },
             "funding": [
                 {
@@ -4513,7 +4513,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-30T09:07:27+00:00"
+            "time": "2026-10-06T19:46:18+00:00"
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
@@ -7407,16 +7407,16 @@
         },
         {
             "name": "nowo-tech/hot-reload-bundle",
-            "version": "v1.5.4",
+            "version": "v1.5.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/HotReloadBundle.git",
-                "reference": "b4e89943bf55d0423e18dc253bf5f0afd47cd7b3"
+                "reference": "7584eadd1e130038b4952188096b1af07a4c1806"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/HotReloadBundle/zipball/b4e89943bf55d0423e18dc253bf5f0afd47cd7b3",
-                "reference": "b4e89943bf55d0423e18dc253bf5f0afd47cd7b3",
+                "url": "https://api.github.com/repos/nowo-tech/HotReloadBundle/zipball/7584eadd1e130038b4952188096b1af07a4c1806",
+                "reference": "7584eadd1e130038b4952188096b1af07a4c1806",
                 "shasum": ""
             },
             "require": {
@@ -7494,20 +7494,20 @@
                 "issues": "https://github.com/nowo-tech/HotReloadBundle/issues",
                 "source": "https://github.com/nowo-tech/HotReloadBundle"
             },
-            "time": "2026-09-27T16:22:13+00:00"
+            "time": "2026-10-09T07:31:19+00:00"
         },
         {
             "name": "nowo-tech/twig-inspector-bundle",
-            "version": "v1.1.6",
+            "version": "v1.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/TwigInspectorBundle.git",
-                "reference": "8bdf88cedfdadb713d1c9bada4eb4219ad5f2fc9"
+                "reference": "eeaf040a3313ddbd24cbf44f71b7a36f3cf0fb75"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/8bdf88cedfdadb713d1c9bada4eb4219ad5f2fc9",
-                "reference": "8bdf88cedfdadb713d1c9bada4eb4219ad5f2fc9",
+                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/eeaf040a3313ddbd24cbf44f71b7a36f3cf0fb75",
+                "reference": "eeaf040a3313ddbd24cbf44f71b7a36f3cf0fb75",
                 "shasum": ""
             },
             "require": {
@@ -7527,7 +7527,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",
-                "igor-php/igor-php": "^0.9.7",
+                "igor-php/igor-php": "^0.10.0",
                 "nowo-tech/phpstan-frankenphp": "^1.0",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.0",
@@ -7605,7 +7605,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-27T16:25:36+00:00"
+            "time": "2026-10-06T08:16:31+00:00"
         },
         {
             "name": "phar-io/manifest",
