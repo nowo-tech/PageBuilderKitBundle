@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.5.1] - 2026-10-09](#151---2026-10-09)
 - [[1.5.0] - 2026-10-07](#150---2026-10-07)
 - [[1.4.4] - 2026-10-06](#144---2026-10-06)
 - [[1.4.3] - 2026-10-02](#143---2026-10-02)
@@ -25,6 +26,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.5.1] - 2026-10-09
+
+### Security
+
+- `AllowlistPageBuilderHtmlSanitizer`: the internal wrapper is identified by reference. Any input element with `id="pbk-root"` used to skip sanitizing (`<script id="pbk-root">`, `<img id="pbk-root" onerror>` and `<meta id="pbk-root" http-equiv=refresh>` survived).
+- URL attributes (`href`, `src`) ignore ASCII whitespace / control characters before checking the scheme (`java\tscript:` and `jav&#x09;ascript:` were accepted) and also reject `vbscript:` and non-image `data:` URLs.
+
+### Dependencies
+
+- Bundle lockfile: `nowo-tech/form-kit-bundle` 2.6.1, `nowo-tech/ui-kit-bundle` 1.9.1; dev `phpstan/phpstan` 2.3.1, `nowo-tech/phpstan-frankenphp` 1.2.3.
+- Demo (`demo/symfony8`): `nowo-tech/form-kit-bundle` 2.6.1, `nowo-tech/ui-kit-bundle` 1.9.1, `aws/aws-sdk-php` 3.400.0; regenerated `config/reference.php`.
+
+### Notes
+
+- Backward compatible for hosts on `^1.5`. **No** Doctrine schema changes. See [UPGRADING.md](UPGRADING.md#151).
 
 ## [1.5.0] - 2026-10-07
 

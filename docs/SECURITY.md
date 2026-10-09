@@ -85,7 +85,7 @@ nowo_page_builder_kit:
 | Strategy | Behaviour |
 | --- | --- |
 | `none` | Trusted editors only; HTML stored/rendered as-is (opt-in; not the default) |
-| `allowlist` (default) | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer` |
+| `allowlist` (default) | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer`; drops `script` / `style` / `iframe` / `object` / `embed` / `link` / `meta` / `svg` with content, removes `on*` handlers, and rejects `javascript:` / `vbscript:` / non-image `data:` URLs (after stripping whitespace / control characters) |
 | `strip` | Remove all tags |
 | `service` | Host `PageBuilderHtmlSanitizerInterface` |
 

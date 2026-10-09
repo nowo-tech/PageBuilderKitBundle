@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [1.5.1](#151)
 - [1.5.0](#150)
 - [1.4.4](#144)
 - [1.4.3](#143)
@@ -18,6 +19,19 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.5.1
+
+From **1.5.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+1. No breaking changes. **No application upgrade steps.**
+2. The default `allowlist` sanitizer is stricter: elements carrying `id="pbk-root"` are now sanitized like any other, and `href` / `src` values with `javascript:` / `vbscript:` schemes (also when split by tabs, newlines or control characters) or non-image `data:` URLs are dropped. `data:image/{png,jpeg,gif,webp,avif}` remains allowed on `img[src]`.
+
+See [CHANGELOG.md](CHANGELOG.md#151---2026-10-09).
 
 ## 1.5.0
 
