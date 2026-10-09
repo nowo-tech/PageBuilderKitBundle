@@ -28,6 +28,16 @@ final class XssSanitizerMatrixTest extends TestCase
         yield 'onerror' => ['<img src=x onerror=alert(1)>', ['onerror']];
         yield 'svg_onload' => ['<svg onload=alert(1)></svg>', ['svg', 'onload']];
         yield 'javascript_href' => ['<a href="javascript:alert(1)">x</a>', ['javascript:']];
+        // An element posing as the internal wrapper must still be sanitized.
+        yield 'fake_root_script' => ['<script id="pbk-root">alert(1)</script>', ['script', 'alert']];
+        yield 'fake_root_handler' => ['<img id="pbk-root" src="x" onerror="alert(1)">', ['onerror']];
+        yield 'fake_root_meta' => ['<meta id="pbk-root" http-equiv="refresh" content="0;url=https://evil.test">', ['meta', 'refresh']];
+        yield 'fake_root_wrapper' => ['<div id="pbk-root"><p>a</p></div><script>alert(1)</script>', ['script', 'alert']];
+        // Browsers drop tabs / newlines inside the scheme; entities are decoded by the parser.
+        yield 'tab_in_scheme' => ["<a href=\"java\tscript:alert(1)\">x</a>", ['script:', 'alert']];
+        yield 'entity_scheme' => ['<a href="jav&#x09;ascript:alert(1)">x</a>', ['script:', 'alert']];
+        yield 'vbscript' => ['<a href="vbscript:msgbox(1)">x</a>', ['vbscript']];
+        yield 'data_html_link' => ['<a href="data:text/html;base64,PHNjcmlwdD4=">x</a>', ['data:']];
     }
 
     /**

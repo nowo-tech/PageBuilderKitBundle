@@ -55,6 +55,19 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
             return strip_tags($html, '<' . implode('><', self::ALLOWED_TAGS) . '>');
         }
 
+        // The wrapper is identified by reference: an `id="pbk-root"` in the input must not be
+        // mistaken for it (it would skip sanitizing, e.g. `<script id="pbk-root">`).
+        $root = null;
+        foreach ($document->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $root = $child;
+                break;
+            }
+        }
+        if (!$root instanceof DOMElement) {
+            return '';
+        }
+
         $xpath = new DOMXPath($document);
         $nodes = $xpath->query('//*');
         if ($nodes === false) {
@@ -68,7 +81,7 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
                 continue;
             }
             $tag = strtolower($node->tagName);
-            if ($tag === 'html' || $tag === 'body' || $node->getAttribute('id') === 'pbk-root') {
+            if ($node === $root || $tag === 'html' || $tag === 'body') {
                 continue;
             }
             if (!in_array($tag, self::ALLOWED_TAGS, true)) {
@@ -95,11 +108,6 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
             }
         }
 
-        $root = $document->getElementById('pbk-root');
-        if (!$root instanceof DOMElement) {
-            return '';
-        }
-
         $out = '';
         foreach ($root->childNodes as $child) {
             $out .= $document->saveHTML($child) ?: '';
@@ -123,8 +131,7 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
                 $remove[] = $attr->name;
                 continue;
             }
-            $value = trim($attr->value);
-            if (($name === 'href' || $name === 'src') && preg_match('#^\s*javascript:#i', $value) === 1) {
+            if (($name === 'href' || $name === 'src') && !self::isSafeUrl($attr->value, $name === 'src')) {
                 $remove[] = $attr->name;
             }
         }
@@ -132,5 +139,22 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
         foreach ($remove as $name) {
             $element->removeAttribute($name);
         }
+    }
+
+    /**
+     * Browsers ignore ASCII whitespace / control characters inside a URL scheme
+     * (`java\tscript:`), so they are removed before the scheme is checked.
+     */
+    private static function isSafeUrl(string $value, bool $imageSource): bool
+    {
+        $normalized = strtolower((string) preg_replace('/[\x00-\x20\x7f]+/', '', $value));
+        if (str_starts_with($normalized, 'javascript:') || str_starts_with($normalized, 'vbscript:')) {
+            return false;
+        }
+        if (str_starts_with($normalized, 'data:')) {
+            return $imageSource && preg_match('#^data:image/(png|jpe?g|gif|webp|avif);#', $normalized) === 1;
+        }
+
+        return true;
     }
 }
