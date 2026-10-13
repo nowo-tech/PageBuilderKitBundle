@@ -4,6 +4,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [Unreleased](#unreleased)
 - [1.8.0](#180)
 - [1.7.0](#170)
 - [1.6.1](#161)
@@ -20,6 +21,9 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.1.1](#111)
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+  - [Recommended first config](#recommended-first-config)
+  - [Public pages and i18n routes](#public-pages-and-i18n-routes)
+  - [Optional demo](#optional-demo)
 
 ## Unreleased
 
