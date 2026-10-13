@@ -4,6 +4,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [1.8.0](#180)
 - [1.7.0](#170)
 - [1.6.1](#161)
 - [1.6.0](#160)
@@ -21,6 +22,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.0.0 — first release](#100--first-release)
 
 ## Unreleased
+
+## 1.8.0
+
+From **1.7.0** — unused doctrine.connection option deprecated.
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 - `doctrine.connection` is deprecated and ignored (it never selected a connection). Remove it from your config; to put the bundle tables on another connection, add the bundle mapping to that entity manager in `doctrine.orm.entity_managers`.
 
