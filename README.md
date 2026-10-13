@@ -16,11 +16,11 @@ This bundle is **FrankenPHP worker mode friendly**. Shared services stay request
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/images/demo/overview.png" alt="Public pricing page with demo chrome and Symfony Web Profiler toolbar" />
+      <img src="docs/images/demo/overview.webp" alt="Public pricing page with demo chrome and Symfony Web Profiler toolbar" />
       <br /><sub>Public pricing — full demo context + Web Profiler</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/images/demo/interaction.png" alt="GrapesJS admin canvas with Web Profiler toolbar" />
+      <img src="docs/images/demo/interaction.webp" alt="GrapesJS admin canvas with Web Profiler toolbar" />
       <br /><sub>Admin GrapesJS canvas — context + Web Profiler</sub>
     </td>
   </tr>

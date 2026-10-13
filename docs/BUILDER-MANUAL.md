@@ -12,7 +12,7 @@ Demo URL: `http://localhost:8137` · Login: `admin` / `admin`
 
 Go to **Admin → Pages** (`/admin/page-builder/pages`).
 
-![Page list](images/demo/builder-01-page-list.png)
+![Page list](images/demo/builder-01-page-list.webp)
 
 From each row you can open **Canvas** (layout), **Content** (typed fields), **Sections** (classic legacy), SEO, revisions, or create from a template.
 
@@ -20,7 +20,7 @@ From each row you can open **Canvas** (layout), **Content** (typed fields), **Se
 
 Open **Canvas** for a Grapes page (e.g. `/admin/page-builder/pages/pricing/canvas`).
 
-![Canvas](images/demo/builder-02-canvas.png)
+![Canvas](images/demo/builder-02-canvas.webp)
 
 - Drag blocks from the Block Manager (Basic, compounds, **Twig**, **Content fields**, A11y, …).
 - Switch locale tabs when the page uses `localeContent`.
@@ -30,7 +30,7 @@ Open **Canvas** for a Grapes page (e.g. `/admin/page-builder/pages/pricing/canva
 
 Open **Content** (`/admin/page-builder/pages/{pageKey}/content`).
 
-![Content fields](images/demo/builder-03-content.png)
+![Content fields](images/demo/builder-03-content.webp)
 
 - **Schema** (layout capability): add fields (`string`, `html`, `repeater`, `reference`, …).
 - **Values** (content capability): fill per-locale tabs; labels are also per locale.
@@ -52,7 +52,7 @@ Public HTML may use:
 
 Demo page: [`/fields`](http://localhost:8137/fields) · Content admin: `/admin/page-builder/pages/fields/content`
 
-![Public fields page](images/demo/builder-04-fields-public.png)
+![Public fields page](images/demo/builder-04-fields-public.webp)
 
 ## 5. Templates
 
@@ -61,7 +61,7 @@ Demo page: [`/fields`](http://localhost:8137/fields) · Content admin: `/admin/p
 - **Copy field schema** (default on)
 - **Copy field values** (default off — editors fill fresh content)
 
-![Templates](images/demo/builder-05-templates.png)
+![Templates](images/demo/builder-05-templates.webp)
 
 ## 6. Publish rules
 
@@ -73,6 +73,6 @@ Draft demo: `/draft` is visible in the app; `/p/draft` returns **404** until pub
 
 All seeded use cases: `/showcase`
 
-![Showcase](images/demo/builder-06-showcase.png)
+![Showcase](images/demo/builder-06-showcase.webp)
 
 See also [USE-CASES.md](USE-CASES.md) for the full capability / demo matrix.

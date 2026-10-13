@@ -4,7 +4,7 @@
 
 | Overview | Interaction |
 |----------|-------------|
-| ![Public pricing with demo chrome and Symfony Web Profiler](images/demo/overview.png) | ![GrapesJS admin canvas with Web Profiler toolbar](images/demo/interaction.png) |
+| ![Public pricing with demo chrome and Symfony Web Profiler](images/demo/overview.webp) | ![GrapesJS admin canvas with Web Profiler toolbar](images/demo/interaction.webp) |
 
 Full viewport captures (demo nav/chrome + content + **Symfony Web Profiler** toolbar). Regenerate with `make -C demo/symfony8 demo-screenshots` (REQ-DEMO-013).
 
