@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Asset uploads: the stored extension is now always derived from the detected MIME type (local and S3 storage). Uploads whose file-name extension does not match the detected type are rejected, so a GIF/PHP polyglot named `x.php` can no longer be written as an executable `.php` file under `public/uploads/page-builder/`.
+- Asset uploads: `image/svg+xml` was removed from the default `assets_upload.allowed_mime` (scriptable SVG served same-origin is stored XSS). Add it back explicitly if you need SVG uploads.
+- Document API: the `_redirect` form field rejects protocol-relative (`//evil.com`), backslash (`/\evil.com`) and control-character targets (open redirect).
+- Admin access: the media library route `admin_page_builder_assets_list` now requires the **layout** capability, like `admin_page_builder_asset_upload` (previously any editor could list uploaded assets).
+
 ## [1.6.1] - 2026-10-13
 
 ### Changed

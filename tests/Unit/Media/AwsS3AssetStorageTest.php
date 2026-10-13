@@ -324,4 +324,44 @@ final class AwsS3AssetStorageTest extends TestCase
             self::assertSame($mime, $result->mimeType);
         }
     }
+
+    #[Test]
+    public function rejectsGifPhpPolyglotNamedPhpBeforeUploading(): void
+    {
+        $helper = new class {
+            public string $_bucketName = 'b';
+
+            public int $uploads = 0;
+
+            /** @return array<string, mixed> */
+            public function uploadFile(string $filePath, string $fileType, string $key, bool $private = false, string $dispositionType = 'inline', ?string $bucket = null): array
+            {
+                ++$this->uploads;
+
+                return ['ObjectURL' => 'https://cdn.example/' . $key];
+            }
+
+            /** @param array<string, mixed> $config */
+            public function getFileURL(string $bucket, string $key, array $config = []): string
+            {
+                return 'https://cdn.example/' . $key;
+            }
+        };
+
+        $storage = new AwsS3AssetStorage($helper);
+        $tmp     = sys_get_temp_dir() . '/pbk-s3-polyglot-' . uniqid('', true);
+        file_put_contents($tmp, "GIF89a<?php echo 'pwned'; ?>");
+
+        try {
+            $storage->store(new UploadedFile($tmp, 'x.php', 'image/gif', null, true));
+            self::fail('Polyglot upload named .php must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('does not match detected MIME type "image/gif"', $exception->getMessage());
+        }
+        self::assertSame(0, $helper->uploads);
+
+        $result = $storage->store(new UploadedFile($tmp, 'x.gif', 'image/gif', null, true));
+        self::assertStringEndsWith('.gif', (string) $result->storageKey);
+        self::assertSame(1, $helper->uploads);
+    }
 }

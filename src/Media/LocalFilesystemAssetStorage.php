@@ -25,13 +25,11 @@ use function is_file;
 use function is_string;
 use function mkdir;
 use function opendir;
-use function preg_replace;
 use function random_bytes;
 use function readdir;
 use function rtrim;
 use function sprintf;
 use function str_contains;
-use function strtolower;
 use function trim;
 use function usort;
 
@@ -54,7 +52,6 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStor
             'image/png',
             'image/gif',
             'image/webp',
-            'image/svg+xml',
         ],
     ) {
     }
@@ -70,8 +67,7 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStor
         }
 
         $mime      = $this->resolveMimeType($file);
-        $extension = strtolower($file->getClientOriginalExtension() ?: $this->extensionFromMime($mime) ?: 'bin');
-        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
+        $extension = UploadedAssetExtension::resolve($mime, $file->getClientOriginalExtension());
         $basename  = bin2hex(random_bytes(16)) . '.' . $extension;
         $file->move($this->directory, $basename);
 
@@ -210,17 +206,5 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStor
         } catch (Throwable) {
             return '';
         }
-    }
-
-    private function extensionFromMime(string $mime): string
-    {
-        return match ($mime) {
-            'image/jpeg'    => 'jpg',
-            'image/png'     => 'png',
-            'image/gif'     => 'gif',
-            'image/webp'    => 'webp',
-            'image/svg+xml' => 'svg',
-            default         => '',
-        };
     }
 }

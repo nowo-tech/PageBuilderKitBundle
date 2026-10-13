@@ -133,6 +133,27 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
     }
 
     #[Test]
+    public function deniesAssetLibraryListWithoutLayoutCapability(): void
+    {
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($this->contentOnlyChecker());
+
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('Page builder capability "layout" required.');
+
+        $subscriber->onKernelController($this->controllerEvent('admin_page_builder_assets_list'));
+    }
+
+    #[Test]
+    public function deniesAssetUploadWithoutLayoutCapability(): void
+    {
+        $subscriber = new PageBuilderKitAdminAccessSubscriber($this->contentOnlyChecker());
+
+        $this->expectException(AccessDeniedException::class);
+
+        $subscriber->onKernelController($this->controllerEvent('admin_page_builder_asset_upload'));
+    }
+
+    #[Test]
     public function allowsDocumentGetWhenAnyListedCapabilityMatches(): void
     {
         $checker = new class implements PageBuilderKitAccessCheckerInterface {
@@ -266,6 +287,43 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
         $subscriber->onKernelController($this->controllerEvent(null));
 
         self::assertSame(0, $calls->count);
+    }
+
+    private function contentOnlyChecker(): PageBuilderKitAccessCheckerInterface
+    {
+        return new class implements PageBuilderKitAccessCheckerInterface {
+            public function canAccess(): bool
+            {
+                return true;
+            }
+
+            public function canLayout(): bool
+            {
+                return false;
+            }
+
+            public function canContent(): bool
+            {
+                return true;
+            }
+
+            public function canPublish(): bool
+            {
+                return false;
+            }
+
+            public function canTemplates(): bool
+            {
+                return false;
+            }
+
+            public function can(PageBuilderCapability|string $capability): bool
+            {
+                $value = $capability instanceof PageBuilderCapability ? $capability->value : $capability;
+
+                return $value === PageBuilderCapability::Content->value;
+            }
+        };
     }
 
     private function denyAllChecker(): PageBuilderKitAccessCheckerInterface

@@ -29,6 +29,7 @@ final readonly class PageBuilderKitAdminAccessSubscriber implements EventSubscri
         'admin_page_builder_canvas'             => PageBuilderCapability::Layout->value,
         'admin_page_builder_sections'           => PageBuilderCapability::Layout->value,
         'admin_page_builder_asset_upload'       => PageBuilderCapability::Layout->value,
+        'admin_page_builder_assets_list'        => PageBuilderCapability::Layout->value,
         'admin_page_builder_document_get'       => [PageBuilderCapability::Layout->value, PageBuilderCapability::Content->value],
         'admin_page_builder_document_save'      => PageBuilderCapability::Layout->value,
         'admin_page_builder_document_publish'   => PageBuilderCapability::Publish->value,

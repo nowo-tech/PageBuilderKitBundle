@@ -612,13 +612,6 @@ final class CoverageGapsTest extends TestCase
         $result = $storage->store($upload);
         self::assertStringEndsWith('.png', (string) $result->storageKey);
 
-        $method     = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'extensionFromMime');
-        $storageRef = new LocalFilesystemAssetStorage($dir, '/u');
-        self::assertSame('jpg', $method->invoke($storageRef, 'image/jpeg'));
-        self::assertSame('gif', $method->invoke($storageRef, 'image/gif'));
-        self::assertSame('webp', $method->invoke($storageRef, 'image/webp'));
-        self::assertSame('svg', $method->invoke($storageRef, 'image/svg+xml'));
-        self::assertSame('', $method->invoke($storageRef, 'application/octet-stream'));
     }
 
     #[Test]

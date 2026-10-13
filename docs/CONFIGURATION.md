@@ -299,7 +299,7 @@ With `grapesjs.a11y_helpers: true` (default), the canvas exposes category **A11y
 | `assets_upload.storage` | `local` | `local` \| `s3` \| `service`. |
 | `assets_upload.service` | `null` | Custom `PageBuilderAssetStorageInterface` id when `storage=service`. |
 | `assets_upload.max_bytes` | `5242880` | Max upload size. |
-| `assets_upload.allowed_mime` | jpeg/png/gif/webp/svg | MIME allowlist. |
+| `assets_upload.allowed_mime` | jpeg/png/gif/webp | Allowlist checked against the **detected** (finfo) MIME type. The stored extension is always derived from that MIME type (`jpg`/`png`/`gif`/`webp`/`avif`/`svg`, otherwise `bin`); uploads whose file-name extension does not match (e.g. a GIF polyglot named `x.php`) are rejected. `image/svg+xml` is **not** in the default list: SVG served from your origin can run scripts (stored XSS). Add it only if uploads come from fully trusted users or are served from a separate origin / with a restrictive CSP. |
 | `assets_upload.local.directory` | `%kernel.project_dir%/public/uploads/page-builder` | Disk path. |
 | `assets_upload.local.public_prefix` | `/uploads/page-builder` | URL prefix returned as `src`. |
 | `assets_upload.s3.helper_service` | `core_aws_s3.service.helper` | `AwsS3Helper` (or compatible) service id. |

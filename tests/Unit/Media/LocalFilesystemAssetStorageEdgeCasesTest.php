@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function file_put_contents;
+use function glob;
 use function sys_get_temp_dir;
 use function uniqid;
 
@@ -75,5 +76,48 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $storage->store(new UploadedFile($tmp, 'note.txt', 'text/plain', null, true));
+    }
+
+    #[Test]
+    public function storeRejectsGifPhpPolyglotNamedPhp(): void
+    {
+        $dir     = sys_get_temp_dir() . '/pbk-polyglot-' . uniqid('', true);
+        $storage = new LocalFilesystemAssetStorage($dir, '/uploads/page-builder');
+        $tmp     = sys_get_temp_dir() . '/pbk-polyglot-src-' . uniqid('', true);
+        file_put_contents($tmp, "GIF89a<?php echo 'pwned'; ?>");
+
+        try {
+            $storage->store(new UploadedFile($tmp, 'x.php', 'image/gif', null, true));
+            self::fail('Polyglot upload named .php must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('does not match detected MIME type "image/gif"', $exception->getMessage());
+        }
+
+        self::assertSame([], glob($dir . '/*.php') ?: []);
+    }
+
+    #[Test]
+    public function storeUsesDetectedMimeExtensionNotClientCase(): void
+    {
+        $dir     = sys_get_temp_dir() . '/pbk-ext-' . uniqid('', true);
+        $storage = new LocalFilesystemAssetStorage($dir, '/media');
+        $tmp     = sys_get_temp_dir() . '/pbk-ext-src-' . uniqid('', true);
+        file_put_contents($tmp, 'GIF89a');
+
+        $result = $storage->store(new UploadedFile($tmp, 'Banner.GIF', 'image/gif', null, true));
+
+        self::assertStringEndsWith('.gif', $result->storageKey ?? '');
+    }
+
+    #[Test]
+    public function defaultAllowlistRejectsSvg(): void
+    {
+        $storage = new LocalFilesystemAssetStorage(sys_get_temp_dir() . '/pbk-svg-' . uniqid('', true), '/media');
+        $tmp     = sys_get_temp_dir() . '/pbk-svg-src-' . uniqid('', true);
+        file_put_contents($tmp, '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('MIME type "image/svg+xml" is not allowed.');
+        $storage->store(new UploadedFile($tmp, 'x.svg', 'image/svg+xml', null, true));
     }
 }

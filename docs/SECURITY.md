@@ -141,6 +141,16 @@ public function onRequest(RequestEvent $event): void
 
 Element `style="…"` attributes from GrapesJS still require `style-src-attr 'unsafe-inline'` (or `'unsafe-hashes'`).
 
+## Asset uploads
+
+When `assets_upload.enabled` is true (`admin_page_builder_asset_upload` / `admin_page_builder_assets_list`, both require the **layout** capability):
+
+- The MIME type is detected from the file bytes (finfo) and checked against `assets_upload.allowed_mime`.
+- The stored file name is random and its extension is derived from the detected MIME type, never from the client name; a mismatching client extension (e.g. a GIF/PHP polyglot named `x.php`) is rejected, so nothing executable lands under `public/`.
+- `image/svg+xml` is not allowed by default (scriptable SVG served same-origin = stored XSS). Opt in only for trusted uploaders or with a separate asset origin / strict CSP.
+
+The document API `_redirect` form field only follows same-origin paths: values starting with `//` or `/\` or containing control characters fall back to the canvas route.
+
 ## Operational guidance
 
 - Audit which users receive `ROLE_EDITOR` or custom-checker access.

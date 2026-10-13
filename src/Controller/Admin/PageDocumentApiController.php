@@ -22,6 +22,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 use function is_array;
 use function is_string;
+use function preg_match;
 use function str_contains;
 use function str_starts_with;
 
@@ -260,11 +261,23 @@ final class PageDocumentApiController extends AbstractController
         $this->addFlash('success', $flash);
 
         $redirect = (string) $request->request->get('_redirect', '');
-        if ($redirect !== '' && str_starts_with($redirect, '/')) {
+        if ($this->isSafeLocalRedirect($redirect)) {
             return $this->redirect($redirect);
         }
 
         return $this->redirectToRoute('admin_page_builder_canvas', ['pageKey' => $pageKey]);
+    }
+
+    /**
+     * Same-origin path only: rejects protocol-relative ("//evil.com"), backslash ("/\evil.com") and control-character targets.
+     */
+    private function isSafeLocalRedirect(string $redirect): bool
+    {
+        return $redirect !== ''
+            && str_starts_with($redirect, '/')
+            && !str_starts_with($redirect, '//')
+            && !str_starts_with($redirect, '/\\')
+            && preg_match('/[\x00-\x1F\x7F]/', $redirect) !== 1;
     }
 
     private function statusError(Request $request, string $error, int $code): Response

@@ -211,13 +211,13 @@ final class Configuration implements ConfigurationInterface
                                 ->end()
                                 ->integerNode('max_bytes')->defaultValue(5_242_880)->min(1)->end()
                                 ->arrayNode('allowed_mime')
+                                    ->info('Detected (finfo) MIME allowlist. image/svg+xml is not allowed by default: SVG served same-origin can run scripts (stored XSS); add it only with a CSP / separate asset origin.')
                                     ->scalarPrototype()->end()
                                     ->defaultValue([
                                         'image/jpeg',
                                         'image/png',
                                         'image/gif',
                                         'image/webp',
-                                        'image/svg+xml',
                                     ])
                                 ->end()
                                 ->arrayNode('local')

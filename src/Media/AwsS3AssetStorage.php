@@ -23,12 +23,10 @@ use function is_string;
 use function ltrim;
 use function method_exists;
 use function pathinfo;
-use function preg_replace;
 use function property_exists;
 use function random_bytes;
 use function rtrim;
 use function sprintf;
-use function strtolower;
 use function trim;
 
 use const FILEINFO_MIME_TYPE;
@@ -55,7 +53,6 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
             'image/png',
             'image/gif',
             'image/webp',
-            'image/svg+xml',
         ],
         private ?string $publicBaseUrl = null,
     ) {
@@ -69,17 +66,7 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
         $this->assertValidUpload($file);
 
         $mime      = $this->resolveMimeType($file) ?: 'application/octet-stream';
-        $extension = strtolower($file->getClientOriginalExtension() ?: match ($mime) {
-            // @codeCoverageIgnoreStart — finfo usually supplies png/jpeg from bytes before these arms
-            'image/jpeg'    => 'jpg',
-            'image/png'     => 'png',
-            'image/gif'     => 'gif',
-            'image/webp'    => 'webp',
-            'image/svg+xml' => 'svg',
-            default         => 'bin',
-            // @codeCoverageIgnoreEnd
-        });
-        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'bin';
+        $extension = UploadedAssetExtension::resolve($mime, $file->getClientOriginalExtension());
         $folder    = trim($this->folder, '/');
         $key       = ($folder !== '' ? $folder . '/' : '') . bin2hex(random_bytes(16)) . '.' . $extension;
         $path      = $file->getRealPath();
