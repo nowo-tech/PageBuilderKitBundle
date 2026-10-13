@@ -11,8 +11,8 @@ const outDir = process.env.SCREENSHOT_DIR
 
 async function loginAsAdmin(page: import('@playwright/test').Page) {
   await page.goto('/login');
-  await page.fill('#username', 'admin');
-  await page.fill('#password', 'admin');
+  await page.fill('input[name="_username"]', 'admin');
+  await page.fill('input[name="_password"]', 'admin');
   await page.click('button[type="submit"]');
   await expect(page).not.toHaveURL(/\/login$/);
 }
