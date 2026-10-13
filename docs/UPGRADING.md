@@ -4,6 +4,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [1.7.0](#170)
 - [1.6.1](#161)
 - [1.6.0](#160)
 - [1.5.1](#151)
@@ -18,6 +19,18 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.1.1](#111)
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+
+## 1.7.0
+
+From **1.6.1** — security: hardened asset uploads, safe redirects, asset library capability.
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+- SVG uploads are no longer allowed by default; add `image/svg+xml` to `assets_upload.allowed_mime` to re-enable them (stored-XSS risk, see SECURITY.md).
+- Uploads whose extension does not match the detected type (e.g. a PNG named `.jpg`) are rejected; files are stored with the canonical extension (`.jpeg` → `.jpg`).
+- Users without the Layout capability can no longer list the media library; `_redirect` values starting with `//` or `/\` are ignored.
 
 ## 1.6.1
 
