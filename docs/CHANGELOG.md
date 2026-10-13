@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- `doctrine.connection`: the option was only stored as the `nowo_page_builder_kit.doctrine.connection` parameter and never wired to Doctrine. It is now deprecated (setting it triggers a deprecation notice) and documented as ignored; map the bundle entities on the entity manager you need in `doctrine.orm.entity_managers` instead.
+
 ## [1.7.0] - 2026-10-13
 
 ### Security

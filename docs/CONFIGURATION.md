@@ -41,7 +41,7 @@ nowo_page_builder_kit:
         default_robots: 'index,follow'
     doctrine:
         table_prefix: ''
-        connection: default
+        # connection: default   # deprecated since 1.8, ignored (see below)
     html:
         sanitize:
             strategy: allowlist # none | strip | allowlist | service
@@ -190,7 +190,7 @@ Then list is `/cms/pages`, canvas `/cms/pages/{pageKey}/canvas`, upload `/cms/as
 | Key | Default | Description |
 | --- | --- | --- |
 | `table_prefix` | `''` | Prefix applied to bundle entity tables (`pb_page`, `pb_document`, …) through `TablePrefixListener`. Use when several apps/tenants share one database. |
-| `connection` | `default` | Connection name recorded for host alignment. |
+| `connection` | `default` | **Deprecated since 1.8, ignored.** It was only stored as the `nowo_page_builder_kit.doctrine.connection` parameter and never wired to Doctrine. The bundle entities are mapped like any other mapping: to use another connection, add the bundle mapping to the matching entity manager in `doctrine.orm.entity_managers`. Setting the key triggers a deprecation notice; it will be removed in the next major. |
 
 Example — tables become `tenant_a_pb_page`, etc.:
 

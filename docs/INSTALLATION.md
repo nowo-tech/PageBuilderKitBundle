@@ -77,7 +77,6 @@ nowo_page_builder_kit:
         css_framework: tailwind
     doctrine:
         table_prefix: ''                   # e.g. 'app_' → app_pb_page
-        connection: default
 ```
 
 ## Routes

@@ -20,6 +20,10 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
 
+## Unreleased
+
+- `doctrine.connection` is deprecated and ignored (it never selected a connection). Remove it from your config; to put the bundle tables on another connection, add the bundle mapping to that entity manager in `doctrine.orm.entity_managers`.
+
 ## 1.7.0
 
 From **1.6.1** — security: hardened asset uploads, safe redirects, asset library capability.

@@ -9,6 +9,8 @@ use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\ArrayNode;
+use Symfony\Component\Config\Definition\BaseNode;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 
@@ -44,6 +46,23 @@ final class ConfigurationTest extends TestCase
         self::assertTrue($config['revisions']['on_save']);
         self::assertTrue($config['revisions']['on_publish']);
         self::assertTrue($config['debug']['collector']);
+    }
+
+    #[Test]
+    public function doctrineConnectionIsDeprecated(): void
+    {
+        $root = (new Configuration())->getConfigTreeBuilder()->buildTree();
+        self::assertInstanceOf(ArrayNode::class, $root);
+        $doctrine = $root->getChildren()['doctrine'];
+        self::assertInstanceOf(ArrayNode::class, $doctrine);
+        $connection = $doctrine->getChildren()['connection'];
+        self::assertInstanceOf(BaseNode::class, $connection);
+
+        self::assertTrue($connection->isDeprecated());
+        $deprecation = $connection->getDeprecation('connection', 'nowo_page_builder_kit.doctrine');
+        self::assertSame('nowo-tech/page-builder-kit-bundle', $deprecation['package']);
+        self::assertSame('1.8', $deprecation['version']);
+        self::assertStringContainsString('doctrine.orm.entity_managers', $deprecation['message']);
     }
 
     #[Test]
