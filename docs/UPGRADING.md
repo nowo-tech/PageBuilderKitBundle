@@ -4,6 +4,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Table of contents
 
+- [1.6.1](#161)
 - [1.6.0](#160)
 - [1.5.1](#151)
 - [1.5.0](#150)
@@ -17,6 +18,16 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 - [1.1.1](#111)
 - [1.1.0](#110)
 - [1.0.0 — first release](#100--first-release)
+
+## 1.6.1
+
+From **1.6.0** — dependency refresh and repository maintenance.
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+- No breaking changes. No application upgrade steps.
 
 ## 1.6.0
 

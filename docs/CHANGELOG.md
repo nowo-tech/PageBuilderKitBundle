@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [[Unreleased]](#unreleased)
 
+- [[1.6.1] - 2026-10-13](#161---2026-10-13)
 - [[1.6.0] - 2026-10-09](#160---2026-10-09)
 - [[1.5.1] - 2026-10-09](#151---2026-10-09)
 - [[1.5.0] - 2026-10-07](#150---2026-10-07)
@@ -29,9 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-10-13
+
 ### Changed
 
 - Development: `composer.json` pins `config.platform.php` to 8.4.1 so the committed lock stays installable on the minimum PHP; CI overrides the platform per matrix cell.
+- Repository: `.twig-cs-fixer.cache` is now git-ignored.
+
+### Dependencies
+
+- `nowo-tech/form-kit-bundle` 2.7.0 → 2.7.1 (development lock; #3).
+- `nowo-tech/ui-kit-bundle` 1.10.0 → 1.11.0 (development lock; #4).
+- `igor-php/igor-php` 0.9.7 → 0.10.1 (require-dev constraint + development lock; #5).
+- `doctrine/orm` 3.7.4 → 3.7.5 (development lock; #6).
 
 ## [1.6.0] - 2026-10-09
 
