@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Dependencies refreshed (Composer and pnpm/npm lock files of the bundle and its demos, campaign 2026-10-19).
+- `.php-cs-fixer.dist.php`: `new ParallelConfig(2)` (REQ-CS-001).
 - Documentation: wave-1 REQ compliance — versioned `.cursor/` (Engram `mcp.json`, rules incl. `01-git-commits.mdc`, Spec Kit skills; only `sandbox.json` stays ignored), README documentation list order (duplicate Builder manual removed) and Roadmap moved after License, CODEOWNERS header, CONTRIBUTING Cursor Agent settings, TOCs for long docs, full GitHub Spec Kit manual, inventory refresh (165/165).
 
 ## [1.8.1] - 2026-10-18
