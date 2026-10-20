@@ -11,9 +11,11 @@ Security considerations for page builder admin, document API, and public renderi
 - [Public HTML final hardening](#public-html-final-hardening)
 - [Grapes Twig fallback](#grapes-twig-fallback)
 - [Content Security Policy (nonce)](#content-security-policy-nonce)
+- [Asset uploads](#asset-uploads)
 - [Operational guidance](#operational-guidance)
 - [Release security checklist](#release-security-checklist)
 - [REQ-SEC-004 (AI security audit)](#req-sec-004-ai-security-audit)
+- [Secrets](#secrets)
 
 ## Threat model
 

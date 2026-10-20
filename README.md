@@ -91,20 +91,6 @@ Admin: `/admin/page-builder/pages` → open a page canvas.
 
 Use both bundles in one app when some routes need rigid blocks and others need a visual builder.
 
-## Roadmap
-
-| Phase | Status | Scope |
-| --- | --- | --- |
-| **Phase 1–2** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
-| **Phase 3** | **Shipped (v1.1.0)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
-| **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
-| **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
-| **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
-| **Phase 5–7** | **Shipped (v1.4.0)** | Content fields + ACL capabilities, hardening/slots, media library + tags |
-| **Phase 9** | **Done (v1.5.0)** | Org compliance (v1.4.3) + optional `PublicHtmlNormalizer` (v1.4.4) + public bind hydrator, section filter and status query (v1.5.0) |
-
-Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`009` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**; polish + compliance + HTML cleanup in **v1.4.1–v1.4.4**).
-
 ## Development
 
 ```bash
@@ -127,19 +113,14 @@ Demo default URL: `http://localhost:8137`.
 
 ## Documentation
 
-- [Architecture (Mermaid)](docs/ARCHITECTURE.md)
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [Widget authors](docs/WIDGET_AUTHORS.md)
-- [Cookbook (packs + templates)](docs/COOKBOOK.md)
-- [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Usage](docs/USAGE.md)
-- [Builder manual](docs/BUILDER-MANUAL.md)
 - [Contributing](docs/CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Changelog](docs/CHANGELOG.md)
 - [Upgrading](docs/UPGRADING.md)
-- [Release process](docs/RELEASE.md)
+- [Release](docs/RELEASE.md)
 - [Security](docs/SECURITY.md)
 - [Engram](docs/ENGRAM.md)
 - [Spec-driven development](docs/SPEC-DRIVEN-DEVELOPMENT.md)
@@ -147,10 +128,14 @@ Demo default URL: `http://localhost:8137`.
 
 ### Additional documentation
 
+- [Architecture (Mermaid)](docs/ARCHITECTURE.md)
+- [Widget authors](docs/WIDGET_AUTHORS.md)
+- [Cookbook (packs + templates)](docs/COOKBOOK.md)
+- [PSR evaluation (REQ-CS-007)](docs/PSR.md)
+- [Builder manual](docs/BUILDER-MANUAL.md)
 - [GitHub Actions CI requirements](docs/GITHUB_CI.md)
 - [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
 - [Use cases matrix](docs/USE-CASES.md)
-- [Builder manual](docs/BUILDER-MANUAL.md)
 - [FrankenPHP worker mode audit](docs/FRANKENPHP-WORKER-AUDIT.md)
 
 ## Tests and coverage
@@ -173,3 +158,17 @@ make release-check
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Roadmap
+
+| Phase | Status | Scope |
+| --- | --- | --- |
+| **Phase 1–2** | **Shipped (v1.0.0)** | GrapesJS + classic v1, document API, publish/draft, i18n, SEO/a11y, security, demo |
+| **Phase 3** | **Shipped (v1.1.0)** | Revisions + diff, duplicate, import/export, templates library, draft preview |
+| **Phase 4** | **Shipped baseline (v1.1.0)** | `WidgetPackInterface`, author guide; classic widget tags |
+| **DX** | **Shipped (v1.1.0)** | Web Profiler DataCollector (`debug.collector`) |
+| **Follow-ups** | **Shipped (v1.2.0)** | Visual revision diff panels, template JSON sharing, Grapes block packs |
+| **Phase 5–7** | **Shipped (v1.4.0)** | Content fields + ACL capabilities, hardening/slots, media library + tags |
+| **Phase 9** | **Done (v1.5.0)** | Org compliance (v1.4.3) + optional `PublicHtmlNormalizer` (v1.4.4) + public bind hydrator, section filter and status query (v1.5.0) |
+
+Details: [SPEC-DRIVEN-DEVELOPMENT.md](docs/SPEC-DRIVEN-DEVELOPMENT.md#roadmap). Spec Kit: `specs/001`–`009` (docs closure in **v1.1.1**; follow-ups in **v1.2.0**; content/media in **v1.4.0**; polish + compliance + HTML cleanup in **v1.4.1–v1.4.4**).

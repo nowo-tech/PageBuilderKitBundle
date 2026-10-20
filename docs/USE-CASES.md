@@ -4,6 +4,15 @@ Page Builder Kit Bundle + FrankenPHP demo cover the editor / publish / render ma
 
 **Editor guide:** [BUILDER-MANUAL.md](BUILDER-MANUAL.md) (screenshots in [`images/demo/`](images/demo/)).
 
+## Table of contents
+
+- [Bundle capabilities](#bundle-capabilities)
+- [Demo matrix (`/showcase`)](#demo-matrix-showcase)
+- [Builder workflows (documented + e2e)](#builder-workflows-documented--e2e)
+- [Coverage gaps (intentional)](#coverage-gaps-intentional)
+- [How to explore](#how-to-explore)
+- [Reseed](#reseed)
+
 ## Bundle capabilities
 
 | Area | What you get |

@@ -8,6 +8,8 @@ Primary path: **GrapesJS schema v2** + **content fields**. Classic Sections (sch
 
 - [Ship a Grapes block pack](#ship-a-grapes-block-pack)
 - [Share templates across projects](#share-templates-across-projects)
+  - [Admin UI](#admin-ui)
+  - [Programmatic](#programmatic)
 - [Prefer Grapes over classic Sections](#prefer-grapes-over-classic-sections)
 - [Related docs](#related-docs)
 

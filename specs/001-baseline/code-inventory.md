@@ -2,12 +2,11 @@
 
 **Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md) · [Phase 7](../008-phase7-media-tags-nesting/spec.md) · [Phase 9](../009-product-polish-compliance/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-10-06 (post **v1.4.4**)
+**Last audited:** 2026-10-20 (post **v1.8.1**)
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **153** files  
-(`find src -type f \( -name '*.php' -o -name '*.twig' -o -name '*.yaml' -o -name '*.js' -o -name '*.ts' -o -name '*.css' \)`)
+**Total production sources:** **165** files (every file tracked under `src/`; audit: `git ls-files src | wc -l`)
 
 ## Bundle entry
 
@@ -116,6 +115,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Media/AssetUploadResult.php` | Upload result VO | FR-P2-ADM-005 |
 | `Media/LocalFilesystemAssetStorage.php` | Local disk storage + list | FR-P2-ADM-005, FR-P7-MED-001 |
 | `Media/AwsS3AssetStorage.php` | S3 storage | FR-P2-ADM-005 |
+| `Media/UploadedAssetExtension.php` | Stored extension derived from detected MIME (never the client name) | FR-P2-ADM-005, FR-SEC-005 |
 
 ## Repository
 
@@ -127,6 +127,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Repository/BuilderPageRevisionRepository.php` | Revision persistence | FR-P3-REV-001 |
 | `Repository/BuilderPageTemplateRepositoryInterface.php` | Template repository contract | FR-P3-TPL-001 |
 | `Repository/BuilderPageTemplateRepository.php` | Template persistence | FR-P3-TPL-001 |
+| `Repository/BuilderPageStatusQueryInterface.php` | Publication status lookup without hydrating the document | FR-REN-003, FR-P3-PREV-002 |
+| `Repository/BuilderPageStatusQuery.php` | Scalar status query (404 vs render decision) | FR-REN-003, FR-P3-PREV-002 |
 
 ## Services
 
@@ -161,6 +163,22 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
 | `Html/PublicHtmlNormalizer.php` | Optional public Grapes HTML cleanup (invalid `</source>`, skeleton `src`, host WebP pictures) | FR-P9-HTML-001, FR-P9-HTML-002, FR-P9-HTML-003, FR-P9-HTML-004 |
+| `Html/PublicHtmlHardener.php` | Always-on final XSS gate before `|raw` public output | FR-P2-REN-005, FR-SEC-005 |
+
+## Content fields and bind slots
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Content/ContentFieldDefinitionProviderInterface.php` | Host catalogue of content fields per page key | FR-P5-SCH-005 |
+| `Content/NullContentFieldDefinitionProvider.php` | Default provider (no known fields) | FR-P5-SCH-005 |
+| `Service/PublicBindHydratorInterface.php` | Public Grapes bind-slot hydration contract | FR-P5-SCH-005, FR-P5-ACL-001 |
+| `Service/PublicBindHydrator.php` | Keeps resolved slot HTML; adds inline-edit UI for `content` capability | FR-P5-SCH-005, FR-P5-ACL-001 |
+
+## Utilities
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Util/ContentSectionFilter.php` | Sanitizes and applies `?section=` focus for Content / canvas deep-links | FR-P5-UI-001 |
 
 ## Security
 
@@ -237,6 +255,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Resources/views/widgets/button.html.twig` | Button template | FR-WGT-001, FR-REN-004 |
 | `Resources/views/widgets/spacer.html.twig` | Spacer template | FR-WGT-001, FR-REN-004 |
 | `Resources/views/widgets/container.html.twig` | Container template | FR-P2-WGT-001, FR-REN-004 |
+| `Resources/views/Icon/page-builder.svg` | Web Profiler panel / toolbar icon (`source()` in Collector view) | FR-ADM-001 |
 
 ## Resources — frontend assets
 
@@ -245,9 +264,11 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Resources/assets/src/grapes-types.ts` | Typed canvas config/structure helpers | FR-P9-FE-001, REQ-ASSETS-003 |
 | `Resources/assets/src/page-builder-canvas.ts` | Grapes canvas ESM source (strict TS) | FR-ADM-002, FR-P2-ADM-001, FR-P7-TAG-001, FR-P9-FE-002 |
 | `Resources/assets/src/page-builder-inline-edit.ts` | Inline content-field editor source | FR-P5-SCH-005 |
+| `Resources/assets/src/page-builder-admin.ts` | CSP-friendly admin helpers (`data-pbk-confirm`, no inline handlers) | FR-ADM-001, FR-SEC-004 |
 | `Resources/assets/src/page-builder.css` | Source stylesheet | FR-ADM-002, REQ-ASSETS-001 |
 | `Resources/public/js/page-builder-canvas.js` | Built Grapes canvas script | FR-ADM-002, FR-P9-FE-003 |
 | `Resources/public/js/page-builder-inline-edit.js` | Built inline-edit script | FR-P5-SCH-005 |
+| `Resources/public/js/page-builder-admin.js` | Built admin helpers script | FR-ADM-001, FR-SEC-004 |
 | `Resources/public/css/page-builder.css` | Published stylesheet | FR-ADM-002, REQ-ASSETS-004 |
 
 ## Resources — translations
@@ -269,12 +290,30 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `docs/COOKBOOK.md` | FR-P9-DX-001 |
 | `examples/acme-grapes-block-pack/` | FR-P9-DX-002 (Composer example; not under `src/`) |
 
-## Summary
+## Coverage summary
 
-| Category | File count |
-| --- | ---: |
-| PHP (excluding Resources subtree) | 112 |
-| Twig views | 25 |
-| YAML (config + translations) | 9 |
-| TS/JS/CSS assets | 7 |
-| **Total** | **153** |
+| Category | Files | Mapped |
+| --- | ---: | ---: |
+| Bundle entry | 1 | 1 |
+| Controllers | 11 | 11 |
+| Debug / Web Profiler | 4 | 4 |
+| Dependency injection and compiler | 7 | 7 |
+| Entities | 6 | 6 |
+| Enums and locale | 6 | 6 |
+| Event subscribers | 2 | 2 |
+| Forms | 13 | 13 |
+| Grapes block packs | 2 | 2 |
+| Media | 7 | 7 |
+| Repository | 8 | 8 |
+| Services | 23 | 23 |
+| HTML | 2 | 2 |
+| Content fields and bind slots | 4 | 4 |
+| Utilities | 1 | 1 |
+| Security | 10 | 10 |
+| Twig | 2 | 2 |
+| Widget system | 12 | 12 |
+| Resources — config and routing | 2 | 2 |
+| Resources — admin and public Twig | 26 | 26 |
+| Resources — frontend assets | 9 | 9 |
+| Resources — translations | 7 | 7 |
+| **Total production files (`git ls-files src`)** | **165** | **165** |

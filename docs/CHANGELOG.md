@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: wave-1 REQ compliance — versioned `.cursor/` (Engram `mcp.json`, rules incl. `01-git-commits.mdc`, Spec Kit skills; only `sandbox.json` stays ignored), README documentation list order (duplicate Builder manual removed) and Roadmap moved after License, CODEOWNERS header, CONTRIBUTING Cursor Agent settings, TOCs for long docs, full GitHub Spec Kit manual, inventory refresh (165/165).
+
 ## [1.8.1] - 2026-10-18
 
 Allows nowo-tech/ui-kit-bundle 2.x (^1.4 || ^2.2) so hosts can move to UiKit 2.2. See [UPGRADING](UPGRADING.md#to-181).

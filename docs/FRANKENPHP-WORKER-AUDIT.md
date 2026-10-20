@@ -8,6 +8,15 @@
 | Method | Manual review of `src/` services, controllers, subscribers, Twig extension, DI extension, DataCollector/trace, content fields, capabilities |
 | **Verdict** | ✅ **Compatible with long-lived workers** for bundle-owned correctness: shared services are readonly or assign-once; request-scoped debug state implements `ResetInterface`; per-request access/capability checks ask AuthorizationChecker without storing the user. |
 
+## Table of contents
+
+- [Execution model assumed](#execution-model-assumed)
+- [Summary](#summary)
+- [Services reviewed (post–Phase 3–5)](#services-reviewed-postphase-35)
+- [BuilderLocales static bind](#builderlocales-static-bind)
+- [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
+- [Re-audit triggers](#re-audit-triggers)
+
 ## Execution model assumed
 
 FrankenPHP worker mode boots the Symfony kernel once per worker and serves many requests with the same container. This audit assumes the strict variant: the kernel is **not** rebooted between requests unless the host configures otherwise.

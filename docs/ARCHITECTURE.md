@@ -7,6 +7,8 @@ Mermaid diagrams for **Page Builder Kit Bundle**. Rendered by GitHub, many IDEs,
 - [System overview](#system-overview)
 - [Doctrine model](#doctrine-model)
 - [Document schemas](#document-schemas)
+  - [Classic schema v1 (sections → columns → widgets)](#classic-schema-v1-sections--columns--widgets)
+  - [GrapesJS schema v2](#grapesjs-schema-v2)
 - [Admin edit → public render](#admin-edit--public-render)
 - [Draft / publish lifecycle](#draft--publish-lifecycle)
 - [Revisions](#revisions)
@@ -14,6 +16,7 @@ Mermaid diagrams for **Page Builder Kit Bundle**. Rendered by GitHub, many IDEs,
 - [Security](#security)
 - [Asset upload](#asset-upload)
 - [Public routing & i18n](#public-routing--i18n)
+- [Related docs](#related-docs)
 
 ---
 

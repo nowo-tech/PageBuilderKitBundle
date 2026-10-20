@@ -8,6 +8,16 @@ make -C demo/symfony8 demo-screenshots
 
 Demo URL: `http://localhost:8137` · Login: `admin` / `admin`
 
+## Table of contents
+
+- [1. Open the page list](#1-open-the-page-list)
+- [2. Edit layout (Grapes canvas)](#2-edit-layout-grapes-canvas)
+- [3. Edit typed content (no canvas)](#3-edit-typed-content-no-canvas)
+- [4. Bind fields in the layout](#4-bind-fields-in-the-layout)
+- [5. Templates](#5-templates)
+- [6. Publish rules](#6-publish-rules)
+- [7. Showcase matrix](#7-showcase-matrix)
+
 ## 1. Open the page list
 
 Go to **Admin → Pages** (`/admin/page-builder/pages`).

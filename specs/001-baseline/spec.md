@@ -141,7 +141,7 @@ Still deferred (not Phase 1–5 MVP acceptance criteria):
 | --- | --- |
 | SC-01 | Editors can create a page and save a document from the canvas |
 | SC-02 | Published pages render at `/p/{pageKey}` or via `nowo_page_builder_render()` |
-| SC-03 | [`code-inventory.md`](code-inventory.md) maps all production files under `src/` (current tree; all shipped phases) |
+| SC-03 | [`code-inventory.md`](code-inventory.md) maps all production files under `src/` (current tree; all shipped phases): **165/165** (`git ls-files src \| wc -l`) |
 | SC-04 | Demo answers on `http://localhost:8137` |
 | SC-05 | `make demo-smoke` returns HTTP 200 |
 
