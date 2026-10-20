@@ -15,9 +15,9 @@
     "dev:inline-edit": "VITE_ENTRY=inline-edit vite build --watch"
   },
   "devDependencies": {
-    "@types/node": "^22",
-    "only-allow": "^1.2.1",
+    "@types/node": "^22.20.5",
+    "only-allow": "^1.2.2",
     "typescript": "~5.7.3",
-    "vite": "^6.4.1"
+    "vite": "^6.4.4"
   }
 }
