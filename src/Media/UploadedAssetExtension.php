@@ -27,7 +27,7 @@ final class UploadedAssetExtension
      *
      * @var array<string, list<string>>
      */
-    private const EXTENSIONS = [
+    private const array EXTENSIONS = [
         'image/jpeg'    => ['jpg', 'jpeg', 'jpe'],
         'image/png'     => ['png'],
         'image/gif'     => ['gif'],

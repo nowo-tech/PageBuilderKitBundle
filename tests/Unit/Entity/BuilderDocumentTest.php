@@ -16,8 +16,8 @@ final class BuilderDocumentTest extends TestCase
     #[Test]
     public function structureAndLocaleUpsert(): void
     {
-        $page     = (new BuilderPage())->setPageKey('p');
-        $document = (new BuilderDocument())
+        $page     = new BuilderPage()->setPageKey('p');
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure(['version' => 1, 'sections' => []]);
 

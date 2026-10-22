@@ -39,7 +39,7 @@ final class GrapesJsFrontendConfigTest extends TestCase
     public function resolveCanvasStylesForEachFramework(): void
     {
         foreach (['bootstrap', 'bootstrap5', 'tabler', 'bootstrap4', 'foundation', 'none'] as $framework) {
-            $styles = (new GrapesJsFrontendConfig(cssFramework: $framework))->toArray()['canvasStyles'];
+            $styles = new GrapesJsFrontendConfig(cssFramework: $framework)->toArray()['canvasStyles'];
             if ($framework === 'none') {
                 self::assertSame([], $styles);
             } else {
@@ -104,9 +104,9 @@ final class GrapesJsFrontendConfigTest extends TestCase
             }
         };
 
-        $array = (new GrapesJsFrontendConfig(
+        $array = new GrapesJsFrontendConfig(
             blockPackRegistry: new GrapesBlockPackRegistry([$pack]),
-        ))->toArray();
+        )->toArray();
 
         self::assertSame('test/pack', $array['blockPacks'][0]['name']);
         self::assertSame('test-block', $array['blockPacks'][0]['blocks'][0]['id']);

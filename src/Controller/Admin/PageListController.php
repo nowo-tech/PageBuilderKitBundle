@@ -19,6 +19,9 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class PageListController extends AbstractController
 {
+    /** Pages per admin list page (REQ-PERF-001: the list is never loaded unbounded). */
+    public const int PAGE_SIZE = 50;
+
     public function __construct(
         private readonly BuilderPageRepository $pageRepository,
         private readonly DocumentService $documentService,
@@ -54,7 +57,10 @@ final class PageListController extends AbstractController
             return $this->redirectToRoute('admin_page_builder_canvas', ['pageKey' => $page->getPageKey()]);
         }
 
-        $pages = $this->pageRepository->findAllOrdered();
+        $total       = $this->pageRepository->countAll();
+        $totalPages  = max(1, (int) ceil($total / self::PAGE_SIZE));
+        $currentPage = min($totalPages, max(1, $request->query->getInt('page', 1)));
+        $pages       = $this->pageRepository->findOrderedSlice(($currentPage - 1) * self::PAGE_SIZE, self::PAGE_SIZE);
         /** @var array<string, FormView> $duplicateForms */
         $duplicateForms = [];
         foreach ($pages as $page) {
@@ -69,6 +75,8 @@ final class PageListController extends AbstractController
 
         return $this->render('@NowoPageBuilderKitBundle/admin/pages/index.html.twig', [
             'pages'           => $pages,
+            'current_page'    => $currentPage,
+            'total_pages'     => $totalPages,
             'create_form'     => $createForm,
             'duplicate_forms' => $duplicateForms,
         ]);

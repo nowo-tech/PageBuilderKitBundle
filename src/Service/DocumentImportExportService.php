@@ -9,6 +9,9 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Throwable;
 
 use function array_key_exists;
 use function array_values;
@@ -28,6 +31,7 @@ final readonly class DocumentImportExportService
         private DocumentService $documentService,
         private DocumentNormalizer $documentNormalizer,
         private BuilderLocales $builderLocales,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -83,6 +87,27 @@ final readonly class DocumentImportExportService
      * @param array<string, mixed> $payload
      */
     public function import(array $payload, ?string $targetPageKey = null, bool $publish = false): BuilderPage
+    {
+        $context = ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'import', 'target_page_key' => $targetPageKey, 'publish' => $publish];
+        $this->logger->info('Page builder import started.', $context);
+        try {
+            $page = $this->doImport($payload, $targetPageKey, $publish);
+        } catch (Throwable $e) {
+            $this->logger->error('Page builder import failed.', $context + ['exception' => $e::class]);
+
+            throw $e;
+        }
+        $this->logger->info('Page builder import finished.', $context + ['page_key' => $page->getPageKey()]);
+
+        return $page;
+    }
+
+    /**
+     * Import body (see import()).
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function doImport(array $payload, ?string $targetPageKey, bool $publish): BuilderPage
     {
         $format = (int) ($payload['formatVersion'] ?? 0);
         if ($format !== self::FORMAT_VERSION) {
@@ -161,7 +186,7 @@ final readonly class DocumentImportExportService
 
             $translation = $page->getTranslation($locale);
             if (!$translation instanceof BuilderPageTranslation) {
-                $translation = (new BuilderPageTranslation())->setLocale($locale);
+                $translation = new BuilderPageTranslation()->setLocale($locale);
                 $page->addTranslation($translation);
             }
 

@@ -74,7 +74,7 @@ final readonly class GrapesJsFrontendConfig
             'twig'                => [
                 'enabled'       => $this->twigEnabled,
                 'canvasHelpers' => $this->twigCanvasHelpers,
-                'variables'     => $this->twigVariables !== [] ? $this->twigVariables : (new GrapesTwigRenderer())->catalogVariables(),
+                'variables'     => $this->twigVariables !== [] ? $this->twigVariables : new GrapesTwigRenderer()->catalogVariables(),
             ],
         ];
     }

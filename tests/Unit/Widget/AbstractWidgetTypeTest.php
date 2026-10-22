@@ -31,10 +31,10 @@ final class AbstractWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        self::assertSame(['html' => ''], (new HtmlWidgetType())->defaultProps());
-        self::assertSame(['height' => '1rem'], (new SpacerWidgetType())->defaultProps());
-        self::assertSame('', (new ImageWidgetType())->sanitizeProps(['alt' => 123], $protection)['alt']);
-        self::assertSame('1rem', (new SpacerWidgetType())->sanitizeProps(['height' => ''], $protection)['height']);
-        self::assertStringContainsString('html.html.twig', (new HtmlWidgetType())->getPublicTemplate());
+        self::assertSame(['html' => ''], new HtmlWidgetType()->defaultProps());
+        self::assertSame(['height' => '1rem'], new SpacerWidgetType()->defaultProps());
+        self::assertSame('', new ImageWidgetType()->sanitizeProps(['alt' => 123], $protection)['alt']);
+        self::assertSame('1rem', new SpacerWidgetType()->sanitizeProps(['height' => ''], $protection)['height']);
+        self::assertStringContainsString('html.html.twig', new HtmlWidgetType()->getPublicTemplate());
     }
 }

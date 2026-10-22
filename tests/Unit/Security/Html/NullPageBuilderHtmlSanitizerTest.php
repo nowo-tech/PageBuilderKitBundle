@@ -17,6 +17,6 @@ final class NullPageBuilderHtmlSanitizerTest extends TestCase
     {
         $html = '<p>keep</p>';
 
-        self::assertSame($html, (new NullPageBuilderHtmlSanitizer())->sanitize($html));
+        self::assertSame($html, new NullPageBuilderHtmlSanitizer()->sanitize($html));
     }
 }

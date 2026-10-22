@@ -233,8 +233,8 @@ final class InlineContentFieldRendererTest extends TestCase
      */
     private function pageWithFields(array $fields, array $fieldValues): BuilderPage
     {
-        $page     = (new BuilderPage())->setPageKey('home');
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $page     = new BuilderPage()->setPageKey('home');
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'fields'      => $fields,
             'fieldValues' => $fieldValues,
         ]);

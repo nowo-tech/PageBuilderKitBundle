@@ -13,6 +13,6 @@ final class NullContentFieldDefinitionProviderTest extends TestCase
     #[Test]
     public function returnsNoDefinitions(): void
     {
-        self::assertSame([], (new NullContentFieldDefinitionProvider())->definitions('home'));
+        self::assertSame([], new NullContentFieldDefinitionProvider()->definitions('home'));
     }
 }

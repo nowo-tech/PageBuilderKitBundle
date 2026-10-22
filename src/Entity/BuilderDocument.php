@@ -101,7 +101,7 @@ class BuilderDocument
             return $existing;
         }
 
-        $localeDocument = (new BuilderDocumentLocale())
+        $localeDocument = new BuilderDocumentLocale()
             ->setLocale($locale)
             ->setWidgetProps($widgetProps)
             ->setDocument($this);

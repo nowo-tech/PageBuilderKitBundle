@@ -39,7 +39,7 @@ final class BuilderPageTest extends TestCase
         self::assertGreaterThan(0, $page->getCreatedAt()->getTimestamp());
         self::assertSame($beforeUpdate->getTimestamp(), $page->getUpdatedAt()->getTimestamp());
 
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('T')
             ->setSlug('t');
@@ -51,14 +51,14 @@ final class BuilderPageTest extends TestCase
         self::assertSame($translation, $page->getTranslation('es'));
         self::assertNull($page->getTranslation('en'));
 
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure(['version' => 1, 'sections' => []]);
 
         self::assertSame($document, $page->getDocument());
         self::assertSame($page, $document->getPage());
 
-        $revision = (new BuilderPageRevision())->setPage($page);
+        $revision = new BuilderPageRevision()->setPage($page);
         $page->getRevisions()->add($revision);
         self::assertCount(1, $page->getRevisions());
     }

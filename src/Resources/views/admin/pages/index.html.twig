@@ -84,6 +84,21 @@
                     </li>
                 {% endfor %}
             </ul>
+            {% if total_pages|default(1) > 1 %}
+                <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="{{ 'admin.pages.pagination'|trans }}">
+                    {% if current_page > 1 %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_list', {page: current_page - 1}) }}">{{ 'admin.pages.previous'|trans }}</a>
+                    {% else %}
+                        <span></span>
+                    {% endif %}
+                    <span class="text-muted small">{{ 'admin.pages.page_of'|trans({'%page%': current_page, '%pages%': total_pages}) }}</span>
+                    {% if current_page < total_pages %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_list', {page: current_page + 1}) }}">{{ 'admin.pages.next'|trans }}</a>
+                    {% else %}
+                        <span></span>
+                    {% endif %}
+                </nav>
+            {% endif %}
         {% endif %}
     </section>
 

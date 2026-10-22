@@ -32,7 +32,7 @@ final class SpacerWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $result = (new SpacerWidgetType())->sanitizeProps(['height' => '2rem'], $protection);
+        $result = new SpacerWidgetType()->sanitizeProps(['height' => '2rem'], $protection);
 
         self::assertSame('2rem', $result['height']);
     }
@@ -44,7 +44,7 @@ final class SpacerWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $result = (new SpacerWidgetType())->sanitizeProps(['height' => ''], $protection);
+        $result = new SpacerWidgetType()->sanitizeProps(['height' => ''], $protection);
 
         self::assertSame('1rem', $result['height']);
     }

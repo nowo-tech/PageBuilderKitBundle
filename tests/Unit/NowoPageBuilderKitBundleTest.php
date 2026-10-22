@@ -34,7 +34,7 @@ final class NowoPageBuilderKitBundleTest extends TestCase
     public function buildRegistersCompilerPasses(): void
     {
         $container = new ContainerBuilder();
-        (new NowoPageBuilderKitBundle())->build($container);
+        new NowoPageBuilderKitBundle()->build($container);
 
         $passClasses = array_map(
             static fn (CompilerPassInterface $pass): string => $pass::class,

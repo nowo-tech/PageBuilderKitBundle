@@ -244,8 +244,8 @@ final class PageBuilderKitAdminAccessSubscriberTest extends TestCase
     {
         $calls        = new stdClass();
         $calls->count = 0;
-        $checker      = new class($calls) implements PageBuilderKitAccessCheckerInterface {
-            public function __construct(private readonly stdClass $calls)
+        $checker      = new readonly class($calls) implements PageBuilderKitAccessCheckerInterface {
+            public function __construct(private stdClass $calls)
             {
             }
 

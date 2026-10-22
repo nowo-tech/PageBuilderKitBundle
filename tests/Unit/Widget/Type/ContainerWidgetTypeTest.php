@@ -34,10 +34,10 @@ final class ContainerWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $props = (new ContainerWidgetType())->sanitizeProps(['tag' => 'MAIN'], $protection);
+        $props = new ContainerWidgetType()->sanitizeProps(['tag' => 'MAIN'], $protection);
         self::assertSame('main', $props['tag']);
 
-        $fallback = (new ContainerWidgetType())->sanitizeProps(['tag' => 'script'], $protection);
+        $fallback = new ContainerWidgetType()->sanitizeProps(['tag' => 'script'], $protection);
         self::assertSame('div', $fallback['tag']);
     }
 }

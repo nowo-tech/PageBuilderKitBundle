@@ -48,7 +48,7 @@ final class PageSeoController extends AbstractController
 
         $translation = $page->getTranslation($locale);
         if (!$translation instanceof BuilderPageTranslation) {
-            $translation = (new BuilderPageTranslation())
+            $translation = new BuilderPageTranslation()
                 ->setLocale($locale)
                 ->setTitle($pageKey)
                 ->setSlug($pageKey);

@@ -17,8 +17,8 @@ final class BuilderDocumentLocaleTest extends TestCase
     #[Test]
     public function gettersAndSetters(): void
     {
-        $document       = (new BuilderDocument())->setPage(new BuilderPage());
-        $localeDocument = (new BuilderDocumentLocale())
+        $document       = new BuilderDocument()->setPage(new BuilderPage());
+        $localeDocument = new BuilderDocumentLocale()
             ->setLocale('en')
             ->setWidgetProps(['w' => ['x' => 1]])
             ->setDocument($document);

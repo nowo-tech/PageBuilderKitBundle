@@ -76,10 +76,10 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function widgetLabelKeysAndDefaultSanitizeMergedProps(): void
     {
-        self::assertSame('widget.spacer.label', (new SpacerWidgetType())->getLabelKey());
-        self::assertSame('widget.image.label', (new ImageWidgetType())->getLabelKey());
-        self::assertSame('widget.text.label', (new TextWidgetType())->getLabelKey());
-        self::assertSame('widget.html.label', (new HtmlWidgetType())->getLabelKey());
+        self::assertSame('widget.spacer.label', new SpacerWidgetType()->getLabelKey());
+        self::assertSame('widget.image.label', new ImageWidgetType()->getLabelKey());
+        self::assertSame('widget.text.label', new TextWidgetType()->getLabelKey());
+        self::assertSame('widget.html.label', new HtmlWidgetType()->getLabelKey());
 
         $widget = new class extends AbstractWidgetType {
             public function getType(): string
@@ -128,7 +128,7 @@ final class CoverageGapsTest extends TestCase
         $container->setAlias('twig.loader.chain', 'twig.loader.native_filesystem');
         $container->setAlias('twig.loader.native', 'twig.loader.chain');
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         self::assertNotEmpty($target->getMethodCalls());
     }
@@ -354,7 +354,7 @@ final class CoverageGapsTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $page    = (new BuilderPage())->setPageKey('g');
+        $page    = new BuilderPage()->setPageKey('g');
         $service = $this->documentService(null, $em);
 
         $mixed = ['es' => 'not-array'];
@@ -526,7 +526,7 @@ final class CoverageGapsTest extends TestCase
         };
         $tmp2 = sys_get_temp_dir() . '/pbk-s3d-' . uniqid('', true) . '.png';
         file_put_contents($tmp2, $png);
-        $r2 = (new AwsS3AssetStorage($helper2, 'f', false, 5_000_000, ['image/png']))
+        $r2 = new AwsS3AssetStorage($helper2, 'f', false, 5_000_000, ['image/png'])
             ->store(new UploadedFile($tmp2, 'n.png', 'image/png', null, true));
         self::assertStringStartsWith('https://fallback/', $r2->src);
 
@@ -545,7 +545,7 @@ final class CoverageGapsTest extends TestCase
         $tmp3 = sys_get_temp_dir() . '/pbk-s3e-' . uniqid('', true) . '.png';
         file_put_contents($tmp3, $png);
         try {
-            (new AwsS3AssetStorage($helper3, 'f', false, 5_000_000, ['image/png']))
+            new AwsS3AssetStorage($helper3, 'f', false, 5_000_000, ['image/png'])
                 ->store(new UploadedFile($tmp3, 'n.png', 'image/png', null, true));
             self::fail('Expected bucket resolve failure');
         } catch (RuntimeException $e) {
@@ -629,8 +629,8 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function pageRenderProviderTraversableProvidersAndClassicBranches(): void
     {
-        $page     = (new BuilderPage())->setPageKey('home')->setUuid('u');
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $page     = new BuilderPage()->setPageKey('home')->setUuid('u');
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'version'  => DocumentNormalizer::SCHEMA_VERSION,
             'sections' => [
                 'bad',
@@ -655,8 +655,8 @@ final class CoverageGapsTest extends TestCase
         $document->upsertLocale('es', ['h1' => ['text' => 'H'], 't1' => ['text' => 'T']]);
         $classicSections = $document->getStructure()['sections'];
 
-        $repo = new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly BuilderPage $page)
+        $repo = new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private BuilderPage $page)
             {
             }
 
@@ -722,8 +722,8 @@ final class CoverageGapsTest extends TestCase
     #[Test]
     public function pageRenderClassicSkipsBadNodes(): void
     {
-        $page = (new BuilderPage())->setPageKey('p')->setUuid('u');
-        (new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('p')->setUuid('u');
+        new BuilderDocument()->setPage($page)->setStructure([
             'version'  => DocumentNormalizer::SCHEMA_VERSION,
             'sections' => [
                 'bad',
@@ -742,8 +742,8 @@ final class CoverageGapsTest extends TestCase
         ]);
         $page->getDocument()?->upsertLocale('es', ['h1' => ['text' => 'H']]);
 
-        $repo = new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly BuilderPage $page)
+        $repo = new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private BuilderPage $page)
             {
             }
 
@@ -775,8 +775,8 @@ final class CoverageGapsTest extends TestCase
         ?EntityManagerInterface $em = null,
     ): DocumentService {
         return new DocumentService(
-            new class($existing) implements BuilderPageRepositoryInterface {
-                public function __construct(private readonly ?BuilderPage $page)
+            new readonly class($existing) implements BuilderPageRepositoryInterface {
+                public function __construct(private ?BuilderPage $page)
                 {
                 }
 

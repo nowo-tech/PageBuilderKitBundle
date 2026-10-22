@@ -24,6 +24,10 @@ use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Stringable;
+
+use function is_string;
 
 #[CoversClass(DocumentImportExportService::class)]
 final class DocumentImportExportServiceTest extends TestCase
@@ -31,14 +35,14 @@ final class DocumentImportExportServiceTest extends TestCase
     #[Test]
     public function exportAndImportRoundTripCreatesDraft(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('home')
             ->setStatus(PageStatus::Published)
             ->setUuid('11111111-1111-4111-8111-111111111111');
         $page->addTranslation(
-            (new BuilderPageTranslation())->setLocale('es')->setTitle('Inicio')->setSlug('inicio'),
+            new BuilderPageTranslation()->setLocale('es')->setTitle('Inicio')->setSlug('inicio'),
         );
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Hi</p>',
@@ -47,7 +51,7 @@ final class DocumentImportExportServiceTest extends TestCase
             'localeContent' => [],
         ]);
         $document->getLocales()->add(
-            (new BuilderDocumentLocale())
+            new BuilderDocumentLocale()
                 ->setLocale('es')
                 ->setWidgetProps(['hero' => ['title' => 'Inicio']])
                 ->setDocument($document),
@@ -118,7 +122,39 @@ final class DocumentImportExportServiceTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $service->export((new BuilderPage())->setPageKey('missing-doc'));
+        $service->export(new BuilderPage()->setPageKey('missing-doc'));
+    }
+
+    #[Test]
+    public function importLogsStartAndFailureWithoutPayloadData(): void
+    {
+        $store  = [];
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{string, string, array<mixed>}> */
+            public array $records = [];
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                $this->records[] = [is_string($level) ? $level : 'unknown', (string) $message, $context];
+            }
+        };
+        $service = new DocumentImportExportService(
+            $this->documentServiceWithStore($store),
+            new DocumentNormalizer(),
+            new BuilderLocales('es', ['es', 'en']),
+            $logger,
+        );
+
+        try {
+            $service->import(['formatVersion' => 99], 'home');
+            self::fail('Expected the unsupported format to be rejected.');
+        } catch (InvalidArgumentException) {
+        }
+
+        self::assertSame(['info', 'Page builder import started.'], [$logger->records[0][0], $logger->records[0][1]]);
+        self::assertSame('error', $logger->records[1][0]);
+        self::assertSame(InvalidArgumentException::class, $logger->records[1][2]['exception']);
+        self::assertSame('home', $logger->records[1][2]['target_page_key']);
     }
 
     #[Test]
@@ -151,11 +187,11 @@ final class DocumentImportExportServiceTest extends TestCase
     #[Test]
     public function importUpdatesExistingPageAppliesTranslationsAndPublishes(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('existing')
             ->setStatus(PageStatus::Draft)
             ->setUuid('22222222-2222-4222-8222-222222222222');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Old</p>',

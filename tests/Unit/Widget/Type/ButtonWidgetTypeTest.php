@@ -57,7 +57,7 @@ final class ButtonWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $result = (new ButtonWidgetType())->sanitizeProps(['target' => '_top'], $protection);
+        $result = new ButtonWidgetType()->sanitizeProps(['target' => '_top'], $protection);
 
         self::assertSame('_self', $result['target']);
     }

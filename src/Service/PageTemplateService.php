@@ -77,7 +77,7 @@ final readonly class PageTemplateService
 
         $template = $this->templateRepository->findOneByTemplateKey($templateKey);
         if (!$template instanceof BuilderPageTemplate) {
-            $template = (new BuilderPageTemplate())->setTemplateKey($templateKey);
+            $template = new BuilderPageTemplate()->setTemplateKey($templateKey);
         }
 
         $template
@@ -330,7 +330,7 @@ final readonly class PageTemplateService
 
         $template = $existing instanceof BuilderPageTemplate
             ? $existing
-            : (new BuilderPageTemplate())->setTemplateKey($templateKey);
+            : new BuilderPageTemplate()->setTemplateKey($templateKey);
 
         $template
             ->setLabel($label)
@@ -385,7 +385,7 @@ final readonly class PageTemplateService
 
             $translation = $page->getTranslation($locale);
             if (!$translation instanceof BuilderPageTranslation) {
-                $translation = (new BuilderPageTranslation())
+                $translation = new BuilderPageTranslation()
                     ->setLocale($locale)
                     ->setTitle($title)
                     ->setSlug($pageKey);

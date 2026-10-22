@@ -47,7 +47,7 @@ final class XssSanitizerMatrixTest extends TestCase
     #[DataProvider('allowlistPayloads')]
     public function allowlistStripsDangerousMarkup(string $input, array $forbidden): void
     {
-        $output = strtolower((new AllowlistPageBuilderHtmlSanitizer())->sanitize($input));
+        $output = strtolower(new AllowlistPageBuilderHtmlSanitizer()->sanitize($input));
         foreach ($forbidden as $needle) {
             self::assertStringNotContainsString(strtolower($needle), $output);
         }
@@ -70,7 +70,7 @@ final class XssSanitizerMatrixTest extends TestCase
     #[DataProvider('grapesPayloads')]
     public function grapesSanitizerStripsXssVectors(string $input, array $forbidden): void
     {
-        $output = strtolower((new GrapesDocumentSanitizer(false))->sanitizeHtml($input));
+        $output = strtolower(new GrapesDocumentSanitizer(false)->sanitizeHtml($input));
         foreach ($forbidden as $needle) {
             self::assertStringNotContainsString(strtolower($needle), $output);
         }

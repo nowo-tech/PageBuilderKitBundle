@@ -16,6 +16,7 @@ use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Twig\TwigFunction;
 
 #[CoversClass(PageBuilderKitExtension::class)]
 final class PageBuilderKitExtensionTest extends TestCase
@@ -159,7 +160,7 @@ final class PageBuilderKitExtensionTest extends TestCase
 
         self::assertSame('HYDRATED', $extension->hydrateBinds('<span data-pbk-bind="a">x</span>', 'home'));
 
-        $names = array_map(static fn ($f): string => $f->getName(), $extension->getFunctions());
+        $names = array_map(static fn (TwigFunction $f): string => $f->getName(), $extension->getFunctions());
         self::assertContains('nowo_page_builder_hydrate_binds', $names);
         self::assertContains('nowo_page_builder_sanitize_section', $names);
         self::assertContains('nowo_page_builder_filter_schema_by_section', $names);

@@ -51,7 +51,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         mkdir($dir);
         mkdir($dir . '/subdir');
         file_put_contents($dir . '/ok.png', 'x');
-        $listed = (new LocalFilesystemAssetStorage($dir, '/media'))->list(10);
+        $listed = new LocalFilesystemAssetStorage($dir, '/media')->list(10);
         self::assertCount(1, $listed);
         self::assertSame('ok.png', $listed[0]['name']);
     }

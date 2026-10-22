@@ -32,7 +32,7 @@ final class TextWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::Strip, null),
         );
 
-        $result = (new TextWidgetType())->sanitizeProps(['html' => '<b>x</b>'], $protection);
+        $result = new TextWidgetType()->sanitizeProps(['html' => '<b>x</b>'], $protection);
 
         self::assertSame('x', $result['html']);
     }
@@ -44,7 +44,7 @@ final class TextWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $result = (new TextWidgetType())->sanitizeProps(['html' => 99], $protection);
+        $result = new TextWidgetType()->sanitizeProps(['html' => 99], $protection);
 
         self::assertSame('', $result['html']);
     }

@@ -49,7 +49,7 @@ final class GrapesDocumentSanitizerTest extends TestCase
     #[Test]
     public function sanitizeStructureNormalizesFields(): void
     {
-        $result = (new GrapesDocumentSanitizer())->sanitizeStructure([
+        $result = new GrapesDocumentSanitizer()->sanitizeStructure([
             'html'   => '<p>Hi</p><script>x</script>',
             'css'    => '.a{}',
             'grapes' => null,
@@ -65,7 +65,7 @@ final class GrapesDocumentSanitizerTest extends TestCase
     public function preservesTwigTokensForPublicRender(): void
     {
         $input = '<h1>{{ title }}</h1>{% if locale == "es" %}<p>{{ pageKey }}</p>{% endif %}';
-        $html  = (new GrapesDocumentSanitizer())->sanitizeHtml($input);
+        $html  = new GrapesDocumentSanitizer()->sanitizeHtml($input);
 
         self::assertStringContainsString('{{ title }}', $html);
         self::assertStringContainsString('{% if locale == "es" %}', $html);
@@ -77,7 +77,7 @@ final class GrapesDocumentSanitizerTest extends TestCase
     public function restoresTwigTokensInsideHtmlAttributes(): void
     {
         $input = '<a href="{{ p.url }}">{{ p.name }}</a>';
-        $html  = (new GrapesDocumentSanitizer())->sanitizeHtml($input);
+        $html  = new GrapesDocumentSanitizer()->sanitizeHtml($input);
 
         self::assertStringContainsString('href="{{ p.url }}"', $html);
         self::assertStringContainsString('{{ p.name }}', $html);
@@ -87,7 +87,7 @@ final class GrapesDocumentSanitizerTest extends TestCase
     #[Test]
     public function sanitizeHtmlStripsDisallowedTags(): void
     {
-        $html = (new GrapesDocumentSanitizer())->sanitizeHtml('<iframe src="x"></iframe><p>Ok</p>');
+        $html = new GrapesDocumentSanitizer()->sanitizeHtml('<iframe src="x"></iframe><p>Ok</p>');
 
         self::assertStringNotContainsString('iframe', strtolower($html));
         self::assertStringContainsString('<p>Ok</p>', $html);
@@ -96,7 +96,7 @@ final class GrapesDocumentSanitizerTest extends TestCase
     #[Test]
     public function sanitizeCssRejectsExpressionSyntax(): void
     {
-        self::assertSame('', (new GrapesDocumentSanitizer())->sanitizeCss('div{color:expression(alert(1))}'));
+        self::assertSame('', new GrapesDocumentSanitizer()->sanitizeCss('div{color:expression(alert(1))}'));
     }
 
     #[Test]

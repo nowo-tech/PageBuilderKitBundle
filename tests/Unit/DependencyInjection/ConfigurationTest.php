@@ -51,7 +51,7 @@ final class ConfigurationTest extends TestCase
     #[Test]
     public function doctrineConnectionIsDeprecated(): void
     {
-        $root = (new Configuration())->getConfigTreeBuilder()->buildTree();
+        $root = new Configuration()->getConfigTreeBuilder()->buildTree();
         self::assertInstanceOf(ArrayNode::class, $root);
         $doctrine = $root->getChildren()['doctrine'];
         self::assertInstanceOf(ArrayNode::class, $doctrine);
@@ -70,7 +70,7 @@ final class ConfigurationTest extends TestCase
     {
         $this->expectException(InvalidConfigurationException::class);
 
-        (new Processor())->processConfiguration(new Configuration(), [[
+        new Processor()->processConfiguration(new Configuration(), [[
             'web_ui' => ['path_prefix' => '/cms/'],
         ]]);
     }
@@ -78,7 +78,7 @@ final class ConfigurationTest extends TestCase
     #[Test]
     public function pathPrefixAcceptsCustomAdminRoot(): void
     {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
+        $config = new Processor()->processConfiguration(new Configuration(), [[
             'web_ui' => ['path_prefix' => '/cms/pages'],
         ]]);
 

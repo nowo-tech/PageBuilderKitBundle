@@ -28,7 +28,7 @@ final class DocumentDiffTest extends TestCase
             'grapes'  => [],
         ];
 
-        $diff = (new DocumentDiff())->compare($structure, $structure);
+        $diff = new DocumentDiff()->compare($structure, $structure);
 
         self::assertTrue($diff['identical']);
         self::assertFalse($diff['structureChanged']);
@@ -47,7 +47,7 @@ final class DocumentDiffTest extends TestCase
         $right         = $left;
         $right['html'] = '<p>Longer content</p>';
 
-        $diff = (new DocumentDiff())->compare($left, $right);
+        $diff = new DocumentDiff()->compare($left, $right);
 
         self::assertFalse($diff['identical']);
         self::assertTrue($diff['structureChanged']);
@@ -94,7 +94,7 @@ final class DocumentDiffTest extends TestCase
             'sections' => [],
         ];
 
-        $diff = (new DocumentDiff())->compare(
+        $diff = new DocumentDiff()->compare(
             $left,
             $right,
             ['es' => ['hero' => ['title' => 'Hola']]],
@@ -127,7 +127,7 @@ final class DocumentDiffTest extends TestCase
             'extra'    => true,
         ];
 
-        $diff = (new DocumentDiff())->compare($left, $right);
+        $diff = new DocumentDiff()->compare($left, $right);
 
         self::assertFalse($diff['identical']);
         self::assertContains('extra', $diff['changedPaths']);

@@ -17,7 +17,7 @@ final class BuilderPageRevisionTest extends TestCase
     public function gettersAndSetters(): void
     {
         $page     = new BuilderPage();
-        $revision = (new BuilderPageRevision())
+        $revision = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure(['version' => 1])
             ->setWidgetPropsByLocale(['es' => []])

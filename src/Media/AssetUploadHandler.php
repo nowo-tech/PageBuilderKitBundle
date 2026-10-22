@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Media;
 
 use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -19,6 +21,7 @@ final readonly class AssetUploadHandler
     public function __construct(
         private PageBuilderAssetStorageInterface $storage,
         private bool $enabled = false,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -47,8 +50,13 @@ final readonly class AssetUploadHandler
         }
 
         if ($assets === []) {
+            $this->logger->warning('Page builder asset upload rejected: no valid file.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'asset_upload']);
+
             throw new InvalidArgumentException('No valid files were uploaded.');
         }
+
+        // File names and URLs are not logged (they can carry personal data).
+        $this->logger->info('Page builder assets uploaded.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'asset_upload', 'count' => count($assets)]);
 
         return $assets;
     }

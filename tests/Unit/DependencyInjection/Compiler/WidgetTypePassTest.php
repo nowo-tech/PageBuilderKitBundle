@@ -24,7 +24,7 @@ final class WidgetTypePassTest extends TestCase
         $container->register('widget.heading', HeadingWidgetType::class)
             ->addTag('nowo_page_builder_kit.widget_type');
 
-        (new WidgetTypePass())->process($container);
+        new WidgetTypePass()->process($container);
 
         $argument = $container->getDefinition(WidgetTypeRegistry::class)->getArgument('$types');
         self::assertCount(1, $argument);
@@ -36,7 +36,7 @@ final class WidgetTypePassTest extends TestCase
         $container = new ContainerBuilder();
         $container->register('widget.heading', Definition::class)->addTag('nowo_page_builder_kit.widget_type');
 
-        (new WidgetTypePass())->process($container);
+        new WidgetTypePass()->process($container);
 
         self::assertFalse($container->hasDefinition(WidgetTypeRegistry::class));
     }

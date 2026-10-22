@@ -35,4 +35,30 @@ final class BuilderPageRepository extends ServiceEntityRepository implements Bui
 
         return $pages;
     }
+
+    /**
+     * One page of the admin list, ordered by page key (REQ-PERF-001).
+     *
+     * @return list<BuilderPage>
+     */
+    public function findOrderedSlice(int $offset, int $limit): array
+    {
+        /** @var list<BuilderPage> $pages */
+        $pages = $this->createQueryBuilder('p')
+            ->orderBy('p.pageKey', SortDirection::Ascending)
+            ->setFirstResult(max(0, $offset))
+            ->setMaxResults(max(1, $limit))
+            ->getQuery()
+            ->getResult();
+
+        return $pages;
+    }
+
+    /**
+     * Number of pages (admin list pagination).
+     */
+    public function countAll(): int
+    {
+        return $this->count([]);
+    }
 }

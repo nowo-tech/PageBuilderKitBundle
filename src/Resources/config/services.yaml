@@ -37,9 +37,9 @@ services:
     Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepository
 
+    # REQ-SF-003: controllers (AbstractController) and form types are tagged by autoconfiguration.
     Nowo\PageBuilderKitBundle\Controller\:
         resource: '../../Controller/'
-        tags: ['controller.service_arguments']
 
     Nowo\PageBuilderKitBundle\Locale\BuilderLocales:
         public: true
@@ -49,7 +49,6 @@ services:
 
     Nowo\PageBuilderKitBundle\Form\:
         resource: '../../Form/'
-        tags: ['form.type']
 
     Nowo\PageBuilderKitBundle\Widget\Type\:
         resource: '../../Widget/Type/'

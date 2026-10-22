@@ -25,7 +25,7 @@ final class TablePrefixListenerTest extends TestCase
 
         $event = new LoadClassMetadataEventArgs($metadata, $this->createStub(EntityManagerInterface::class));
 
-        (new TablePrefixListener('app_'))->loadClassMetadata($event);
+        new TablePrefixListener('app_')->loadClassMetadata($event);
 
         self::assertSame('app_pb_page', $metadata->getTableName());
     }
@@ -37,14 +37,14 @@ final class TablePrefixListenerTest extends TestCase
         $metadata->setPrimaryTable(['name' => 'pb_page']);
         $event = new LoadClassMetadataEventArgs($metadata, $this->createStub(EntityManagerInterface::class));
 
-        (new TablePrefixListener(''))->loadClassMetadata($event);
+        new TablePrefixListener('')->loadClassMetadata($event);
         self::assertSame('pb_page', $metadata->getTableName());
 
         $foreign = new ClassMetadata(stdClass::class);
         $foreign->setPrimaryTable(['name' => 'other']);
         $foreignEvent = new LoadClassMetadataEventArgs($foreign, $this->createStub(EntityManagerInterface::class));
 
-        (new TablePrefixListener('app_'))->loadClassMetadata($foreignEvent);
+        new TablePrefixListener('app_')->loadClassMetadata($foreignEvent);
         self::assertSame('other', $foreign->getTableName());
     }
 }

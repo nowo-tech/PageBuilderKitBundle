@@ -33,8 +33,8 @@ final class AwsS3AssetStorageTest extends TestCase
             {
                 $this->calls[] = [$filePath, $fileType, $key, $private];
 
-                return new class($key) {
-                    public function __construct(private readonly string $key)
+                return new readonly class($key) {
+                    public function __construct(private string $key)
                     {
                     }
 
@@ -167,7 +167,7 @@ final class AwsS3AssetStorageTest extends TestCase
             }
         };
 
-        self::assertSame([], (new AwsS3AssetStorage($helper))->list());
+        self::assertSame([], new AwsS3AssetStorage($helper)->list());
     }
 
     #[Test]

@@ -28,6 +28,10 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+- The admin page list now shows 50 pages per screen (`?page=N`). If you override `admin/pages/index.html.twig`, render
+  the new `current_page` / `total_pages` variables (see the bundle template) or pages beyond the first 50 are hidden.
+- New runtime dependencies `psr/clock` and `psr/log` (interfaces only).
+
 ## To 1.8.1
 
 From **1.8.0**:

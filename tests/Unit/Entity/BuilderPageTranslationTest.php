@@ -17,7 +17,7 @@ final class BuilderPageTranslationTest extends TestCase
     public function gettersAndSetters(): void
     {
         $page        = new BuilderPage();
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('Title')
             ->setSlug('slug')

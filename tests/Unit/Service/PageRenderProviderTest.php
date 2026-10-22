@@ -44,7 +44,7 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function throwsWhenPageHasNoDocument(): void
     {
-        $page     = (new BuilderPage())->setPageKey('home');
+        $page     = new BuilderPage()->setPageKey('home');
         $provider = $this->createProvider($page);
 
         $this->expectException(RuntimeException::class);
@@ -56,7 +56,7 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function skipsMalformedNodesAndUnknownWidgetTypes(): void
     {
-        $page      = (new BuilderPage())->setPageKey('landing');
+        $page      = new BuilderPage()->setPageKey('landing');
         $structure = [
             'version'  => DocumentNormalizer::SCHEMA_VERSION,
             'sections' => [
@@ -77,7 +77,7 @@ final class PageRenderProviderTest extends TestCase
                 ],
             ],
         ];
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure($structure);
         $page->setDocument($document);
@@ -92,17 +92,17 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function rendersWidgetTreeWithMergedLocaleProps(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('landing')
             ->setStatus(PageStatus::Published);
 
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('Inicio')
             ->setSlug('inicio');
         $page->addTranslation($translation);
 
-        $structure = (new DocumentNormalizer())->normalize([
+        $structure = new DocumentNormalizer()->normalize([
             'sections' => [
                 [
                     'id'      => 'sec-1',
@@ -118,7 +118,7 @@ final class PageRenderProviderTest extends TestCase
             ],
         ]);
 
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure($structure);
         $document->upsertLocale('es', ['w-head' => ['text' => 'Hola', 'tag' => 'h1']]);
@@ -142,11 +142,11 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function rendersGrapesHtmlAndCssForLocale(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('landing')
             ->setStatus(PageStatus::Published);
 
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('Inicio')
             ->setSlug('inicio');
@@ -168,7 +168,7 @@ final class PageRenderProviderTest extends TestCase
             'sections' => [],
         ];
 
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure($structure);
         $page->setDocument($document);
@@ -186,11 +186,11 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function evaluatesTwigVariablesInGrapesHtml(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('twig-demo')
             ->setStatus(PageStatus::Published);
         $page->addTranslation(
-            (new BuilderPageTranslation())->setLocale('es')->setTitle('Inicio Twig')->setSlug('inicio-twig'),
+            new BuilderPageTranslation()->setLocale('es')->setTitle('Inicio Twig')->setSlug('inicio-twig'),
         );
 
         $structure = [
@@ -202,7 +202,7 @@ final class PageRenderProviderTest extends TestCase
             'localeContent' => [],
             'sections'      => [],
         ];
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure($structure));
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure($structure));
 
         $tree = $this->createProvider($page)->getRenderedTree('twig-demo', 'es', ['promo' => 'Summer']);
 
@@ -215,11 +215,11 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function exposesSeoPayloadFromTranslation(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('seo-demo')
             ->setStatus(PageStatus::Published);
         $page->addTranslation(
-            (new BuilderPageTranslation())
+            new BuilderPageTranslation()
                 ->setLocale('en')
                 ->setTitle('SEO page')
                 ->setSlug('seo-demo')
@@ -229,7 +229,7 @@ final class PageRenderProviderTest extends TestCase
                 ->setRobots('index,follow'),
         );
         $page->setDocument(
-            (new BuilderDocument())->setPage($page)->setStructure([
+            new BuilderDocument()->setPage($page)->setStructure([
                 'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
                 'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
                 'html'          => '<p>Hi</p>',
@@ -251,11 +251,11 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function mergesTwigContextFromProvidersAndUsesStructureHtmlFallback(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('ctx')
             ->setStatus(PageStatus::Published);
-        $page->addTranslation((new BuilderPageTranslation())->setLocale('es')->setTitle('T')->setSlug('t'));
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page->addTranslation(new BuilderPageTranslation()->setLocale('es')->setTitle('T')->setSlug('t'));
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Fallback {{ promo }}</p>',
@@ -266,8 +266,8 @@ final class PageRenderProviderTest extends TestCase
         ]));
 
         $provider = new PageRenderProvider(
-            new class($page) implements BuilderPageRepositoryInterface {
-                public function __construct(private readonly BuilderPage $page)
+            new readonly class($page) implements BuilderPageRepositoryInterface {
+                public function __construct(private BuilderPage $page)
                 {
                 }
 
@@ -306,11 +306,11 @@ final class PageRenderProviderTest extends TestCase
     #[Test]
     public function hardensGrapesHtmlAndCssEvenWhenTwigFails(): void
     {
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setPageKey('xss')
             ->setStatus(PageStatus::Published);
-        $page->addTranslation((new BuilderPageTranslation())->setLocale('es')->setTitle('XSS')->setSlug('xss'));
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page->addTranslation(new BuilderPageTranslation()->setLocale('es')->setTitle('XSS')->setSlug('xss'));
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>ok</p><p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p><a href="data:text/html;base64,PHNjcmlwdD4=">x</a><iframe srcdoc="x"></iframe>',
@@ -333,8 +333,8 @@ final class PageRenderProviderTest extends TestCase
 
     private function createProvider(?BuilderPage $page): PageRenderProvider
     {
-        $repository = new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly ?BuilderPage $page)
+        $repository = new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private ?BuilderPage $page)
             {
             }
 

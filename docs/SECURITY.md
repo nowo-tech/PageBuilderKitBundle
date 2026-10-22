@@ -13,6 +13,7 @@ Security considerations for page builder admin, document API, and public renderi
 - [Content Security Policy (nonce)](#content-security-policy-nonce)
 - [Asset uploads](#asset-uploads)
 - [Operational guidance](#operational-guidance)
+- [Logging](#logging)
 - [Release security checklist](#release-security-checklist)
 - [REQ-SEC-004 (AI security audit)](#req-sec-004-ai-security-audit)
 - [Secrets](#secrets)
@@ -160,6 +161,20 @@ The document API `_redirect` form field only follows same-origin paths: values s
 - Use `doctrine.table_prefix` when multiple apps share one schema.
 - Leave `allow_unauthenticated: false` in production.
 - Never commit `.env` secrets or demo credentials into production configs.
+
+## Logging
+
+REQ-OBS-001. The bundle logs through the autowired `Psr\Log\LoggerInterface` (a `NullLogger` when services are built by hand), with structured context and no content:
+
+| Event | Level | Context |
+|-------|-------|---------|
+| Asset upload stored (`AssetUploadHandler`) | info | `bundle`, `action`, `count` |
+| Asset upload with no valid file | warning | `bundle`, `action` |
+| Page import started / finished (`DocumentImportExportService`) | info | `bundle`, `action`, `target_page_key`, `publish`, `page_key` |
+| Page import failed | error | + `exception` (class name only) |
+| Page published (`DocumentService::publish()`) | info | `bundle`, `action`, `page_key` |
+
+Never logged: file names, upload URLs or storage keys, document JSON, widget props, HTML, translations or exception messages (they can echo editor content).
 
 ## Release security checklist
 

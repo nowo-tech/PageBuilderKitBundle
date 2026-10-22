@@ -13,7 +13,7 @@ endif
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra check-composer-archive
+.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra check-composer-archive check-no-raw-html-form
 
 # Default target
 help:
@@ -149,7 +149,7 @@ check-composer-archive:
 	@chmod +x .scripts/check-composer-archive-excludes-demo.sh
 	@./.scripts/check-composer-archive-excludes-demo.sh
 
-release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-composer-archive composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage release-check-demos
+release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-no-raw-html-form check-composer-archive composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage release-check-demos
 
 # REQ-TEST-011 — boot demo stack and assert one HTTP 200
 # classic mode keeps FrankenPHP up before vendor/ is installed on fresh CI checkouts
@@ -174,6 +174,9 @@ demo-smoke:
 		if [ "$$c" != "$$expected" ]; then echo "demo-smoke failed on $$path"; exit 1; fi; \
 	done; \
 	echo "demo-smoke OK (HTTP 200 + use-case checks)"
+
+check-no-raw-html-form:
+	@bash .scripts/check-no-raw-html-form.sh
 
 release-check-demos:
 	@if [ -f demo/Makefile ]; then $(MAKE) -C demo release-check; fi

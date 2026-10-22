@@ -28,7 +28,7 @@ final class WidgetPackPassTest extends TestCase
         $container->register('pack.demo', stdClass::class)
             ->addTag('nowo_page_builder_kit.widget_pack', ['types' => ['widget.heading']]);
 
-        (new WidgetPackPass())->process($container);
+        new WidgetPackPass()->process($container);
 
         $packs = $container->getDefinition(WidgetPackRegistry::class)->getArgument('$packs');
         self::assertCount(1, $packs);
@@ -41,7 +41,7 @@ final class WidgetPackPassTest extends TestCase
     public function noOpWhenPackRegistryMissing(): void
     {
         $container = new ContainerBuilder();
-        (new WidgetPackPass())->process($container);
+        new WidgetPackPass()->process($container);
 
         self::assertFalse($container->hasDefinition(WidgetPackRegistry::class));
     }
@@ -57,7 +57,7 @@ final class WidgetPackPassTest extends TestCase
             ->addTag('nowo_page_builder_kit.widget_pack', ['types' => 'bad'])
             ->addTag('nowo_page_builder_kit.widget_pack', ['types' => ['widget.heading', 'widget.heading']]);
 
-        (new WidgetPackPass())->process($container);
+        new WidgetPackPass()->process($container);
 
         $types = $container->getDefinition(WidgetTypeRegistry::class)->getArgument('$types');
         self::assertCount(1, $types);
@@ -71,7 +71,7 @@ final class WidgetPackPassTest extends TestCase
         $container->register('pack.demo', stdClass::class)
             ->addTag('nowo_page_builder_kit.widget_pack');
 
-        (new WidgetPackPass())->process($container);
+        new WidgetPackPass()->process($container);
 
         $packs = $container->getDefinition(WidgetPackRegistry::class)->getArgument('$packs');
         self::assertCount(1, $packs);
@@ -88,7 +88,7 @@ final class WidgetPackPassTest extends TestCase
         $container->register('pack.demo', stdClass::class)
             ->addTag('nowo_page_builder_kit.widget_pack', ['types' => ['widget.heading']]);
 
-        (new WidgetPackPass())->process($container);
+        new WidgetPackPass()->process($container);
 
         $types = $container->getDefinition(WidgetTypeRegistry::class)->getArgument('$types');
         self::assertCount(1, $types);

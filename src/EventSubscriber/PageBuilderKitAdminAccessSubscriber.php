@@ -24,7 +24,7 @@ final readonly class PageBuilderKitAdminAccessSubscriber implements EventSubscri
      *
      * @var array<string, list<string>|string|null>
      */
-    private const ROUTE_CAPABILITIES = [
+    private const array ROUTE_CAPABILITIES = [
         'admin_page_builder_list'               => null,
         'admin_page_builder_canvas'             => PageBuilderCapability::Layout->value,
         'admin_page_builder_sections'           => PageBuilderCapability::Layout->value,

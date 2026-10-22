@@ -143,7 +143,7 @@ final class ContentFieldsServiceTest extends TestCase
     #[Test]
     public function requireDocumentWhenPageHasNone(): void
     {
-        $page = (new BuilderPage())->setPageKey('orphan');
+        $page = new BuilderPage()->setPageKey('orphan');
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Page "orphan" has no document.');
@@ -323,8 +323,8 @@ final class ContentFieldsServiceTest extends TestCase
      */
     private function pageWithDocument(array $structure): BuilderPage
     {
-        $page     = (new BuilderPage())->setPageKey('home');
-        $document = (new BuilderDocument())->setPage($page)->setStructure($structure);
+        $page     = new BuilderPage()->setPageKey('home');
+        $document = new BuilderDocument()->setPage($page)->setStructure($structure);
         $page->setDocument($document);
 
         return $page;

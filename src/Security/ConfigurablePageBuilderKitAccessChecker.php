@@ -99,12 +99,6 @@ final readonly class ConfigurablePageBuilderKitAccessChecker implements PageBuil
             return $emptyAllows;
         }
 
-        foreach ($roles as $role) {
-            if ($this->authorizationChecker->isGranted($role)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($roles, fn ($role): bool => $this->authorizationChecker->isGranted($role));
     }
 }

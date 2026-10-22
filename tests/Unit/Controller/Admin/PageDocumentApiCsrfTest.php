@@ -65,8 +65,8 @@ final class PageDocumentApiCsrfTest extends TestCase
 
     private function controller(bool $csrfValid): PageDocumentApiController
     {
-        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
-        $doc  = (new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Draft);
+        $doc  = new BuilderDocument()->setPage($page)->setStructure([
             'version'       => 2,
             'engine'        => 'grapesjs',
             'html'          => '',
@@ -77,8 +77,8 @@ final class PageDocumentApiCsrfTest extends TestCase
         ]);
         $page->setDocument($doc);
 
-        $repo = new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly BuilderPage $page)
+        $repo = new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private BuilderPage $page)
             {
             }
 

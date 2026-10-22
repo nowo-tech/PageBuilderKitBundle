@@ -50,7 +50,7 @@ down:
 
 restart: ensure-up
 	$(DOCKER_COMPOSE) restart php
-	$(DOCKER_COMPOSE) exec -T php sh -c "php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:schema:update --force --no-interaction"
+	$(DOCKER_COMPOSE) exec -T php sh -c "i=0; until php bin/console doctrine:database:create --if-not-exists --no-interaction; do i=\$$((i+1)); [ \$$i -ge 30 ] && exit 1; echo Waiting for MySQL...; sleep 2; done; php bin/console doctrine:schema:update --force --no-interaction"
 
 build:
 	$(DOCKER_COMPOSE) build --no-cache
@@ -70,7 +70,7 @@ logs:
 	$(DOCKER_COMPOSE) logs -f
 
 database: ensure-up
-	$(DOCKER_COMPOSE) exec -T php sh -c "php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:schema:update --force --no-interaction"
+	$(DOCKER_COMPOSE) exec -T php sh -c "i=0; until php bin/console doctrine:database:create --if-not-exists --no-interaction; do i=\$$((i+1)); [ \$$i -ge 30 ] && exit 1; echo Waiting for MySQL...; sleep 2; done; php bin/console doctrine:schema:update --force --no-interaction"
 
 test: ensure-up link-bundle
 	$(DOCKER_COMPOSE) exec -e APP_ENV=test php sh -c "mkdir -p var/data && php bin/console doctrine:schema:update --force"
@@ -83,7 +83,7 @@ cache-clear: ensure-up
 	$(DOCKER_COMPOSE) exec php php bin/console cache:clear
 
 link-bundle: ensure-up
-	$(DOCKER_COMPOSE) exec php sh -c "rm -rf vendor/nowo-tech/page-builder-kit-bundle && ln -sf /var/page-builder-kit-bundle vendor/nowo-tech/page-builder-kit-bundle && php bin/console doctrine:database:create --if-not-exists --no-interaction && php bin/console doctrine:schema:update --force --no-interaction && php bin/console assets:install --symlink --relative --no-interaction && php bin/console cache:clear"
+	$(DOCKER_COMPOSE) exec php sh -c "rm -rf vendor/nowo-tech/page-builder-kit-bundle && ln -sf /var/page-builder-kit-bundle vendor/nowo-tech/page-builder-kit-bundle && i=0; until php bin/console doctrine:database:create --if-not-exists --no-interaction; do i=\$$((i+1)); [ \$$i -ge 30 ] && exit 1; echo Waiting for MySQL...; sleep 2; done; php bin/console doctrine:schema:update --force --no-interaction && php bin/console assets:install --symlink --relative --no-interaction && php bin/console cache:clear"
 
 assets: ensure-up
 	@# Prefer host pnpm when available (faster); fall back to container.
@@ -107,7 +107,8 @@ release-check: ensure-up update-bundle test test-coverage
 -include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk)
 
 # Paste into demo/symfony8/Makefile (REQ-DEMO-013). Uses official Playwright image.
-PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.63.0-jammy
+# Keep in sync with @playwright/test in e2e/package-lock.json (browsers ship with the image).
+PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.64.1-jammy
 
 test-e2e: ensure-up
 	@mkdir -p e2e/node_modules

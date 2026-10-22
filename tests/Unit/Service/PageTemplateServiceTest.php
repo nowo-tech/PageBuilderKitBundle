@@ -36,8 +36,8 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function saveFromPageAndApplyRoundTrip(): void
     {
-        $page     = (new BuilderPage())->setPageKey('pricing');
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $page     = new BuilderPage()->setPageKey('pricing');
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Plan</p>',
@@ -47,7 +47,7 @@ final class PageTemplateServiceTest extends TestCase
         ]);
         $page->setDocument($document);
         $document->getLocales()->add(
-            (new BuilderDocumentLocale())
+            new BuilderDocumentLocale()
                 ->setLocale('es')
                 ->setWidgetProps(['hero' => ['title' => 'Plan']])
                 ->setDocument($document),
@@ -193,8 +193,8 @@ final class PageTemplateServiceTest extends TestCase
             new DocumentNormalizer(),
         );
 
-        $page = (new BuilderPage())->setPageKey('pricing');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('pricing');
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Plan</p>',
@@ -211,7 +211,7 @@ final class PageTemplateServiceTest extends TestCase
         }
 
         $this->expectException(InvalidArgumentException::class);
-        $service->saveFromPage((new BuilderPage())->setPageKey('missing'), 'pricing-tpl', 'Pricing');
+        $service->saveFromPage(new BuilderPage()->setPageKey('missing'), 'pricing-tpl', 'Pricing');
     }
 
     #[Test]
@@ -269,7 +269,7 @@ final class PageTemplateServiceTest extends TestCase
             new DocumentNormalizer(),
         );
 
-        $seed = (new BuilderPageTemplate())
+        $seed = new BuilderPageTemplate()
             ->setTemplateKey('hero-tpl')
             ->setLabel('Hero')
             ->setStructure([
@@ -365,7 +365,7 @@ final class PageTemplateServiceTest extends TestCase
         ];
 
         $templateRepo->put(
-            (new BuilderPageTemplate())
+            new BuilderPageTemplate()
                 ->setTemplateKey('exists')
                 ->setLabel('Exists')
                 ->setStructure($structure),
@@ -482,7 +482,7 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function createPageFromTemplateFiltersNonArrayWidgetPropsAndDeleteRejectsUnknown(): void
     {
-        $template = (new BuilderPageTemplate())
+        $template = new BuilderPageTemplate()
             ->setTemplateKey('pricing-tpl')
             ->setLabel('Pricing')
             ->setStructure([
@@ -498,8 +498,8 @@ final class PageTemplateServiceTest extends TestCase
                 'skip' => 'bad',
             ]);
 
-        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
-            public function __construct(private readonly BuilderPageTemplate $template)
+        $templateRepo = new readonly class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private BuilderPageTemplate $template)
             {
             }
 
@@ -533,7 +533,7 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function createPageFromTemplateRespectsFieldOptions(): void
     {
-        $template = (new BuilderPageTemplate())
+        $template = new BuilderPageTemplate()
             ->setTemplateKey('fields-tpl')
             ->setLabel('Fields')
             ->setStructure([
@@ -551,8 +551,8 @@ final class PageTemplateServiceTest extends TestCase
             ])
             ->setWidgetPropsByLocale([]);
 
-        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
-            public function __construct(private readonly BuilderPageTemplate $template)
+        $templateRepo = new readonly class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private BuilderPageTemplate $template)
             {
             }
 
@@ -599,7 +599,7 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function createPageFromTemplateOptionallyCopiesSeo(): void
     {
-        $template = (new BuilderPageTemplate())
+        $template = new BuilderPageTemplate()
             ->setTemplateKey('seo-tpl')
             ->setLabel('SEO')
             ->setStructure([
@@ -624,8 +624,8 @@ final class PageTemplateServiceTest extends TestCase
             ])
             ->setWidgetPropsByLocale([]);
 
-        $templateRepo = new class($template) implements BuilderPageTemplateRepositoryInterface {
-            public function __construct(private readonly BuilderPageTemplate $template)
+        $templateRepo = new readonly class($template) implements BuilderPageTemplateRepositoryInterface {
+            public function __construct(private BuilderPageTemplate $template)
             {
             }
 
@@ -671,8 +671,8 @@ final class PageTemplateServiceTest extends TestCase
     #[Test]
     public function saveExportImportPreserveSeoAndApplyCreatesMissingLocales(): void
     {
-        $page     = (new BuilderPage())->setPageKey('pricing');
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $page     = new BuilderPage()->setPageKey('pricing');
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Plan</p>',
@@ -682,7 +682,7 @@ final class PageTemplateServiceTest extends TestCase
         ]);
         $page->setDocument($document);
         $page->addTranslation(
-            (new BuilderPageTranslation())
+            new BuilderPageTranslation()
                 ->setLocale('es')
                 ->setTitle('Pricing')
                 ->setSlug('pricing')

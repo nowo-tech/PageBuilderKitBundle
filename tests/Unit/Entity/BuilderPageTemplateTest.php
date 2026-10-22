@@ -15,7 +15,7 @@ final class BuilderPageTemplateTest extends TestCase
     #[Test]
     public function accessorsRoundTrip(): void
     {
-        $template = (new BuilderPageTemplate())
+        $template = new BuilderPageTemplate()
             ->setTemplateKey('hero')
             ->setLabel('Hero')
             ->setStructure(['version' => 2, 'engine' => 'grapesjs'])

@@ -19,7 +19,7 @@ use function is_string;
 
 final class PageAssetUploadController extends AbstractController
 {
-    public const CSRF_TOKEN_ID = 'page_builder_asset_upload';
+    public const string CSRF_TOKEN_ID = 'page_builder_asset_upload';
 
     public function __construct(
         private readonly AssetUploadHandler $assetUploadHandler,

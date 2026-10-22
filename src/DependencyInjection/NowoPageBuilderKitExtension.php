@@ -393,10 +393,10 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             return;
         }
 
+        // Autoconfigured: ResetInterface adds the kernel.reset tag (REQ-SF-003, no duplicate manual tag).
         $container->register(PageBuilderKitTrace::class)
             ->setAutowired(true)
-            ->setAutoconfigured(true)
-            ->addTag('kernel.reset', ['method' => 'reset']);
+            ->setAutoconfigured(true);
 
         $container->setAlias(PageBuilderKitTraceInterface::class, PageBuilderKitTrace::class);
 
@@ -408,6 +408,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
                 (bool) $config['revisions']['enabled'],
                 new Reference(PageBuilderKitAccessCheckerInterface::class),
             ])
+            // The data_collector tag carries the profiler template / id / priority (no attribute equivalent here).
             ->addTag('data_collector', [
                 'template' => '@NowoPageBuilderKitBundle/Collector/page_builder.html.twig',
                 'id'       => PageBuilderKitDataCollector::NAME,

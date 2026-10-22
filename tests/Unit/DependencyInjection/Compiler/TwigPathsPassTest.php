@@ -25,7 +25,7 @@ final class TwigPathsPassTest extends TestCase
         $loader = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native_filesystem', $loader);
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         $calls = $loader->getMethodCalls();
         self::assertNotEmpty($calls);
@@ -42,7 +42,7 @@ final class TwigPathsPassTest extends TestCase
         $container->setDefinition('twig.loader.native_filesystem', $target);
         $container->setAlias('twig.loader.native', 'twig.loader.native_filesystem');
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         self::assertNotEmpty($target->getMethodCalls());
     }
@@ -60,7 +60,7 @@ final class TwigPathsPassTest extends TestCase
         $container->setDefinition('twig.loader.filesystem', $loader);
 
         try {
-            (new TwigPathsPass())->process($container);
+            new TwigPathsPass()->process($container);
 
             $calls = $loader->getMethodCalls();
             self::assertSame('prependPath', $calls[0][0]);
@@ -79,7 +79,7 @@ final class TwigPathsPassTest extends TestCase
     {
         $container = new ContainerBuilder();
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         self::assertFalse($container->hasDefinition('twig.loader.native_filesystem'));
     }
@@ -92,7 +92,7 @@ final class TwigPathsPassTest extends TestCase
         $loader = new Definition(FilesystemLoader::class);
         $container->setDefinition('twig.loader.native', $loader);
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         self::assertNotEmpty($loader->getMethodCalls());
     }
@@ -107,7 +107,7 @@ final class TwigPathsPassTest extends TestCase
         $container->setAlias('twig.loader.native', 'twig.loader.native_filesystem');
         $container->setAlias('twig.loader.alias', 'twig.loader.native');
 
-        (new TwigPathsPass())->process($container);
+        new TwigPathsPass()->process($container);
 
         self::assertNotEmpty($target->getMethodCalls());
     }

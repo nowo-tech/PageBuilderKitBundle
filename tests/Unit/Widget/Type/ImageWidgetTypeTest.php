@@ -32,7 +32,7 @@ final class ImageWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::None, null),
         );
 
-        $result = (new ImageWidgetType())->sanitizeProps(
+        $result = new ImageWidgetType()->sanitizeProps(
             ['src' => ' /img.png ', 'alt' => ' Alt '],
             $protection,
         );

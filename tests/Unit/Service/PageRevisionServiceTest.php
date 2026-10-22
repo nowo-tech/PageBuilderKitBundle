@@ -44,8 +44,8 @@ final class PageRevisionServiceTest extends TestCase
     #[Test]
     public function restoreAppliesRevisionThroughDocumentService(): void
     {
-        $page = (new BuilderPage())->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home');
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>live</p>',
@@ -62,7 +62,7 @@ final class PageRevisionServiceTest extends TestCase
             'grapes'        => [],
             'localeContent' => [],
         ];
-        $revision = (new BuilderPageRevision())
+        $revision = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure($oldStructure)
             ->setWidgetPropsByLocale([]);
@@ -73,8 +73,8 @@ final class PageRevisionServiceTest extends TestCase
         $em->expects(self::atLeastOnce())->method('persist');
         $em->expects(self::atLeastOnce())->method('flush');
 
-        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
-            public function __construct(private readonly BuilderPageRevision $revision)
+        $repo = new readonly class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private BuilderPageRevision $revision)
             {
             }
 
@@ -112,7 +112,7 @@ final class PageRevisionServiceTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $service->restore((new BuilderPage())->setPageKey('x'), 99);
+        $service->restore(new BuilderPage()->setPageKey('x'), 99);
     }
 
     #[Test]
@@ -124,14 +124,14 @@ final class PageRevisionServiceTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $service->restore((new BuilderPage())->setPageKey('x'), 1);
+        $service->restore(new BuilderPage()->setPageKey('x'), 1);
     }
 
     #[Test]
     public function diffComparesLiveDocumentAgainstRevision(): void
     {
-        $page = (new BuilderPage())->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home');
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>live</p>',
@@ -140,7 +140,7 @@ final class PageRevisionServiceTest extends TestCase
             'localeContent' => [],
         ]));
 
-        $revision = (new BuilderPageRevision())
+        $revision = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure([
                 'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
@@ -154,8 +154,8 @@ final class PageRevisionServiceTest extends TestCase
         $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
         $idProp->setValue($revision, 3);
 
-        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
-            public function __construct(private readonly BuilderPageRevision $revision)
+        $repo = new readonly class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private BuilderPageRevision $revision)
             {
             }
 
@@ -193,7 +193,7 @@ final class PageRevisionServiceTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $service->diff((new BuilderPage())->setPageKey('x'), 1);
+        $service->diff(new BuilderPage()->setPageKey('x'), 1);
     }
 
     #[Test]
@@ -205,14 +205,14 @@ final class PageRevisionServiceTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $service->diff((new BuilderPage())->setPageKey('home'), 404);
+        $service->diff(new BuilderPage()->setPageKey('home'), 404);
     }
 
     #[Test]
     public function diffCollectsLiveLocaleProps(): void
     {
-        $page     = (new BuilderPage())->setPageKey('home');
-        $document = (new BuilderDocument())->setPage($page)->setStructure([
+        $page     = new BuilderPage()->setPageKey('home');
+        $document = new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>live</p>',
@@ -223,15 +223,15 @@ final class PageRevisionServiceTest extends TestCase
         $document->upsertLocale('es', ['w1' => ['text' => 'Hola']]);
         $page->setDocument($document);
 
-        $revision = (new BuilderPageRevision())
+        $revision = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure($document->getStructure())
             ->setWidgetPropsByLocale(['es' => ['w1' => ['text' => 'Hola']]]);
         $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
         $idProp->setValue($revision, 9);
 
-        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
-            public function __construct(private readonly BuilderPageRevision $revision)
+        $repo = new readonly class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private BuilderPageRevision $revision)
             {
             }
 
@@ -262,8 +262,8 @@ final class PageRevisionServiceTest extends TestCase
     #[Test]
     public function accessorsAndCreateUseUnderlyingStore(): void
     {
-        $page = (new BuilderPage())->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home');
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>live</p>',
@@ -281,8 +281,8 @@ final class PageRevisionServiceTest extends TestCase
         $idProp = new ReflectionProperty(BuilderPageRevision::class, 'id');
         $idProp->setValue($listed, 11);
 
-        $repo = new class($listed) implements BuilderPageRevisionRepositoryInterface {
-            public function __construct(private readonly BuilderPageRevision $listed)
+        $repo = new readonly class($listed) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private BuilderPageRevision $listed)
             {
             }
 

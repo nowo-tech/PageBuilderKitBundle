@@ -83,7 +83,7 @@ final class PageBuilderKitAccessGuardTest extends TestCase
         $denied->method('canAccess')->willReturn(false);
 
         $this->expectException(AccessDeniedException::class);
-        (new PageBuilderKitAccessGuard($denied))->assertAccess();
+        new PageBuilderKitAccessGuard($denied)->assertAccess();
     }
 
     #[Test]
@@ -93,7 +93,7 @@ final class PageBuilderKitAccessGuardTest extends TestCase
         $denied->method('canLayout')->willReturn(false);
 
         $this->expectException(AccessDeniedException::class);
-        (new PageBuilderKitAccessGuard($denied))->assertLayout();
+        new PageBuilderKitAccessGuard($denied)->assertLayout();
     }
 
     #[Test]
@@ -103,7 +103,7 @@ final class PageBuilderKitAccessGuardTest extends TestCase
         $denied->method('canContent')->willReturn(false);
 
         $this->expectException(AccessDeniedException::class);
-        (new PageBuilderKitAccessGuard($denied))->assertContent();
+        new PageBuilderKitAccessGuard($denied)->assertContent();
     }
 
     #[Test]
@@ -113,7 +113,7 @@ final class PageBuilderKitAccessGuardTest extends TestCase
         $denied->method('canPublish')->willReturn(false);
 
         $this->expectException(AccessDeniedException::class);
-        (new PageBuilderKitAccessGuard($denied))->assertPublish();
+        new PageBuilderKitAccessGuard($denied)->assertPublish();
     }
 
     #[Test]
@@ -123,7 +123,7 @@ final class PageBuilderKitAccessGuardTest extends TestCase
         $denied->method('canTemplates')->willReturn(false);
 
         $this->expectException(AccessDeniedException::class);
-        (new PageBuilderKitAccessGuard($denied))->assertTemplates();
+        new PageBuilderKitAccessGuard($denied)->assertTemplates();
     }
 
     #[Test]
@@ -134,6 +134,6 @@ final class PageBuilderKitAccessGuardTest extends TestCase
 
         $this->expectException(AccessDeniedException::class);
         $this->expectExceptionMessage('Page builder capability "layout" required.');
-        (new PageBuilderKitAccessGuard($denied))->assertCan(PageBuilderCapability::Layout);
+        new PageBuilderKitAccessGuard($denied)->assertCan(PageBuilderCapability::Layout);
     }
 }

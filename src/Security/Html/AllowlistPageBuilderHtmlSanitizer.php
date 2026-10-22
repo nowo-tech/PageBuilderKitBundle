@@ -24,12 +24,12 @@ use const LIBXML_HTML_NOIMPLIED;
 
 final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitizerInterface
 {
-    private const ALLOWED_TAGS = [
+    private const array ALLOWED_TAGS = [
         'p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'span',
     ];
 
-    private const ALLOWED_ATTRS = [
+    private const array ALLOWED_ATTRS = [
         'a'   => ['href', 'title', 'target', 'rel'],
         'img' => ['src', 'alt', 'title', 'width', 'height'],
         '*'   => ['class', 'id'],
@@ -131,7 +131,7 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
                 $remove[] = $attr->name;
                 continue;
             }
-            if (($name === 'href' || $name === 'src') && !self::isSafeUrl($attr->value, $name === 'src')) {
+            if (($name === 'href' || $name === 'src') && !$this->isSafeUrl($attr->value, $name === 'src')) {
                 $remove[] = $attr->name;
             }
         }
@@ -145,7 +145,7 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
      * Browsers ignore ASCII whitespace / control characters inside a URL scheme
      * (`java\tscript:`), so they are removed before the scheme is checked.
      */
-    private static function isSafeUrl(string $value, bool $imageSource): bool
+    private function isSafeUrl(string $value, bool $imageSource): bool
     {
         $normalized = strtolower((string) preg_replace('/[\x00-\x20\x7f]+/', '', $value));
         if (str_starts_with($normalized, 'javascript:') || str_starts_with($normalized, 'vbscript:')) {

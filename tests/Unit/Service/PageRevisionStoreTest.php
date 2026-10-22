@@ -63,7 +63,7 @@ final class PageRevisionStoreTest extends TestCase
     public function snapshotSkipsWhenUnchangedAgainstLatest(): void
     {
         $page     = $this->pageWithStructure();
-        $existing = (new BuilderPageRevision())
+        $existing = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure($page->getDocument()?->getStructure() ?? [])
             ->setWidgetPropsByLocale([]);
@@ -84,8 +84,8 @@ final class PageRevisionStoreTest extends TestCase
     public function pruneRemovesOldestBeyondMax(): void
     {
         $page = $this->pageWithStructure();
-        $keep = (new BuilderPageRevision())->setPage($page)->setStructure(['version' => 2])->setLabel('keep');
-        $drop = (new BuilderPageRevision())->setPage($page)->setStructure(['version' => 2])->setLabel('drop');
+        $keep = new BuilderPageRevision()->setPage($page)->setStructure(['version' => 2])->setLabel('keep');
+        $drop = new BuilderPageRevision()->setPage($page)->setStructure(['version' => 2])->setLabel('drop');
         $page->addRevision($keep);
         $page->addRevision($drop);
 
@@ -106,10 +106,10 @@ final class PageRevisionStoreTest extends TestCase
     public function accessorsAndLookupHelpersReflectConfiguration(): void
     {
         $page     = $this->pageWithStructure();
-        $revision = (new BuilderPageRevision())->setPage($page)->setStructure(['version' => 2])->setWidgetPropsByLocale([]);
+        $revision = new BuilderPageRevision()->setPage($page)->setStructure(['version' => 2])->setWidgetPropsByLocale([]);
 
-        $repo = new class($revision) implements BuilderPageRevisionRepositoryInterface {
-            public function __construct(private readonly BuilderPageRevision $revision)
+        $repo = new readonly class($revision) implements BuilderPageRevisionRepositoryInterface {
+            public function __construct(private BuilderPageRevision $revision)
             {
             }
 
@@ -156,14 +156,14 @@ final class PageRevisionStoreTest extends TestCase
         self::assertNull($store->extractLivePayload($page));
 
         $page->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([]));
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([]));
         self::assertNull($store->extractLivePayload($page));
 
         $pageWithContent = $this->pageWithStructure();
         $document        = $pageWithContent->getDocument();
         self::assertInstanceOf(BuilderDocument::class, $document);
         $document->getLocales()->add(
-            (new BuilderDocumentLocale())
+            new BuilderDocumentLocale()
                 ->setLocale('es')
                 ->setWidgetProps(['hero' => ['title' => 'Hola']])
                 ->setDocument($document),
@@ -181,7 +181,7 @@ final class PageRevisionStoreTest extends TestCase
     public function snapshotCanIgnoreUnchangedGuardAndPruneCanBeDisabledByLimit(): void
     {
         $page     = $this->pageWithStructure();
-        $existing = (new BuilderPageRevision())
+        $existing = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure($page->getDocument()?->getStructure() ?? [])
             ->setWidgetPropsByLocale([]);
@@ -219,13 +219,13 @@ final class PageRevisionStoreTest extends TestCase
      */
     private function repo(?BuilderPageRevision $latest, array $list): BuilderPageRevisionRepositoryInterface
     {
-        return new class($latest, $list) implements BuilderPageRevisionRepositoryInterface {
+        return new readonly class($latest, $list) implements BuilderPageRevisionRepositoryInterface {
             /**
              * @param list<BuilderPageRevision> $list
              */
             public function __construct(
-                private readonly ?BuilderPageRevision $latest,
-                private readonly array $list,
+                private ?BuilderPageRevision $latest,
+                private array $list,
             ) {
             }
 
@@ -248,8 +248,8 @@ final class PageRevisionStoreTest extends TestCase
 
     private function pageWithStructure(): BuilderPage
     {
-        $page = (new BuilderPage())->setPageKey('home');
-        $doc  = (new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home');
+        $doc  = new BuilderDocument()->setPage($page)->setStructure([
             'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'    => '<p>Hi</p>',

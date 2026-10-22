@@ -30,10 +30,10 @@ final class PageDocumentApiControllerTest extends TestCase
     #[Test]
     public function unpublishReturnsDraftStatusJson(): void
     {
-        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Published);
+        $page = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Published);
 
-        $repo = new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly BuilderPage $page)
+        $repo = new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private BuilderPage $page)
             {
             }
 

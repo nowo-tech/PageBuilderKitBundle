@@ -28,8 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Structured logging (`Psr\Log\LoggerInterface`, autowired) for asset uploads, page import (start / finish / failure) and publishing, without content; policy in `docs/SECURITY.md#logging` (REQ-OBS-001).
+- Admin page list is paginated (50 per page, `?page=`), with `BuilderPageRepository::findOrderedSlice()` / `countAll()` and translated pagination labels (REQ-PERF-001).
+
 ### Changed
 
+- `DocumentService::publish()` dates `publishedAt` with the optional injected `Psr\Clock\ClockInterface` (REQ-DI-001); runtime dependencies `psr/clock`, `psr/log`.
+- Services rely on autoconfiguration: manual `controller.service_arguments`, `form.type` and the trace `kernel.reset` tags removed (REQ-SF-003).
+- PHPUnit suites split into `unit` and `integration`; the controller coverage exclusion is documented (covered end to end by the demo Playwright suite) (REQ-TEST-002/003).
+- Rector uses the PHP 8.4 sets (package floor) with at most 2 workers (REQ-CS-003); `release-check` runs `check-no-raw-html-form` (REQ-MAKE-002).
+- `composer.json`: `support.docs` added, keyword stuffing removed (`elementor`, `nowo`) (REQ-PKG-004).
+- Demo: the database bootstrap retries until MySQL accepts connections (clean `make up` failed with "Connection refused"); the Playwright image follows `@playwright/test` 1.64.1 from the lock. README coverage 99.58% as measured.
+- `.scripts/check-no-cursor-coauthor.sh` accepts git worktrees (REQ-GIT-001).
 - Dependencies refreshed (Composer and pnpm/npm lock files of the bundle and its demos, campaign 2026-10-19).
 - `.php-cs-fixer.dist.php`: `new ParallelConfig(2)` (REQ-CS-001).
 - Documentation: wave-1 REQ compliance — versioned `.cursor/` (Engram `mcp.json`, rules incl. `01-git-commits.mdc`, Spec Kit skills; only `sandbox.json` stays ignored), README documentation list order (duplicate Builder manual removed) and Roadmap moved after License, CODEOWNERS header, CONTRIBUTING Cursor Agent settings, TOCs for long docs, full GitHub Spec Kit manual, inventory refresh (165/165).

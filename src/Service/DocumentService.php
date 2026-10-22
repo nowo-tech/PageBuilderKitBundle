@@ -15,6 +15,9 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
+use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Uid\Uuid;
 
 use function in_array;
@@ -40,6 +43,8 @@ final readonly class DocumentService
         private ?PageRevisionStore $pageRevisionStore = null,
         private ?ContentFieldsNormalizer $contentFieldsNormalizer = null,
         ?DocumentStructureValidator $structureValidator = null,
+        private ?ClockInterface $clock = null,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
         $this->structureValidator = $structureValidator ?? new DocumentStructureValidator($widgetTypeRegistry);
     }
@@ -107,18 +112,18 @@ final readonly class DocumentService
             throw new InvalidArgumentException(sprintf('Page key "%s" already exists.', $pageKey));
         }
 
-        $page = (new BuilderPage())
+        $page = new BuilderPage()
             ->setUuid(Uuid::v4()->toRfc4122())
             ->setPageKey($pageKey)
             ->setStatus(PageStatus::Draft);
 
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale($locale)
             ->setTitle($title)
             ->setSlug($pageKey);
         $page->addTranslation($translation);
 
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($page)
             ->setStructure($this->documentNormalizer->emptyStructure());
 
@@ -168,7 +173,7 @@ final readonly class DocumentService
 
             $translation = $page->getTranslation($locale);
             if (!$translation instanceof BuilderPageTranslation) {
-                $translation = (new BuilderPageTranslation())->setLocale($locale);
+                $translation = new BuilderPageTranslation()->setLocale($locale);
                 $page->addTranslation($translation);
             }
 
@@ -212,8 +217,9 @@ final readonly class DocumentService
         }
 
         $page->setStatus(PageStatus::Published);
-        $page->setPublishedAt(new DateTimeImmutable());
+        $page->setPublishedAt($this->clock?->now() ?? new DateTimeImmutable());
         $this->entityManager->flush();
+        $this->logger->info('Page builder page published.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'publish', 'page_key' => $page->getPageKey()]);
     }
 
     public function unpublish(BuilderPage $page): void

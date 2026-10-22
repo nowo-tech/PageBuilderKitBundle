@@ -12,7 +12,9 @@ return RectorConfig::configure()
     ->withSkip([
         __DIR__ . '/demo',
     ])
-    ->withPhpSets(php82: true)
+    // Machine-wide cap: at most 2 worker processes; generous timeout for slow (WSL2 / CI) hosts.
+    ->withParallel(300, 2, 10)
+    ->withPhpSets(php84: true)
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,

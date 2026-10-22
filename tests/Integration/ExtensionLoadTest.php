@@ -26,7 +26,7 @@ final class ExtensionLoadTest extends TestCase
 
         $processor = new Processor();
         $processed = $processor->processConfiguration(
-            (new NowoPageBuilderKitExtension())->getConfiguration([], new ContainerBuilder()),
+            new NowoPageBuilderKitExtension()->getConfiguration([], new ContainerBuilder()),
             [$rawConfig],
         );
 

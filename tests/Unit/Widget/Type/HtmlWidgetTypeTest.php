@@ -32,7 +32,7 @@ final class HtmlWidgetTypeTest extends TestCase
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::Allowlist, null),
         );
 
-        $result = (new HtmlWidgetType())->sanitizeProps(
+        $result = new HtmlWidgetType()->sanitizeProps(
             ['html' => '<p>ok</p><script>x</script>'],
             $protection,
         );

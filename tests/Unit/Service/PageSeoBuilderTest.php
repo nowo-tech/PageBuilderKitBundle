@@ -32,7 +32,7 @@ final class PageSeoBuilderTest extends TestCase
     #[Test]
     public function prefersTranslationFields(): void
     {
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('Inicio')
             ->setSlug('inicio')
@@ -44,7 +44,7 @@ final class PageSeoBuilderTest extends TestCase
             ->setCanonicalUrl('https://example.com/es/inicio')
             ->setRobots('noindex');
 
-        $seo = (new PageSeoBuilder('Nowo', 'https://cdn.example/og.png', 'https://example.com'))
+        $seo = new PageSeoBuilder('Nowo', 'https://cdn.example/og.png', 'https://example.com')
             ->build($translation, 'home', 'es', 'Inicio');
 
         self::assertSame('SEO Inicio', $seo['title']);
@@ -59,7 +59,7 @@ final class PageSeoBuilderTest extends TestCase
     #[Test]
     public function canonicalIsNullWhenBaseUrlMissing(): void
     {
-        $seo = (new PageSeoBuilder('', '', ''))->build(null, 'home', 'en', 'Home');
+        $seo = new PageSeoBuilder('', '', '')->build(null, 'home', 'en', 'Home');
 
         self::assertNull($seo['canonical']);
     }

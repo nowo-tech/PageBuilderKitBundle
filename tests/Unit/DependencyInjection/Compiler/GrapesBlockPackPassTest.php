@@ -24,7 +24,7 @@ final class GrapesBlockPackPassTest extends TestCase
         $container->register('pack.demo', stdClass::class)
             ->addTag('nowo_page_builder_kit.grapes_block_pack');
 
-        (new GrapesBlockPackPass())->process($container);
+        new GrapesBlockPackPass()->process($container);
 
         $packs = $container->getDefinition(GrapesBlockPackRegistry::class)->getArgument('$packs');
         self::assertCount(1, $packs);
@@ -34,7 +34,7 @@ final class GrapesBlockPackPassTest extends TestCase
     public function noOpWhenRegistryMissing(): void
     {
         $container = new ContainerBuilder();
-        (new GrapesBlockPackPass())->process($container);
+        new GrapesBlockPackPass()->process($container);
 
         self::assertFalse($container->hasDefinition(GrapesBlockPackRegistry::class));
     }

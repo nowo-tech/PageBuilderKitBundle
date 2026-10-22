@@ -47,10 +47,10 @@ final class WidgetTypeRegistryTest extends TestCase
 
     private function createWidgetType(string $type, string $labelKey): WidgetTypeInterface
     {
-        return new class($type, $labelKey) implements WidgetTypeInterface {
+        return new readonly class($type, $labelKey) implements WidgetTypeInterface {
             public function __construct(
-                private readonly string $type,
-                private readonly string $labelKey,
+                private string $type,
+                private string $labelKey,
             ) {
             }
 

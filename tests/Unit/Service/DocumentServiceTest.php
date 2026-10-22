@@ -91,7 +91,7 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function createPageRejectsDuplicateKey(): void
     {
-        $existing = (new BuilderPage())->setPageKey('home');
+        $existing = new BuilderPage()->setPageKey('home');
         $service  = $this->createService($existing);
 
         $this->expectException(InvalidArgumentException::class);
@@ -103,7 +103,7 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function loadPageByKeyReturnsRepositoryResult(): void
     {
-        $page = (new BuilderPage())->setPageKey('home');
+        $page = new BuilderPage()->setPageKey('home');
 
         self::assertSame($page, $this->createService($page)->loadPageByKey('home'));
     }
@@ -111,14 +111,14 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function duplicatePageCreatesDraftCopy(): void
     {
-        $source = (new BuilderPage())->setPageKey('home')->setUuid('11111111-1111-4111-8111-111111111111');
+        $source = new BuilderPage()->setPageKey('home')->setUuid('11111111-1111-4111-8111-111111111111');
         $source->addTranslation(
-            (new BuilderPageTranslation())
+            new BuilderPageTranslation()
                 ->setLocale('es')
                 ->setTitle('Inicio')
                 ->setSlug('inicio'),
         );
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($source)
             ->setStructure([
                 'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
@@ -180,21 +180,21 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function duplicatePageFallsBackTitleCopiesExtraLocalesAndSkipsUnknown(): void
     {
-        $source = (new BuilderPage())->setPageKey('home')->setUuid('11111111-1111-4111-8111-111111111111');
+        $source = new BuilderPage()->setPageKey('home')->setUuid('11111111-1111-4111-8111-111111111111');
         $source->addTranslation(
-            (new BuilderPageTranslation())
+            new BuilderPageTranslation()
                 ->setLocale('en')
                 ->setTitle('Home EN')
                 ->setSlug('home-en')
                 ->setMetaTitle('Meta EN'),
         );
         $source->addTranslation(
-            (new BuilderPageTranslation())
+            new BuilderPageTranslation()
                 ->setLocale('fr')
                 ->setTitle('Accueil')
                 ->setSlug('accueil'),
         );
-        $document = (new BuilderDocument())
+        $document = new BuilderDocument()
             ->setPage($source)
             ->setStructure([
                 'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
@@ -205,7 +205,7 @@ final class DocumentServiceTest extends TestCase
                 'localeContent' => [],
             ]);
         $document->getLocales()->add(
-            (new BuilderDocumentLocale())
+            new BuilderDocumentLocale()
                 ->setLocale('en')
                 ->setWidgetProps(['hero' => ['title' => 'EN']])
                 ->setDocument($document),
@@ -295,7 +295,7 @@ final class DocumentServiceTest extends TestCase
         $em->expects(self::exactly(2))->method('flush');
 
         $service = $this->createService(null, $em);
-        $page    = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
+        $page    = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Draft);
 
         $service->publish($page);
         self::assertSame(PageStatus::Published, $page->getStatus());
@@ -309,8 +309,8 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function publishRejectsMissingRequiredContentFields(): void
     {
-        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Draft);
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version' => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'  => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'    => '<h1>{{ fields.hero_title }}</h1>',
@@ -336,14 +336,14 @@ final class DocumentServiceTest extends TestCase
         $service = $this->createService();
 
         $this->expectException(InvalidArgumentException::class);
-        $service->duplicatePage((new BuilderPage())->setPageKey('orphan'), 'orphan-copy');
+        $service->duplicatePage(new BuilderPage()->setPageKey('orphan'), 'orphan-copy');
     }
 
     #[Test]
     public function publishAndSaveSnapshotThroughRevisionStore(): void
     {
-        $page = (new BuilderPage())->setPageKey('home')->setStatus(PageStatus::Draft);
-        $page->setDocument((new BuilderDocument())->setPage($page)->setStructure([
+        $page = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Draft);
+        $page->setDocument(new BuilderDocument()->setPage($page)->setStructure([
             'version'       => DocumentNormalizer::GRAPES_SCHEMA_VERSION,
             'engine'        => DocumentNormalizer::ENGINE_GRAPESJS,
             'html'          => '<p>Hi</p>',
@@ -419,8 +419,8 @@ final class DocumentServiceTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $page = (new BuilderPage())->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page));
+        $page = new BuilderPage()->setPageKey('home');
+        $page->setDocument(new BuilderDocument()->setPage($page));
 
         $this->createService(null, $em)->saveDocument(
             $page,
@@ -673,7 +673,7 @@ final class DocumentServiceTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $page = (new BuilderPage())->setPageKey('home');
+        $page = new BuilderPage()->setPageKey('home');
 
         $this->createService(null, $em)->saveDocument($page, $this->validStructure(), ['es' => []]);
 
@@ -693,7 +693,7 @@ final class DocumentServiceTest extends TestCase
     #[Test]
     public function validateStructureRejectsUnknownWidgetType(): void
     {
-        $structure = (new DocumentNormalizer())->normalize([
+        $structure = new DocumentNormalizer()->normalize([
             'sections' => [
                 [
                     'columns' => [
@@ -758,8 +758,8 @@ final class DocumentServiceTest extends TestCase
         $em->expects(self::once())->method('persist');
         $em->expects(self::once())->method('flush');
 
-        $page = (new BuilderPage())->setPageKey('home');
-        $page->setDocument((new BuilderDocument())->setPage($page));
+        $page = new BuilderPage()->setPageKey('home');
+        $page->setDocument(new BuilderDocument()->setPage($page));
 
         $this->createService(null, $em)->saveDocument(
             $page,
@@ -781,7 +781,7 @@ final class DocumentServiceTest extends TestCase
      */
     private function validStructure(): array
     {
-        return (new DocumentNormalizer())->normalize([
+        return new DocumentNormalizer()->normalize([
             'sections' => [
                 [
                     'columns' => [
@@ -822,8 +822,8 @@ final class DocumentServiceTest extends TestCase
 
     private function createStubRepository(?BuilderPage $page): BuilderPageRepositoryInterface
     {
-        return new class($page) implements BuilderPageRepositoryInterface {
-            public function __construct(private readonly ?BuilderPage $page)
+        return new readonly class($page) implements BuilderPageRepositoryInterface {
+            public function __construct(private ?BuilderPage $page)
             {
             }
 

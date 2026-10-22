@@ -24,7 +24,7 @@ final class BuilderPageSeoTypeTest extends TestCase
             ->addExtension(new ValidatorExtension(Validation::createValidatorBuilder()->getValidator()))
             ->getFormFactory();
 
-        $translation = (new BuilderPageTranslation())
+        $translation = new BuilderPageTranslation()
             ->setLocale('es')
             ->setTitle('T')
             ->setSlug('t')

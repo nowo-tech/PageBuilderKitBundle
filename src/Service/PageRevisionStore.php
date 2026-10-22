@@ -74,7 +74,7 @@ final readonly class PageRevisionStore
             }
         }
 
-        $revision = (new BuilderPageRevision())
+        $revision = new BuilderPageRevision()
             ->setPage($page)
             ->setStructure($payload['structure'])
             ->setWidgetPropsByLocale($payload['widgetPropsByLocale'])

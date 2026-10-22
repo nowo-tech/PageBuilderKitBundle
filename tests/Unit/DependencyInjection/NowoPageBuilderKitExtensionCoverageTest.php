@@ -31,14 +31,14 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
     #[Test]
     public function getAliasMatchesConfiguration(): void
     {
-        self::assertSame(Configuration::ALIAS, (new NowoPageBuilderKitExtension())->getAlias());
+        self::assertSame(Configuration::ALIAS, new NowoPageBuilderKitExtension()->getAlias());
     }
 
     #[Test]
     public function prependSkipsFormKitProfileWhenExtensionMissing(): void
     {
         $container = new ContainerBuilder();
-        (new NowoPageBuilderKitExtension())->prepend($container);
+        new NowoPageBuilderKitExtension()->prepend($container);
 
         self::assertNotEmpty($container->getExtensionConfig('framework'));
         self::assertSame([], $container->getExtensionConfig('nowo_form_kit'));
@@ -62,7 +62,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
             'profiles' => ['page_builder_kit' => ['alias' => 'page_builder_kit']],
         ]);
 
-        (new NowoPageBuilderKitExtension())->prepend($container);
+        new NowoPageBuilderKitExtension()->prepend($container);
 
         self::assertCount(1, $container->getExtensionConfig('nowo_form_kit'));
     }
@@ -101,7 +101,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
             ],
         ];
 
-        (new NowoPageBuilderKitExtension())->load([$config], $container);
+        new NowoPageBuilderKitExtension()->load([$config], $container);
 
         self::assertSame(
             ConfigurablePageBuilderKitAccessChecker::class,
@@ -120,7 +120,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         $container->setParameter('kernel.bundles', []);
         $container->register('app.storage', stdClass::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => [
                 'assets_upload' => [
@@ -143,7 +143,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', []);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => ['assets_upload' => ['enabled' => false]],
         ]], $container);
@@ -160,7 +160,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
 
         $this->expectException(LogicException::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => [
                 'assets_upload' => ['enabled' => true, 'storage' => 'service', 'service' => null],
@@ -176,7 +176,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
 
         $this->expectException(LogicException::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => [
                 'assets_upload' => [
@@ -204,7 +204,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         });
         $container->register('security.authorization_checker', stdClass::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => false, 'access_roles' => ['ROLE_X']],
         ]], $container);
 
@@ -217,7 +217,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         $container = new ContainerBuilder();
         $container->setParameter('kernel.bundles', []);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'grapesjs' => [
                 'assets_upload' => [
@@ -238,7 +238,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         $container->setParameter('kernel.bundles', ['SecurityBundle' => 'x']);
         $container->register('app.checker', stdClass::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => [
                 'allow_unauthenticated' => false,
                 'access_checker'        => 'app.checker',
@@ -264,7 +264,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         });
         $container->register('security.authorization_checker', stdClass::class);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => false, 'access_roles' => ['ROLE_X']],
         ]], $container);
 
@@ -278,7 +278,7 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         $container->setParameter('kernel.bundles', []);
         $container->setParameter('kernel.debug', true);
 
-        (new NowoPageBuilderKitExtension())->load([[
+        new NowoPageBuilderKitExtension()->load([[
             'security' => ['allow_unauthenticated' => true],
             'debug'    => ['collector' => true],
         ]], $container);

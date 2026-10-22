@@ -9,17 +9,16 @@
         "cms",
         "page-builder",
         "grapesjs",
-        "elementor",
         "widgets",
         "i18n",
         "admin",
-        "seo",
-        "nowo"
+        "seo"
     ],
     "homepage": "https://github.com/nowo-tech/PageBuilderKitBundle",
     "support": {
         "issues": "https://github.com/nowo-tech/PageBuilderKitBundle/issues",
-        "source": "https://github.com/nowo-tech/PageBuilderKitBundle"
+        "source": "https://github.com/nowo-tech/PageBuilderKitBundle",
+        "docs": "https://github.com/nowo-tech/PageBuilderKitBundle/tree/main/docs"
     },
     "authors": [
         {
@@ -39,6 +38,8 @@
         "doctrine/orm": "^3.7",
         "nowo-tech/form-kit-bundle": "^2.4",
         "nowo-tech/ui-kit-bundle": "^1.4 || ^2.2",
+        "psr/clock": "^1.0",
+        "psr/log": "^2.0 || ^3.0",
         "symfony/asset": "^7.4 || ^8.0",
         "symfony/config": "^7.4 || ^8.0",
         "symfony/dependency-injection": "^7.4 || ^8.0",
