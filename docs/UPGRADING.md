@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.9.0](#to-190)
 - [To 1.8.1](#to-181)
 - [1.8.0](#180)
 - [1.7.0](#170)
@@ -27,6 +28,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.9.0
+
+From **1.8.1**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 - The admin page list now shows 50 pages per screen (`?page=N`). If you override `admin/pages/index.html.twig`, render
   the new `current_page` / `total_pages` variables (see the bundle template) or pages beyond the first 50 are hidden.
