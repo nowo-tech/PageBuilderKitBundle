@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `admin/pages/sections.html.twig` renders each widget's props through a child loop over its sub-form (`form.widgets[widget.id]`) instead of one `form_row(form.widgets[id][field])` per entry of `widget.fields`; the field order is unchanged (`SectionsEditType` adds them in `widget.fields` order) (REQ-TWIG-003).
+
 ## [1.9.0] - 2026-10-22
 
 Wave-2 REQ compliance: structured logging, paginated admin list, injectable clock, autoconfigured services, split test suites. See [UPGRADING](UPGRADING.md#to-190).

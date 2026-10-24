@@ -74,9 +74,10 @@
                                         <span class="badge text-bg-secondary">{{ widget.type }} · {{ widget.id }}</span>
                                     </div>
                                     {% if form.widgets[widget.id] is defined %}
-                                        {% for field in widget.fields %}
-                                            {% if form.widgets[widget.id][field] is defined %}
-                                                {{ form_row(form.widgets[widget.id][field]) }}
+                                        {# REQ-TWIG-003: child loop over the widget's sub-form (SectionsEditType adds one field per widget prop) #}
+                                        {% for child in form.widgets[widget.id] %}
+                                            {% if not child.rendered %}
+                                                {{ form_row(child) }}
                                             {% endif %}
                                         {% else %}
                                             <p class="text-muted small mb-0">{{ 'admin.sections.no_props'|trans }}</p>
