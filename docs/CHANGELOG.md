@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.9.1] - 2026-10-24](#191---2026-10-24)
 - [[1.9.0] - 2026-10-22](#190---2026-10-22)
 - [[1.8.1] - 2026-10-18](#181---2026-10-18)
 - [[1.8.0] - 2026-10-13](#180---2026-10-13)
@@ -28,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.9.1] - 2026-10-24
+
+Bundle views render form bodies through the child loop (REQ-TWIG-003). See [UPGRADING](UPGRADING.md#to-191).
 
 ### Changed
 

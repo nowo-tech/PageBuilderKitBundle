@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.9.1](#to-191)
 - [To 1.9.0](#to-190)
 - [To 1.8.1](#to-181)
 - [1.8.0](#180)
@@ -28,6 +29,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.9.1
+
+From **1.9.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 ## To 1.9.0
 
