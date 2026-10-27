@@ -287,4 +287,68 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         self::assertTrue($container->hasDefinition(PageBuilderKitDataCollector::class));
         self::assertSame(PageBuilderKitTrace::class, (string) $container->getAlias(PageBuilderKitTraceInterface::class));
     }
+
+    #[Test]
+    public function loadRejectsEveryRoleListEmpty(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', ['SecurityBundle' => SecurityBundle::class]);
+        $container->register('security.authorization_checker', stdClass::class);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('security.access_roles and every security.*_roles list are empty');
+
+        new NowoPageBuilderKitExtension()->load([[
+            'security' => [
+                'allow_unauthenticated' => false,
+                'access_roles'          => [],
+                'layout_roles'          => [],
+                'content_roles'         => [],
+                'publish_roles'         => [],
+                'templates_roles'       => [],
+            ],
+        ]], $container);
+    }
+
+    #[Test]
+    public function loadAcceptsEmptyAccessRolesWhenOneCapabilityListIsSet(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', ['SecurityBundle' => SecurityBundle::class]);
+        $container->register('security.authorization_checker', stdClass::class);
+
+        new NowoPageBuilderKitExtension()->load([[
+            'security' => [
+                'allow_unauthenticated' => false,
+                'access_roles'          => [],
+                'layout_roles'          => [],
+                'content_roles'         => ['ROLE_WRITER'],
+                'publish_roles'         => [],
+                'templates_roles'       => [],
+            ],
+        ]], $container);
+
+        self::assertTrue($container->hasDefinition('nowo_page_builder_kit.access_checker.default'));
+    }
+
+    #[Test]
+    public function loadAcceptsEveryRoleListEmptyWithCustomAccessChecker(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', ['SecurityBundle' => SecurityBundle::class]);
+
+        new NowoPageBuilderKitExtension()->load([[
+            'security' => [
+                'allow_unauthenticated' => false,
+                'access_roles'          => [],
+                'layout_roles'          => [],
+                'content_roles'         => [],
+                'publish_roles'         => [],
+                'templates_roles'       => [],
+                'access_checker'        => 'app.page_builder_access',
+            ],
+        ]], $container);
+
+        self::assertFalse($container->hasDefinition('nowo_page_builder_kit.access_checker.default'));
+    }
 }

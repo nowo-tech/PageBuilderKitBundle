@@ -23,6 +23,7 @@ Security considerations for page builder admin, document API, and public renderi
 | Risk | Mitigation |
 | --- | --- |
 | Unauthorized users reach admin or document API | `access_roles` / `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`, custom `access_checker` (guard), Symfony Security (REQ-UI-002) |
+| Misconfigured empty role list opens a capability to every user | An empty list grants nothing (`ConfigurablePageBuilderKitAccessChecker::grantedAny()`); `access_roles` + every `*_roles` empty without `access_checker` / `allow_unauthenticated` → container compile error (`NowoPageBuilderKitExtension::registerAccessChecker()`) |
 | CSRF on document save or publish | `X-CSRF-TOKEN` validated against intention `page_builder_document` |
 | CSRF on content field forms | `_csrf_token` intention `page_builder_content` |
 | Stored XSS through `text` / `html` widgets / richtext fields | Twig auto-escaping; default `html.sanitize: allowlist` (DOM tag/attr allowlist); Grapes sanitizer on persist/render; always-on HTML5 `PublicHtmlHardener` before output |
@@ -38,7 +39,7 @@ The bundle protects route names beginning with `admin_page_builder_` via `PageBu
 
 **Two options** (same as BlogKit / MarketingKit):
 
-1. **Roles** — configure `access_roles` (shortcut for all) and optional `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`.
+1. **Roles** — configure `access_roles` (shortcut for all) and optional `layout_roles` / `content_roles` / `publish_roles` / `templates_roles`. An empty list grants nothing; all lists empty fails at compile time.
 2. **Custom guard** — implement `PageBuilderKitAccessCheckerInterface` and set `security.access_checker`. Controllers may also inject `PageBuilderKitAccessGuard`.
 
 Default configuration:

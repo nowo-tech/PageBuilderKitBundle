@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- An empty `security.layout_roles` / `content_roles` / `publish_roles` / `templates_roles` (or `access_roles`) list now
+  **grants nothing**. Before, `ConfigurablePageBuilderKitAccessChecker` treated an empty capability list as "allow"
+  (`emptyAllows`), so e.g. `layout_roles: []` gave layout — and through it content, publish and templates — to every
+  user reaching the admin, even with a non-empty `access_roles`. The `Configuration` help and the class docblock that
+  described this as "no extra gate beyond access_roles" were wrong and are fixed.
+- The container refuses to compile (`LogicException`) when `access_roles` and every `*_roles` list are empty while
+  `security.allow_unauthenticated` is `false` and no `security.access_checker` is set. See [UPGRADING](UPGRADING.md#unreleased).
+
 ## [1.9.1] - 2026-10-24
 
 Bundle views render form bodies through the child loop (REQ-TWIG-003). See [UPGRADING](UPGRADING.md#to-191).

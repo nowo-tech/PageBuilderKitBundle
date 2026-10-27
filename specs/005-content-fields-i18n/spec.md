@@ -55,7 +55,7 @@ ACL
 | ID | Requirement |
 | --- | --- |
 | FR-P5-ACL-001 | `PageBuilderKitAccessCheckerInterface` exposes `canAccess`, `canLayout`, `canContent`, `canPublish`, `canTemplates`, and convenience `can()` |
-| FR-P5-ACL-002 | Default checker is role-based (`access_roles` shortcut + `*_roles`); empty capability role lists use BlogKit emptyAllows semantics |
+| FR-P5-ACL-002 | Default checker is role-based (`access_roles` shortcut + `*_roles`); an empty role list grants nothing (fail closed); every list empty without `access_checker` / `allow_unauthenticated` fails at compile time (superseded the earlier emptyAllows semantics, 2026-10-27) |
 | FR-P5-ACL-003 | Hosts may set `security.access_checker` to a custom guard service |
 | FR-P5-ACL-004 | `PageBuilderKitAccessGuard` provides `assertLayout()` / `assertContent()` / … for controllers |
 | FR-P5-ACL-005 | `PageBuilderKitAdminAccessSubscriber` maps admin routes to capabilities after `canAccess()` |

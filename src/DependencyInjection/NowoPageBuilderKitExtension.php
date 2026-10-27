@@ -333,6 +333,16 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             return;
         }
 
+        if (
+            $security['access_roles'] === []
+            && $security['layout_roles'] === []
+            && $security['content_roles'] === []
+            && $security['publish_roles'] === []
+            && $security['templates_roles'] === []
+        ) {
+            throw new LogicException('NowoPageBuilderKitBundle: security.access_roles and every security.*_roles list are empty, so nobody could use the admin UI. Configure at least one role (an empty list denies), set security.access_checker, or set security.allow_unauthenticated for a trusted demo.');
+        }
+
         $id         = 'nowo_page_builder_kit.access_checker.default';
         $definition = new Definition(ConfigurablePageBuilderKitAccessChecker::class);
         $definition->setArgument('$accessRoles', $security['access_roles']);

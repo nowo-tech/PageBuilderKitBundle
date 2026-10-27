@@ -643,7 +643,7 @@ Spec: [`specs/006-phase6-content-hardening/spec.md`](../specs/006-phase6-content
 ```yaml
 nowo_page_builder_kit:
     security:
-        access_roles: []          # optional shortcut for every capability
+        access_roles: []          # optional shortcut for every capability; empty grants nothing
         layout_roles: [ROLE_PBK_LAYOUT]
         content_roles: [ROLE_PBK_CONTENT]
         publish_roles: [ROLE_PBK_LAYOUT]

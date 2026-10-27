@@ -140,13 +140,15 @@ No HTML/CSS document dumps are collected (size / PII). FrankenPHP-safe via `kern
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `access_roles` | `[ROLE_EDITOR]` | Shortcut: any matching role grants **every** capability (`canLayout` / `canContent` / …). |
-| `layout_roles` | `[ROLE_EDITOR]` | Canvas, structure, revisions, field schema. Empty list → BlogKit emptyAllows (no extra gate). |
-| `content_roles` | `[ROLE_EDITOR]` | Content forms + SEO. Layout editors also pass. |
-| `publish_roles` | `[ROLE_EDITOR]` | Publish / unpublish. Layout editors also pass. |
-| `templates_roles` | `[ROLE_EDITOR]` | Templates admin. Layout editors also pass. |
+| `access_roles` | `[ROLE_EDITOR]` | Shortcut: any matching role grants **every** capability (`canLayout` / `canContent` / …). Empty list → grants nothing. |
+| `layout_roles` | `[ROLE_EDITOR]` | Canvas, structure, revisions, field schema. Empty list → grants nothing (only `access_roles` holders get layout). |
+| `content_roles` | `[ROLE_EDITOR]` | Content forms + SEO. Layout editors also pass. Empty list → grants nothing beyond `access_roles` / `layout_roles`. |
+| `publish_roles` | `[ROLE_EDITOR]` | Publish / unpublish. Layout editors also pass. Empty list → grants nothing beyond `access_roles` / `layout_roles`. |
+| `templates_roles` | `[ROLE_EDITOR]` | Templates admin. Layout editors also pass. Empty list → grants nothing beyond `access_roles` / `layout_roles`. |
 | `access_checker` | `null` | Optional service id implementing `PageBuilderKitAccessCheckerInterface` (**custom guard**). |
 | `allow_unauthenticated` | `false` | When `true`, registers allow-all checker + guard. Demos only. |
+
+**Empty lists deny (fail closed).** An empty role list never means "everyone": it grants nothing, and when `access_roles` and every `*_roles` list are empty (with no `access_checker` and `allow_unauthenticated: false`) the container refuses to compile with a `LogicException`. Up to 1.9.1 an empty `*_roles` list granted that capability to every user reaching the admin.
 
 Access is **roles by default** or a **custom guard** via `access_checker` (same pattern as BlogKit / MarketingKit / RoutingKit). Controllers can inject `PageBuilderKitAccessGuard` (`assertLayout()`, …). The admin subscriber maps routes to `canLayout()` / `canContent()` / `canPublish()` / `canTemplates()`.
 
@@ -155,7 +157,7 @@ Example — content editors without canvas:
 ```yaml
 nowo_page_builder_kit:
     security:
-        access_roles: []
+        access_roles: []          # empty = no shortcut role (grants nothing by itself)
         layout_roles: [ROLE_PBK_LAYOUT]
         content_roles: [ROLE_PBK_CONTENT]
         publish_roles: [ROLE_PBK_LAYOUT]

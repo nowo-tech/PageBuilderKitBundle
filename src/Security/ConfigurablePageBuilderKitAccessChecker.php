@@ -13,9 +13,9 @@ use function is_string;
  * Role-based access driven by nowo_page_builder_kit.security.*_roles (BlogKit-style).
  *
  * `access_roles` is a shortcut that grants every capability when held.
- * Each `*_roles` list is OR'd with that shortcut; an empty `*_roles` list allows
- * that capability for anyone who already passed `access_roles`, or for everyone
- * when `access_roles` is also empty (same emptyAllows semantics as BlogKit).
+ * Each `*_roles` list is OR'd with that shortcut, and layout editors also pass content, publish and templates.
+ * An empty list grants nothing (fail closed): with `layout_roles: []` only `access_roles` holders get layout;
+ * with every list empty nobody gets in (the extension refuses to compile that configuration).
  */
 final readonly class ConfigurablePageBuilderKitAccessChecker implements PageBuilderKitAccessCheckerInterface
 {
@@ -46,28 +46,28 @@ final readonly class ConfigurablePageBuilderKitAccessChecker implements PageBuil
 
     public function canLayout(): bool
     {
-        return $this->grantedAny($this->accessRoles, false)
-            || $this->grantedAny($this->layoutRoles, true);
+        return $this->grantedAny($this->accessRoles)
+            || $this->grantedAny($this->layoutRoles);
     }
 
     public function canContent(): bool
     {
-        return $this->grantedAny($this->accessRoles, false)
-            || $this->grantedAny($this->contentRoles, true)
+        return $this->grantedAny($this->accessRoles)
+            || $this->grantedAny($this->contentRoles)
             || $this->canLayout();
     }
 
     public function canPublish(): bool
     {
-        return $this->grantedAny($this->accessRoles, false)
-            || $this->grantedAny($this->publishRoles, true)
+        return $this->grantedAny($this->accessRoles)
+            || $this->grantedAny($this->publishRoles)
             || $this->canLayout();
     }
 
     public function canTemplates(): bool
     {
-        return $this->grantedAny($this->accessRoles, false)
-            || $this->grantedAny($this->templatesRoles, true)
+        return $this->grantedAny($this->accessRoles)
+            || $this->grantedAny($this->templatesRoles)
             || $this->canLayout();
     }
 
@@ -91,14 +91,12 @@ final readonly class ConfigurablePageBuilderKitAccessChecker implements PageBuil
     }
 
     /**
+     * Whether the current user holds one of the roles; an empty list grants nothing.
+     *
      * @param list<string> $roles
      */
-    private function grantedAny(array $roles, bool $emptyAllows): bool
+    private function grantedAny(array $roles): bool
     {
-        if ($roles === []) {
-            return $emptyAllows;
-        }
-
-        return array_any($roles, fn ($role): bool => $this->authorizationChecker->isGranted($role));
+        return array_any($roles, fn (string $role): bool => $this->authorizationChecker->isGranted($role));
     }
 }

@@ -30,6 +30,15 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+**Behaviour change (security):** an empty role list under `nowo_page_builder_kit.security` now **denies**.
+
+- `layout_roles: []`, `content_roles: []`, `publish_roles: []`, `templates_roles: []` no longer open that capability to
+  everybody. If you relied on it, list the roles explicitly (e.g. `[ROLE_USER]`) or move them to `access_roles`.
+- `access_roles: []` together with every `*_roles: []` (no `access_checker`, `allow_unauthenticated: false`) now fails
+  at container compile time with a `LogicException`. Configure at least one role, set `security.access_checker`, or —
+  only for a trusted demo — `security.allow_unauthenticated: true`.
+- Default configuration (`[ROLE_EDITOR]` everywhere) is unaffected.
+
 ## To 1.9.1
 
 From **1.9.0**:
