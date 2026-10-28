@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use SortDirection;
@@ -28,8 +29,7 @@ final class BuilderPageRepository extends ServiceEntityRepository implements Bui
     public function findAllOrdered(): array
     {
         /** @var list<BuilderPage> $pages */
-        $pages = $this->createQueryBuilder('p')
-            ->orderBy('p.pageKey', SortDirection::Ascending)
+        $pages = $this->orderedQueryBuilder()
             ->getQuery()
             ->getResult();
 
@@ -44,14 +44,25 @@ final class BuilderPageRepository extends ServiceEntityRepository implements Bui
     public function findOrderedSlice(int $offset, int $limit): array
     {
         /** @var list<BuilderPage> $pages */
-        $pages = $this->createQueryBuilder('p')
-            ->orderBy('p.pageKey', SortDirection::Ascending)
+        $pages = $this->orderedQueryBuilder()
             ->setFirstResult(max(0, $offset))
             ->setMaxResults(max(1, $limit))
             ->getQuery()
             ->getResult();
 
         return $pages;
+    }
+
+    /**
+     * Pages ordered by key with their document fetch-joined: `BuilderPage::$document` is the inverse side of a
+     * one-to-one, which Doctrine cannot lazy-load, so without the join every listed page costs one more query (1 + N).
+     */
+    private function orderedQueryBuilder(): QueryBuilder
+    {
+        return $this->createQueryBuilder('p')
+            ->leftJoin('p.document', 'd')
+            ->addSelect('d')
+            ->orderBy('p.pageKey', SortDirection::Ascending);
     }
 
     /**

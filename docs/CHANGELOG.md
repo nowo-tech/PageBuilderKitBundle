@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+- **Admin page lists without 1 + N queries.** `BuilderPage::$document` is the inverse side of a one-to-one, which
+  Doctrine cannot lazy-load: `findAllOrdered()` / `findOrderedSlice()` issued one extra query per listed page. Both
+  now fetch-join the document (one query); an integration test pins the query count.
+
 ## [1.10.0] - 2026-10-28
 
 Security: empty role lists deny instead of granting everyone (every list empty fails compilation). See [UPGRADING](UPGRADING.md#to-1100).
