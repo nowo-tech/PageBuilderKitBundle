@@ -8,6 +8,10 @@ import { resolve } from 'node:path';
 const outDir = process.env.SCREENSHOT_DIR
   ? resolve(process.env.SCREENSHOT_DIR)
   : resolve(__dirname, '../../../../docs/images/demo');
+// Builder-manual captures (docs/BUILDER-MANUAL.md) stay out of the 1–3 README screenshots in docs/images/demo/.
+const manualDir = process.env.MANUAL_SCREENSHOT_DIR
+  ? resolve(process.env.MANUAL_SCREENSHOT_DIR)
+  : resolve(outDir, '..', 'builder-manual');
 
 async function loginAsAdmin(page: import('@playwright/test').Page) {
   await page.goto('/login');
@@ -47,13 +51,14 @@ async function waitForWebProfiler(page: import('@playwright/test').Page) {
 async function shot(page: import('@playwright/test').Page, name: string) {
   await waitForWebProfiler(page);
   await page.screenshot({
-    path: resolve(outDir, name),
+    path: resolve(name.startsWith('builder-') ? manualDir : outDir, name),
     fullPage: false,
   });
 }
 
 test.beforeAll(() => {
   mkdirSync(outDir, { recursive: true });
+  mkdirSync(manualDir, { recursive: true });
 });
 
 async function waitForGrapesCanvas(page: import('@playwright/test').Page) {

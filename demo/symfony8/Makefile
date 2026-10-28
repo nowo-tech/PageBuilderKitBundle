@@ -17,7 +17,7 @@ help:
 	@echo "  Admin canvas contact: /admin/page-builder/pages/contact/canvas"
 	@echo "  make assets         pnpm + Vite (app.ts → public/build/) via Pentatrion"
 	@echo "  make test-e2e       Playwright e2e (REQ-DEMO-013)"
-	@echo "  make demo-screenshots  Refresh docs/images/demo/*.png"
+	@echo "  make demo-screenshots  Refresh docs/images/demo/ + builder-manual/ (WebP)"
 
 up:
 	@if [ ! -f .env ]; then cp .env.example .env 2>/dev/null || true; fi
@@ -120,15 +120,16 @@ test-e2e: ensure-up
 		bash -lc 'npm install --no-fund --no-audit && npx playwright test --project=chromium'
 
 demo-screenshots: ensure-up
-	@mkdir -p ../../docs/images/demo e2e/node_modules
+	@mkdir -p ../../docs/images/demo ../../docs/images/builder-manual e2e/node_modules
 	@PORT=$$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=$${PORT:-8137}; \
 	docker run --rm --network host \
 		-v "$(CURDIR)/e2e:/e2e" \
-		-v "$(CURDIR)/../../docs/images/demo:/screenshots" \
+		-v "$(CURDIR)/../../docs/images:/images" \
 		-w /e2e \
 		-e DEMO_BASE_URL=http://127.0.0.1:$$PORT \
-		-e SCREENSHOT_DIR=/screenshots \
+		-e SCREENSHOT_DIR=/images/demo \
+		-e MANUAL_SCREENSHOT_DIR=/images/builder-manual \
 		$(PLAYWRIGHT_IMAGE) \
-		bash -lc 'npm install --no-fund --no-audit && npx playwright test --project=screenshots && node scripts/to-webp.mjs /screenshots'
-	@echo "Screenshots written under docs/images/demo/ (WebP)"
+		bash -lc 'npm install --no-fund --no-audit && npx playwright test --project=screenshots && node scripts/to-webp.mjs /images/demo && node scripts/to-webp.mjs /images/builder-manual'
+	@echo "Screenshots written under docs/images/demo/ and docs/images/builder-manual/ (WebP)"
 

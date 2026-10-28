@@ -97,7 +97,7 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 make assets                         # pnpm + Vite: TS → src/Resources/public/
 make -C demo/symfony8 assets        # Pentatrion Vite: assets/app.ts → public/build/
 make -C demo/symfony8 test-e2e
-make -C demo/symfony8 demo-screenshots   # refreshes docs/images/demo/*.png
+make -C demo/symfony8 demo-screenshots   # refreshes docs/images/demo/ and docs/images/builder-manual/ (WebP)
 ```
 
 
