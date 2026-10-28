@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.10.1] - 2026-10-28](#1101---2026-10-28)
 - [[1.10.0] - 2026-10-28](#1100---2026-10-28)
 - [[1.9.1] - 2026-10-24](#191---2026-10-24)
 - [[1.9.0] - 2026-10-22](#190---2026-10-22)
@@ -30,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.10.1] - 2026-10-28
+
+Performance: admin page lists fetch-join the page document (no 1 + N queries). See [UPGRADING](UPGRADING.md#to-1101).
 
 ### Performance
 
