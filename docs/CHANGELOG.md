@@ -45,6 +45,10 @@ Security: empty role lists deny instead of granting everyone (every list empty f
 - The container refuses to compile (`LogicException`) when `access_roles` and every `*_roles` list are empty while
   `security.allow_unauthenticated` is `false` and no `security.access_checker` is set. See [UPGRADING](UPGRADING.md#unreleased).
 
+### Fixed
+
+- Upload size check in `LocalFilesystemAssetStorage` / `AwsS3AssetStorage` compares only an integer `UploadedFile::getSize()` (it returns `int|false` in current symfony/http-foundation; PHPStan flagged the `!== null` guard as always true).
+
 ## [1.9.1] - 2026-10-24
 
 Bundle views render form bodies through the child loop (REQ-TWIG-003). See [UPGRADING](UPGRADING.md#to-191).

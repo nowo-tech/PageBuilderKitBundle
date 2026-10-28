@@ -22,6 +22,7 @@ use function in_array;
 use function is_array;
 use function is_dir;
 use function is_file;
+use function is_int;
 use function is_string;
 use function mkdir;
 use function opendir;
@@ -168,7 +169,8 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetStor
             throw new InvalidArgumentException('Invalid uploaded file.');
         }
 
-        if ($file->getSize() !== null && $file->getSize() > $this->maxBytes) {
+        $size = $file->getSize();
+        if (is_int($size) && $size > $this->maxBytes) {
             throw new InvalidArgumentException(sprintf('File exceeds max size of %d bytes.', $this->maxBytes));
         }
 
