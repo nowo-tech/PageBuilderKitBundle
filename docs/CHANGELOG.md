@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.10.2] - 2026-10-28](#1102---2026-10-28)
 - [[1.10.1] - 2026-10-28](#1101---2026-10-28)
 - [[1.10.0] - 2026-10-28](#1100---2026-10-28)
 - [[1.9.1] - 2026-10-24](#191---2026-10-24)
@@ -31,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.10.2] - 2026-10-28
+
+PageBuilderKit: url / image content fields refuse javascript:, vbscript: and non-image data: URLs (stored XSS). See [UPGRADING](UPGRADING.md#to-1102).
 
 ### Security
 
