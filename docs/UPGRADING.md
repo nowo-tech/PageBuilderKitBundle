@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.10.0](#to-1100)
 - [To 1.9.1](#to-191)
 - [To 1.9.0](#to-190)
 - [To 1.8.1](#to-181)
@@ -29,6 +30,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.10.0
+
+From **1.9.1**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 **Behaviour change (security):** an empty role list under `nowo_page_builder_kit.security` now **denies**.
 
