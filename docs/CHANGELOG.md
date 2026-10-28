@@ -39,7 +39,7 @@ PageBuilderKit: url / image content fields refuse javascript:, vbscript: and non
 
 ### Security
 
-- **Stored XSS through `url` / `image` content fields (Medium).** Content field values were stored without a scheme
+- **Stored XSS through `url` / `image` content fields (Medium, [GHSA-pgpr-xrgq-c8xp](https://github.com/nowo-tech/PageBuilderKitBundle/security/advisories/GHSA-pgpr-xrgq-c8xp)).** Content field values were stored without a scheme
   check and printed in `href` / `src`: a user with the `content` capability (default `ROLE_EDITOR`) could save
   `javascript:…` through the inline save API and run script for visitors or admins who clicked the link (since 1.4.0).
   `ContentFieldsNormalizer` now drops `javascript:`, `vbscript:` and non-image `data:` URLs, and the templates
