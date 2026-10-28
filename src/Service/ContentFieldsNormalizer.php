@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Service;
 
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
+use Nowo\PageBuilderKitBundle\Security\Html\SafeUrl;
 
 use function array_key_exists;
 use function count;
@@ -439,11 +440,12 @@ final readonly class ContentFieldsNormalizer
             ContentFieldType::Reference->value => $this->normalizeReferenceValue($value),
             ContentFieldType::Html->value,
             ContentFieldType::Richtext->value,
+            // URLs are printed in href / src: unsafe schemes (javascript:, vbscript:, non-image data:) are dropped.
+            ContentFieldType::Url->value   => SafeUrl::filter(is_scalar($value) ? (string) $value : ''),
+            ContentFieldType::Image->value => SafeUrl::filter(is_scalar($value) ? (string) $value : '', true),
             ContentFieldType::Raw->value,
             ContentFieldType::Text->value,
             ContentFieldType::String->value,
-            ContentFieldType::Url->value,
-            ContentFieldType::Image->value,
             ContentFieldType::Icon->value,
             ContentFieldType::Select->value => is_scalar($value) || $value === null
                 ? (string) ($value ?? '')

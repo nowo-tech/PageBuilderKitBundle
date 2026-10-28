@@ -19,14 +19,16 @@
     <{{ _tag }} class="pbk-field__value" data-pbk-value>
         {% if type == 'bool' %}
             {{ value ? 'public.field.yes'|trans : 'public.field.no'|trans }}
-        {% elseif type == 'image' and value %}
-            <img src="{{ value|e('html_attr') }}" alt="{{ label|e('html_attr') }}" class="pbk-field__img">
+        {% elseif type == 'image' and value|pbk_safe_url(true) %}
+            <img src="{{ value|pbk_safe_url(true)|e('html_attr') }}" alt="{{ label|e('html_attr') }}" class="pbk-field__img">
         {% elseif type == 'icon' and value %}
             {# Icon class name (e.g. bi bi-star) or short label #}
             <i class="{{ value|e('html_attr') }}" aria-hidden="true"></i>
             <span class="visually-hidden">{{ value }}</span>
-        {% elseif type == 'url' and value %}
-            <a href="{{ value|e('html_attr') }}">{{ value }}</a>
+        {% elseif type == 'url' and value|pbk_safe_url %}
+            <a href="{{ value|pbk_safe_url|e('html_attr') }}">{{ value }}</a>
+        {% elseif type == 'url' or type == 'image' %}
+            {{ value }}
         {% elseif is_html_output %}
             {{ value|pbk_harden_html }}
         {% else %}

@@ -135,7 +135,7 @@
                                             {% endif %}
                                         </div>
                                         {% if current %}
-                                            <div class="mt-2"><img src="{{ current|e('html_attr') }}" alt="" style="max-height:80px" class="rounded border" data-pbk-image-preview="#field-{{ field.key }}"></div>
+                                            <div class="mt-2"><img src="{{ current|pbk_safe_url(true)|e('html_attr') }}" alt="" style="max-height:80px" class="rounded border" data-pbk-image-preview="#field-{{ field.key }}"></div>
                                         {% endif %}
                                     {% elseif field.type == 'group' or field.type == 'repeater' %}
                                         <div class="border rounded p-2 bg-light">

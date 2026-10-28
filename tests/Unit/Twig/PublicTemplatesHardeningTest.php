@@ -45,7 +45,7 @@ final class PublicTemplatesHardeningTest extends TestCase
             $names[] = $filter->getName();
         }
 
-        self::assertSame(['pbk_harden_html', 'pbk_harden_css'], $names);
+        self::assertSame(['pbk_harden_html', 'pbk_harden_css', 'pbk_safe_url'], $names);
     }
 
     #[Test]

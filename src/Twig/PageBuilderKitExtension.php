@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Twig;
 
 use Nowo\PageBuilderKitBundle\Html\PublicHtmlHardener;
+use Nowo\PageBuilderKitBundle\Security\Html\SafeUrl;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
 use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
@@ -39,6 +40,8 @@ final class PageBuilderKitExtension extends AbstractExtension
             new TwigFilter('pbk_harden_html', $this->publicHtmlHardener->harden(...), ['is_safe' => ['html']]),
             // GrapesJS CSS printed inside <style>: escape `<` so it can never close the element.
             new TwigFilter('pbk_harden_css', $this->publicHtmlHardener->hardenCss(...), ['is_safe' => ['html']]),
+            // URL fields printed in href / src (also values stored before the normalizer refused unsafe schemes).
+            new TwigFilter('pbk_safe_url', SafeUrl::filter(...)),
         ];
     }
 

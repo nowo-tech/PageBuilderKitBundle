@@ -398,4 +398,24 @@ final class ContentFieldsNormalizerTest extends TestCase
         ], 'es', 'en');
         self::assertSame('Hello', $withDefault['title']);
     }
+
+    #[Test]
+    public function dropsUnsafeUrlAndImageSchemes(): void
+    {
+        $normalizer = new ContentFieldsNormalizer();
+        $schema     = $normalizer->normalizeSchema([
+            ['key' => 'cta', 'type' => 'url'],
+            ['key' => 'logo', 'type' => 'image'],
+        ]);
+
+        $values = $normalizer->normalizeValues([
+            'en' => ['cta' => 'javascript:alert(document.cookie)', 'logo' => 'data:text/html;base64,PHNjcmlwdD4='],
+            'es' => ['cta' => 'https://example.com/precios', 'logo' => '/media/logo.png'],
+        ], $schema);
+
+        self::assertSame('', $values['en']['cta']);
+        self::assertSame('', $values['en']['logo']);
+        self::assertSame('https://example.com/precios', $values['es']['cta']);
+        self::assertSame('/media/logo.png', $values['es']['logo']);
+    }
 }

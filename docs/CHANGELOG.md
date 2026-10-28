@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Stored XSS through `url` / `image` content fields (Medium).** Content field values were stored without a scheme
+  check and printed in `href` / `src`: a user with the `content` capability (default `ROLE_EDITOR`) could save
+  `javascript:…` through the inline save API and run script for visitors or admins who clicked the link (since 1.4.0).
+  `ContentFieldsNormalizer` now drops `javascript:`, `vbscript:` and non-image `data:` URLs, and the templates
+  (`public/_editable_field`, the button / image widgets, the admin image preview) print them through the new
+  `pbk_safe_url` filter, which also neutralises rows saved before this release. The policy is `Security\Html\SafeUrl`,
+  shared with the HTML sanitizer.
+
 ## [1.10.1] - 2026-10-28
 
 Performance: admin page lists fetch-join the page document (no 1 + N queries). See [UPGRADING](UPGRADING.md#to-1101).
