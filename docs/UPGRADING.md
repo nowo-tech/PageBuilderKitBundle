@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.11.0](#to-1110)
 - [To 1.10.2](#to-1102)
 - [To 1.10.1](#to-1101)
 - [To 1.10.0](#to-1100)
@@ -32,6 +33,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.11.0
+
+From **1.10.2**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 - Hosts that split roles: importing a page now needs `layout_roles` (and `publish_roles` when `publish: true`) in addition to `templates_roles`. With the defaults (every list `ROLE_EDITOR`) nothing changes.
 - `framework.csrf_protection` and `framework.form.csrf_protection` must stay enabled while the admin routes are registered; otherwise the container build fails with a `LogicException`.
