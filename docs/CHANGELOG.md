@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.11.1] - 2026-10-29](#1111---2026-10-29)
 - [[1.11.0] - 2026-10-29](#1110---2026-10-29)
 - [[1.10.2] - 2026-10-28](#1102---2026-10-28)
 - [[1.10.1] - 2026-10-28](#1101---2026-10-28)
@@ -33,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.11.1] - 2026-10-29
+
+PageBuilderKit: GrapesJS project JSON sanitised on save and canvas load See [UPGRADING](UPGRADING.md#to-1111).
 
 ### Security
 

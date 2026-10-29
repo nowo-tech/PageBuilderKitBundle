@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.11.1](#to-1111)
 - [To 1.11.0](#to-1110)
 - [To 1.10.2](#to-1102)
 - [To 1.10.1](#to-1101)
@@ -33,6 +34,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.11.1
+
+From **1.11.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 - Pages saved earlier are cleaned when the canvas opens them; saving rewrites the stored `grapes` JSON. Event handlers or `script` components in the canvas project are dropped unless `grapesjs.allow_scripts: true`.
 - `PageCanvasController` takes `GrapesDocumentSanitizer` as a new constructor argument (autowired).
