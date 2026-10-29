@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Page import (`POST …/pages/import`) now also requires the `layout` capability, plus `publish` when the payload sets `publish: true`; a templates-only role could overwrite and publish any page (REQ-SEC-004 re-audit L3, CWE-863).
+- New `CsrfProtectionPass`: the container refuses to compile when the admin controllers are registered without a CSRF token manager or with `framework.form.csrf_protection` disabled; the create-page, SEO and sections forms relied on it and failed open (REQ-SEC-004 re-audit L4, CWE-352).
+
 ## [1.10.2] - 2026-10-28
 
 PageBuilderKit: url / image content fields refuse javascript:, vbscript: and non-image data: URLs (stored XSS). See [UPGRADING](UPGRADING.md#to-1102).

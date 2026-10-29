@@ -33,6 +33,10 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+- Hosts that split roles: importing a page now needs `layout_roles` (and `publish_roles` when `publish: true`) in addition to `templates_roles`. With the defaults (every list `ROLE_EDITOR`) nothing changes.
+- `framework.csrf_protection` and `framework.form.csrf_protection` must stay enabled while the admin routes are registered; otherwise the container build fails with a `LogicException`.
+- `PageDocumentApiController` takes `PageBuilderKitAccessGuard` as a new constructor argument (autowired; only matters if you construct it by hand).
+
 ## To 1.10.2
 
 From **1.10.1**:

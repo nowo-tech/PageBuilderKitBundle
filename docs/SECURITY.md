@@ -194,13 +194,20 @@ See also [CONFIGURATION.md](CONFIGURATION.md) and [USAGE.md](USAGE.md).
 
 | Field | Value |
 |-------|--------|
-| **Date** | 2026-09-27 |
-| **Method** | Cursor agent static pass (`src/`, Flex recipe, demo, this doc + `.github/SECURITY.md`) |
-| **Overall risk** | **Low** |
+| **Date** | 2026-10-29 |
+| **Method** | Claude Code static re-audit (`src/`, templates, Flex recipe, demo, this doc) |
+| **Overall risk** | **Low** (after 1.10.2 and 1.11.0) |
 | **Grade** | **Pass (good)** |
-| **Record** | This document (in-package). Monorepo catalog: `BUNDLES_SECURITY_ANALYSIS.md` §4 / §7.2 / Appendix Z |
+| **Record** | This document (in-package). Monorepo catalog: `BUNDLES_SECURITY_ANALYSIS.md` §4 / §7 / Appendix AY |
 
-No Critical/High findings. Residuals: do not set `html.sanitize.strategy: none` for UGC or broad editor roles; host firewall on admin path prefix; keep CSRF on document API.
+Findings of the 2026-10-29 re-audit:
+
+- **M1 (fixed in 1.10.2, GHSA-pgpr-xrgq-c8xp):** `url` / `image` content fields accepted `javascript:` / `data:text/html` URLs (stored XSS).
+- **L3 (fixed in 1.11.0):** page import only required the `templates` capability; it now also requires `layout`, plus `publish` when `publish: true`.
+- **L4 (fixed in 1.11.0):** the create-page, SEO and sections forms relied on framework form CSRF; `CsrfProtectionPass` now refuses to compile without it.
+- **Open:** L1 (GrapesJS project JSON reloaded unsanitised in the canvas, editor-to-editor), L2 (canvas loads GrapesJS and plugins from esm.sh without SRI), plus hardening notes (production guard for `allow_unauthenticated`, guard keyed on route-name prefix, Twig sandbox `range`).
+
+Residuals: do not set `html.sanitize.strategy: none` for UGC or broad editor roles; host firewall on admin path prefix; keep `allow_unauthenticated: false` in production (not enforced yet); do not import the bundle routes with `name_prefix`.
 
 ## Secrets
 

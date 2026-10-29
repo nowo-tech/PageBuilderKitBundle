@@ -9,6 +9,7 @@ use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
@@ -34,6 +35,7 @@ final class PageDocumentApiController extends AbstractController
         private readonly DocumentNormalizer $documentNormalizer,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
         private readonly DocumentImportExportService $importExportService,
+        private readonly PageBuilderKitAccessGuard $accessGuard,
         private readonly PageBuilderKitTraceInterface $trace = new NullPageBuilderKitTrace(),
     ) {
     }
@@ -211,6 +213,12 @@ final class PageDocumentApiController extends AbstractController
         $targetKey = is_string($payload['targetPageKey'] ?? null) ? $payload['targetPageKey'] : null;
         $publish   = (bool) ($payload['publish'] ?? false);
         unset($payload['targetPageKey'], $payload['publish']);
+
+        // The route only requires `templates`; an import overwrites a page document (layout) and may publish it.
+        $this->accessGuard->assertLayout();
+        if ($publish) {
+            $this->accessGuard->assertPublish();
+        }
 
         try {
             $page = $this->importExportService->import($payload, $targetKey, $publish);

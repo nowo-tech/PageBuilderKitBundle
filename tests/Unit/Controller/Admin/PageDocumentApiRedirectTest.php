@@ -11,6 +11,8 @@ use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
@@ -94,6 +96,7 @@ final class PageDocumentApiRedirectTest extends TestCase
             new DocumentNormalizer(),
             $csrf,
             new DocumentImportExportService($documents, new DocumentNormalizer(), new BuilderLocales('es', ['es', 'en'])),
+            new PageBuilderKitAccessGuard(new AllowAllPageBuilderKitAccessChecker()),
         );
 
         $request = Request::create('/admin/page-builder/pages/home/unpublish', 'POST', ['_redirect' => $redirect]);

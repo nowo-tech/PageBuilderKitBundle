@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetPackPass;
@@ -24,6 +25,7 @@ final class NowoPageBuilderKitBundle extends Bundle
         $container->addCompilerPass(new WidgetTypePass());
         $container->addCompilerPass(new WidgetPackPass());
         $container->addCompilerPass(new GrapesBlockPackPass());
+        $container->addCompilerPass(new CsrfProtectionPass());
 
         $entityDir = __DIR__ . '/Entity';
         if (is_dir($entityDir)) {

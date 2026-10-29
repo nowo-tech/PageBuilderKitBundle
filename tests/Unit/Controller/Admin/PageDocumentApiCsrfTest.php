@@ -12,6 +12,9 @@ use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
+use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
@@ -22,12 +25,13 @@ use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 use const JSON_THROW_ON_ERROR;
 
-/** CSRF contract for document save (403 without token, 200 with valid token). */
+/** CSRF contract for document save (403 without token, 200 with valid token) and import capability checks. */
 final class PageDocumentApiCsrfTest extends TestCase
 {
     #[Test]
@@ -63,7 +67,59 @@ final class PageDocumentApiCsrfTest extends TestCase
         self::assertSame(['ok' => true], json_decode((string) $response->getContent(), true));
     }
 
-    private function controller(bool $csrfValid): PageDocumentApiController
+    #[Test]
+    public function importRequiresLayoutCapability(): void
+    {
+        $controller = $this->controller(csrfValid: true, checker: $this->checker(layout: false, publish: true));
+
+        $this->expectException(AccessDeniedException::class);
+        $controller->import($this->importRequest(publish: false));
+    }
+
+    #[Test]
+    public function importWithPublishRequiresPublishCapability(): void
+    {
+        $controller = $this->controller(csrfValid: true, checker: $this->checker(layout: true, publish: false));
+
+        $this->expectException(AccessDeniedException::class);
+        $controller->import($this->importRequest(publish: true));
+    }
+
+    #[Test]
+    public function importWithoutPublishOnlyNeedsLayout(): void
+    {
+        $controller = $this->controller(csrfValid: true, checker: $this->checker(layout: true, publish: false));
+
+        $response = $controller->import($this->importRequest(publish: false));
+
+        // Past the capability checks: the empty payload is rejected by the import service.
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    private function importRequest(bool $publish): Request
+    {
+        $request = Request::create('/admin/page-builder/pages/import', 'POST', content: json_encode([
+            'targetPageKey' => 'home',
+            'publish'       => $publish,
+        ], JSON_THROW_ON_ERROR));
+        $request->headers->set('X-CSRF-TOKEN', 'ok');
+        $request->headers->set('Accept', 'application/json');
+
+        return $request;
+    }
+
+    private function checker(bool $layout, bool $publish): PageBuilderKitAccessCheckerInterface
+    {
+        $checker = $this->createStub(PageBuilderKitAccessCheckerInterface::class);
+        $checker->method('canAccess')->willReturn(true);
+        $checker->method('canLayout')->willReturn($layout);
+        $checker->method('canPublish')->willReturn($publish);
+        $checker->method('canTemplates')->willReturn(true);
+
+        return $checker;
+    }
+
+    private function controller(bool $csrfValid, ?PageBuilderKitAccessCheckerInterface $checker = null): PageDocumentApiController
     {
         $page = new BuilderPage()->setPageKey('home')->setStatus(PageStatus::Draft);
         $doc  = new BuilderDocument()->setPage($page)->setStructure([
@@ -126,6 +182,7 @@ final class PageDocumentApiCsrfTest extends TestCase
             new DocumentNormalizer(),
             $csrf,
             $importExport,
+            new PageBuilderKitAccessGuard($checker ?? new AllowAllPageBuilderKitAccessChecker()),
         );
     }
 }
