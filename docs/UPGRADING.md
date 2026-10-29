@@ -34,6 +34,9 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+- Pages saved earlier are cleaned when the canvas opens them; saving rewrites the stored `grapes` JSON. Event handlers or `script` components in the canvas project are dropped unless `grapesjs.allow_scripts: true`.
+- `PageCanvasController` takes `GrapesDocumentSanitizer` as a new constructor argument (autowired).
+
 ## To 1.11.0
 
 From **1.10.2**:

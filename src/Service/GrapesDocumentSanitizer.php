@@ -8,7 +8,10 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMXPath;
+use Nowo\PageBuilderKitBundle\Security\Html\SafeUrl;
 
+use function array_is_list;
+use function array_values;
 use function html_entity_decode;
 use function in_array;
 use function is_array;
@@ -18,7 +21,10 @@ use function libxml_use_internal_errors;
 use function preg_replace;
 use function preg_replace_callback;
 use function rawurldecode;
+use function str_contains;
 use function str_ireplace;
+use function str_starts_with;
+use function strtolower;
 use function trim;
 
 use const ENT_HTML5;
@@ -31,6 +37,12 @@ use const LIBXML_HTML_NOIMPLIED;
  */
 final readonly class GrapesDocumentSanitizer
 {
+    /** Elements removed from HTML and from the GrapesJS component tree (`script` only when scripts are off). */
+    private const array BLOCKED_TAGS = ['script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base'];
+
+    /** Attributes whose value is a URL; script schemes (and non-image `data:`) are dropped. */
+    private const array URL_ATTRIBUTES = ['href', 'src', 'action', 'poster', 'background', 'data'];
+
     public function __construct(
         private bool $allowScripts = false,
     ) {
@@ -63,7 +75,7 @@ final readonly class GrapesDocumentSanitizer
         }
 
         $xpath = new DOMXPath($dom);
-        foreach (['script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base'] as $tag) {
+        foreach (self::BLOCKED_TAGS as $tag) {
             if ($tag === 'script' && $this->allowScripts) {
                 continue;
             }
@@ -188,9 +200,7 @@ final readonly class GrapesDocumentSanitizer
         if (is_string($structure['css'] ?? null)) {
             $structure['css'] = $this->sanitizeCss($structure['css']);
         }
-        if (!is_array($structure['grapes'] ?? null)) {
-            $structure['grapes'] = [];
-        }
+        $structure['grapes'] = is_array($structure['grapes'] ?? null) ? $this->sanitizeGrapes($structure['grapes']) : [];
 
         return $this->sanitizeLocaleContent($structure);
     }
@@ -217,11 +227,89 @@ final readonly class GrapesDocumentSanitizer
             $sanitized[$locale] = [
                 'html'   => $this->sanitizeHtml(is_string($content['html'] ?? null) ? $content['html'] : ''),
                 'css'    => $this->sanitizeCss(is_string($content['css'] ?? null) ? $content['css'] : ''),
-                'grapes' => is_array($content['grapes'] ?? null) ? $content['grapes'] : [],
+                'grapes' => is_array($content['grapes'] ?? null) ? $this->sanitizeGrapes($content['grapes']) : [],
             ];
         }
         $structure['localeContent'] = $sanitized;
 
         return $structure;
+    }
+
+    /**
+     * Walks a GrapesJS project tree (pages → frames → components) with the same rules as {@see sanitizeHtml()}.
+     *
+     * The canvas reloads `grapes` through `loadProjectData()`, which renders components as-is (no HTML parsing),
+     * so event handlers or script components stored there would run in the next editor's admin session.
+     *
+     * @param array<mixed> $grapes
+     *
+     * @return array<mixed>
+     */
+    public function sanitizeGrapes(array $grapes): array
+    {
+        $isList = array_is_list($grapes);
+        $out    = [];
+        foreach ($grapes as $key => $value) {
+            if (is_string($key)) {
+                $lower = strtolower($key);
+                if (!$this->allowScripts && ($lower === 'script' || str_starts_with($lower, 'script-'))) {
+                    continue;
+                }
+                if ($lower === 'attributes' && is_array($value)) {
+                    $out[$key] = $this->sanitizeGrapesAttributes($value);
+                    continue;
+                }
+                if ($lower === 'content' && is_string($value) && str_contains($value, '<')) {
+                    $out[$key] = $this->sanitizeHtml($value);
+                    continue;
+                }
+            }
+            if (is_array($value)) {
+                if ($this->isBlockedGrapesComponent($value)) {
+                    continue;
+                }
+                $value = $this->sanitizeGrapes($value);
+            }
+            $out[$key] = $value;
+        }
+
+        return $isList ? array_values($out) : $out;
+    }
+
+    /**
+     * @param array<mixed> $component
+     */
+    private function isBlockedGrapesComponent(array $component): bool
+    {
+        // `type` is a GrapesJS component type ("link" is an anchor), so only `script` is matched there.
+        $tag  = is_string($component['tagName'] ?? null) ? strtolower($component['tagName']) : null;
+        $type = is_string($component['type'] ?? null) ? strtolower($component['type']) : null;
+        if ($this->allowScripts && ($tag === 'script' || $type === 'script')) {
+            return false;
+        }
+
+        return $type === 'script' || ($tag !== null && in_array($tag, self::BLOCKED_TAGS, true));
+    }
+
+    /**
+     * @param array<mixed> $attributes
+     *
+     * @return array<mixed>
+     */
+    private function sanitizeGrapesAttributes(array $attributes): array
+    {
+        foreach ($attributes as $name => $value) {
+            $lower = strtolower(trim((string) $name));
+            if (str_starts_with($lower, 'on') || in_array($lower, ['srcdoc', 'formaction', 'xlink:href'], true)) {
+                unset($attributes[$name]);
+                continue;
+            }
+            if (in_array($lower, self::URL_ATTRIBUTES, true) && is_string($value)
+                && !SafeUrl::isSafe(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $lower !== 'href' && $lower !== 'action')) {
+                unset($attributes[$name]);
+            }
+        }
+
+        return $attributes;
     }
 }

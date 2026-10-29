@@ -108,4 +108,60 @@ final class GrapesDocumentSanitizerTest extends TestCase
         self::assertStringContainsString('<script>', $sanitizer->sanitizeHtml($input), 'Twig source (decoded by design).');
         self::assertSame('<p>{{ &lt;script&gt;alert(1)&lt;/script&gt; }}</p>', $sanitizer->sanitizeHtml($input, false));
     }
+
+    #[Test]
+    public function sanitizeGrapesDropsHandlersScriptsAndUnsafeUrls(): void
+    {
+        $project = ['pages' => [['frames' => [['component' => ['type' => 'wrapper', 'components' => [
+            ['tagName' => 'img', 'attributes' => ['src' => 'x', 'onerror' => 'alert(1)', 'ONLOAD' => 'x', 'alt' => 'a']],
+            ['type' => 'link', 'attributes' => ['href' => ' JaVaScript:alert(1)', 'title' => 't']],
+            ['type' => 'link', 'attributes' => ['href' => 'https://example.com']],
+            ['tagName' => 'img', 'attributes' => ['src' => 'data:image/png;base64,AAAA']],
+            ['tagName' => 'img', 'attributes' => ['src' => 'data:text/html;base64,AAAA']],
+            ['tagName' => 'iframe', 'attributes' => ['srcdoc' => '<script>x</script>']],
+            ['type' => 'script', 'content' => 'alert(1)'],
+            ['tagName' => 'div', 'attributes' => ['srcdoc' => 'x', 'formaction' => 'x'], 'script' => 'alert(1)', 'script-props' => ['a']],
+            ['type' => 'text', 'content' => '<b onclick="x">Hi</b>'],
+        ]]]]]], 'styles' => [['selectors' => ['a'], 'style' => ['color' => 'red']]]];
+
+        $out        = new GrapesDocumentSanitizer()->sanitizeGrapes($project);
+        $components = $out['pages'][0]['frames'][0]['component']['components'];
+
+        self::assertCount(7, $components, 'iframe and script components removed; list re-indexed.');
+        self::assertSame(['src' => 'x', 'alt' => 'a'], $components[0]['attributes']);
+        self::assertSame(['title' => 't'], $components[1]['attributes']);
+        self::assertSame(['href' => 'https://example.com'], $components[2]['attributes']);
+        self::assertSame(['src' => 'data:image/png;base64,AAAA'], $components[3]['attributes']);
+        self::assertSame([], $components[4]['attributes']);
+        self::assertSame(['tagName' => 'div', 'attributes' => []], $components[5]);
+        self::assertStringNotContainsString('onclick', $components[6]['content']);
+        self::assertSame($project['styles'], $out['styles']);
+    }
+
+    #[Test]
+    public function sanitizeGrapesKeepsScriptsWhenAllowed(): void
+    {
+        $project = ['components' => [
+            ['type' => 'script', 'content' => 'x'],
+            ['tagName' => 'div', 'script' => 'x'],
+            ['tagName' => 'object'],
+        ]];
+
+        $out = new GrapesDocumentSanitizer(true)->sanitizeGrapes($project);
+
+        self::assertSame([['type' => 'script', 'content' => 'x'], ['tagName' => 'div', 'script' => 'x']], $out['components']);
+    }
+
+    #[Test]
+    public function sanitizeStructureCleansTopLevelAndLocaleGrapes(): void
+    {
+        $grapes = ['components' => [['tagName' => 'img', 'attributes' => ['onerror' => 'x']]]];
+        $out    = new GrapesDocumentSanitizer()->sanitizeStructure([
+            'grapes'        => $grapes,
+            'localeContent' => ['en' => ['html' => '', 'css' => '', 'grapes' => $grapes]],
+        ]);
+
+        self::assertSame([], $out['grapes']['components'][0]['attributes']);
+        self::assertSame([], $out['localeContent']['en']['grapes']['components'][0]['attributes']);
+    }
 }

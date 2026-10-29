@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The GrapesJS project JSON (`grapes`, top level and per locale) is now sanitised on save and when the canvas loads it: `on*`, `srcdoc`, `formaction` attributes, script-scheme / non-image `data:` URLs, `script` / `iframe` / `object` / `embed` / `form` / `link` / `meta` / `base` components and `script*` props (unless `grapesjs.allow_scripts`) are removed. `loadProjectData()` renders components without HTML parsing, so a stored handler ran in the next editor's admin session (REQ-SEC-004 re-audit L1, CWE-79).
+
 ## [1.11.0] - 2026-10-29
 
 PageBuilderKit: import requires layout/publish; fail closed without form CSRF See [UPGRADING](UPGRADING.md#to-1110).

@@ -9,6 +9,7 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
+use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,7 @@ final class PageCanvasController extends AbstractController
         private readonly ContentFieldsNormalizer $contentFieldsNormalizer,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
         private readonly GrapesJsFrontendConfig $grapesJsFrontendConfig,
+        private readonly GrapesDocumentSanitizer $grapesDocumentSanitizer,
     ) {
     }
 
@@ -42,6 +44,10 @@ final class PageCanvasController extends AbstractController
         $structure = $this->documentNormalizer->normalize(
             $document?->getStructure() ?? $this->documentNormalizer->emptyStructure(),
         );
+        if ($this->documentNormalizer->isGrapesStructure($structure)) {
+            // Rows saved before 1.11.1 kept `grapes` verbatim; the canvas loads it without HTML parsing.
+            $structure = $this->grapesDocumentSanitizer->sanitizeStructure($structure);
+        }
         $grapesConfig = $this->grapesJsFrontendConfig->toArray();
         if (!empty($grapesConfig['assetsUploadEnabled'])) {
             $grapesConfig['uploadUrl']        = $this->generateUrl('admin_page_builder_asset_upload');
