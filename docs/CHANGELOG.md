@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.12.0] - 2026-10-30](#1120---2026-10-30)
 - [[1.11.1] - 2026-10-29](#1111---2026-10-29)
 - [[1.11.0] - 2026-10-29](#1110---2026-10-29)
 - [[1.10.2] - 2026-10-28](#1102---2026-10-28)
@@ -34,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [1.12.0] - 2026-10-30
+
+PageBuilderKit: UiKit page contract (scaffolds, confirm dialogs, vendored GrapesJS CSS); SEC-004 BO: stored XSS in hydrate_binds fixed (DOM-based), hardened sanitizers, gadget attributes dropped, service strategy fail-closed See [UPGRADING](UPGRADING.md#to-1120).
 
 Security fix for stored XSS in bind-slot hydration (M1, GHSA); admin pages on the UiKit page contract (REQ-UI-003);
 TypeScript test suite with a coverage gate (REQ-TEST-003). See
