@@ -691,13 +691,34 @@ Controllers may inject `PageBuilderKitAccessGuard` (`assertLayout()`, …). Twig
 
 ## Twig overrides
 
-Override bundle templates in the host:
+The admin pages follow the UiKit page contract (REQ-UI-003): theme them once through `nowo_ui_kit` (layout, CSS stack,
+theme slots, tokens) — see [CONFIGURATION](CONFIGURATION.md#web_ui) — and, for a bundle-specific change, override one
+data block through `web_ui.templates.<page>`:
+
+```yaml
+nowo_page_builder_kit:
+    web_ui:
+        templates:
+            index: 'admin/pbk/index.html.twig'
+```
+
+```twig
+{# templates/admin/pbk/index.html.twig #}
+{% extends '@!NowoPageBuilderKitBundle/admin/pages/index.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    <p class="nowo-ui-muted">Pages go live after review.</p>
+    {{ parent() }}
+{% endblock %}
+```
+
+Full-file overrides remain possible for public and widget templates (frozen forks — read the freeze rule and the list
+of subpaths in [TEMPLATES](TEMPLATES.md#overriding-templates-req-twig-001)):
 
 ```text
 templates/bundles/NowoPageBuilderKitBundle/
 ├── widgets/heading.html.twig
-├── public/page.html.twig
-└── admin/pages/canvas.html.twig
+└── public/page.html.twig
 ```
 
 Widget types resolve public templates via `@NowoPageBuilderKitBundle/widgets/{type}.html.twig`.

@@ -35,6 +35,54 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+From **1.11.1**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle nowo-tech/ui-kit-bundle
+php bin/console assets:install
+```
+
+Requires `nowo-tech/ui-kit-bundle` **^2.17.3** (and `twig/twig` ^3.15). No database change.
+
+### Layout
+
+- `web_ui.layout_template` now defaults to `null`: the admin pages render inside `nowo_ui_kit.layouts.admin`. Point
+  that UiKit option at your admin layout (or a one-file bridge using `@NowoUiKit/layout/_bridge.html.twig`) once for
+  every Nowo bundle. The 1.x default value `@NowoPageBuilderKitBundle/admin/layout.html.twig` is treated as `null`.
+- A custom `web_ui.layout_template` that renders the UiKit canonical blocks (`nowo_ui_page_header`,
+  `nowo_ui_content`, …) is used as is. A 1.x layout rendering `{% block admin %}` still works through the deprecated
+  bridge (a deprecation is triggered); migrate it before 2.0.
+- The bundle no longer loads Bootstrap from a CDN: your admin layout loads the CSS framework (UiKit `nowo-ui.css`
+  and its theme slots style the pages without one).
+
+### Template contract
+
+- The admin pages extend UiKit scaffolds; see [TEMPLATES](TEMPLATES.md) for each page, its view model and data blocks.
+  Theme them through `nowo_ui_kit.theme` (classes, attributes, tokens; `theme.bundles.NowoPageBuilderKitBundle`) instead
+  of copying templates.
+- Full-file copies of `admin/pages/*.html.twig` (or `admin/layout.html.twig`) under
+  `templates/bundles/NowoPageBuilderKitBundle/` are frozen forks: the variable `page` is now the UiKit view model and
+  the `BuilderPage` entity is `builder_page`; the blocks `page_title`, `header_actions` and `admin` only exist in the
+  deprecated layout. Prefer `web_ui.templates.<page>` with a thin `{% extends '@!NowoPageBuilderKitBundle/admin/pages/<page>.html.twig' %}`
+  overriding one data block. Copies that still extend `nowo_page_builder_layout_template()` keep rendering inside the
+  UiKit admin layout until 2.0.
+- Confirmations use the UiKit `<dialog>` (loaded by the UiKit `scripts` partial of your layout); forms marked
+  `data-pbk-confirm` in a copied template are no longer intercepted.
+- Hosts relying on the Bootstrap classes the form types used to add (`form-control`, `form-select`, `mb-0`, …) get them
+  from their form theme / FormKit profile now.
+
+### Configuration
+
+- `web_ui.css_framework` is deprecated: remove it. If you relied on it for the GrapesJS canvas iframe styles, list
+  them in `grapesjs.canvas_styles`.
+- New `web_ui.templates.<page>` (optional).
+
+### Front-end
+
+- `page-builder-admin.js` now powers the image upload and media library of the content page (no inline script); make
+  sure your CSP allows the bundle asset package. The canvas loads `css/grapes.min.css` / `css/grapick.min.css` from the
+  bundle (run `assets:install`); the GrapesJS scripts are still fetched at run time from `grapesjs.cdn_version` on esm.sh.
+
 ## To 1.11.1
 
 From **1.11.0**:

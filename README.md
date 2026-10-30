@@ -15,11 +15,15 @@ This bundle is **FrankenPHP worker mode friendly**. Shared services stay request
 
 <table>
   <tr>
-    <td align="center" width="50%">
+    <td align="center" width="33%">
       <img src="docs/images/demo/overview.webp" alt="Public pricing page with demo chrome and Symfony Web Profiler toolbar" />
       <br /><sub>Public pricing — full demo context + Web Profiler</sub>
     </td>
-    <td align="center" width="50%">
+    <td align="center" width="33%">
+      <img src="docs/images/demo/pages.webp" alt="Admin pages list on the UiKit list scaffold with row actions and Web Profiler toolbar" />
+      <br /><sub>Admin pages list — UiKit list scaffold + Web Profiler</sub>
+    </td>
+    <td align="center" width="33%">
       <img src="docs/images/demo/interaction.webp" alt="GrapesJS admin canvas with Web Profiler toolbar" />
       <br /><sub>Admin GrapesJS canvas — context + Web Profiler</sub>
     </td>
@@ -45,7 +49,8 @@ Page Builder Kit Bundle gives Symfony applications a reusable visual page builde
 - Dev **Web Profiler** panel (`debug.collector`); classic **widget packs** for host extensions
 - `DocumentService`, `PageRenderProvider`, Twig `nowo_page_builder_render()`
 - Configurable access guard and HTML sanitization, plus an always-on HTML5 final hardener for public output (`|pbk_harden_html`, `|pbk_harden_css`; PHP 8.4 `Dom\HTMLDocument`)
-- CSP-friendly templates: `nonce` from the request attribute `csp_nonce` on every `<script>` / `<style>`, no inline event handlers
+- Admin pages on the **UiKit page contract** (REQ-UI-003): list / settings / form / show scaffolds, UiKit confirm `<dialog>`s, one host theme for every Nowo bundle, per-page `web_ui.templates` overrides — see [Templates](docs/TEMPLATES.md)
+- CSP-friendly templates: `nonce` from the request attribute `csp_nonce` on every `<script>` / `<style>`, no inline scripts or event handlers, no CDN assets in the admin markup
 - Symfony 8 FrankenPHP demo in `demo/symfony8` (default port **8137**)
 
 ## Quick start
@@ -94,7 +99,8 @@ Use both bundles in one app when some routes need rigid blocks and others need a
 ## Development
 
 ```bash
-make assets                         # pnpm + Vite: TS → src/Resources/public/
+make assets                         # pnpm + Vite in the container: TS → src/Resources/public/
+make test-ts                        # typecheck + Vitest coverage gate + global TS %
 make -C demo/symfony8 assets        # Pentatrion Vite: assets/app.ts → public/build/
 make -C demo/symfony8 test-e2e
 make -C demo/symfony8 demo-screenshots   # refreshes docs/images/demo/ and docs/images/builder-manual/ (WebP)
@@ -116,6 +122,7 @@ Demo default URL: `http://localhost:8137`.
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Usage](docs/USAGE.md)
+- [Templates (UiKit page contract)](docs/TEMPLATES.md)
 - [Contributing](docs/CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Changelog](docs/CHANGELOG.md)
@@ -143,7 +150,7 @@ Demo default URL: `http://localhost:8137`.
 | Area | Status | Command |
 | --- | --- | --- |
 | PHP `src/` coverage | **99.58%** lines (4082/4099; CI gate **≥99%**; `src/Controller` and `src/Repository` excluded — controllers are covered end to end by the demo Playwright suite, repositories need a full ORM runtime; see `phpunit.xml.dist`) | `make test-coverage` |
-| TS/JS | **N/A** (canvas/typecheck only; no Vitest coverage suite yet) | `pnpm typecheck` |
+| TS `src/Resources/assets/src` coverage | **96.89%** global (min of statements 99.23% / branches 96.89% / functions 98.00% / lines 99.34%; Vitest + jsdom; gate ≥ 99% lines and statements, ≥ 98% functions, ≥ 96% branches in `vitest.config.ts`) | `make test-ts` |
 | Python | **N/A** | — |
 | Unit / bundle QA | Enabled | `make test` |
 | Full release checks | Enabled | `make release-check` |
@@ -151,7 +158,7 @@ Demo default URL: `http://localhost:8137`.
 ```bash
 make test
 make test-coverage
-pnpm typecheck
+make test-ts
 make release-check
 ```
 

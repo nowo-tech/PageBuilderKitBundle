@@ -28,6 +28,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Controller/Admin/PageAssetUploadController.php` | Grapes Asset Manager uploads + library list | FR-P2-ADM-005, FR-P7-MED-002 |
 | `Controller/Admin/PageRevisionsController.php` | Revision list, restore, diff | FR-P3-REV-002, FR-P3-REV-003, FR-P9-STD-003, FR-P9-STD-004 |
 | `Controller/Admin/PageTemplatesController.php` | Templates library | FR-P3-TPL-002, FR-P9-STD-003, FR-P9-STD-004 |
+| `Controller/Admin/TranslatesFlashes.php` | Admin flashes translated when added (UiKit flashes partial prints them as is) | FR-I18N-001, REQ-UI-003 |
 | `Controller/Public/PageRenderController.php` | Public `/p/{pageKey}` (+ draft preview) | FR-REN-003, FR-P3-PREV-001, FR-P3-PREV-002 |
 
 ## Debug / Web Profiler
@@ -50,6 +51,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `DependencyInjection/Compiler/WidgetTypePass.php` | Tagged widget types → registry | FR-WGT-003, FR-DI-001 |
 | `DependencyInjection/Compiler/WidgetPackPass.php` | Tagged widget packs → registry | FR-P4-PACK-003, FR-P4-PACK-004 |
 | `DependencyInjection/Compiler/GrapesBlockPackPass.php` | Tagged Grapes block packs → registry | FR-P4-PACK-003, FR-P9-DX-002 |
+| `DependencyInjection/Compiler/CsrfProtectionPass.php` | Refuses to compile without form CSRF protection (fail closed) | REQ-SEC-005 |
 
 ## Entities
 
@@ -194,6 +196,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Security/Html/NullPageBuilderHtmlSanitizer.php` | No-op sanitizer | FR-SEC-003 |
 | `Security/Html/StripPageBuilderHtmlSanitizer.php` | Strip-tags sanitizer | FR-SEC-003 |
 | `Security/Html/AllowlistPageBuilderHtmlSanitizer.php` | DOM allowlist sanitizer | FR-SEC-003, FR-P5-VAL-004 |
+| `Security/Html/SafeUrl.php` | URL scheme allowlist for href / src (`pbk_safe_url`) | FR-SEC-003, REQ-SEC-005 |
 
 ## Twig
 
@@ -201,6 +204,13 @@ Maps production files under `src/` to functional requirements across shipped pha
 | --- | --- | --- |
 | `Twig/PageBuilderKitExtension.php` | Render helpers, `can` / `can_edit`, inline field | FR-REN-002, FR-P5-ACL-006, FR-P5-SCH-005 |
 | `Twig/ElementAppearanceExtension.php` | Appearance Twig helpers | FR-P2-WGT-002 |
+
+## UiKit page contract
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Ui/PageBuilderKitPages.php` | Layout (`web_ui.layout_template` / `nowo_ui_kit.layouts.admin`), per-page templates, 1.x layout bridge | REQ-UI-003, FR-CFG-002 |
+| `Ui/PageBuilderKitPageFactory.php` | UiKit view models of the eight admin pages (headers, row actions, confirms, pagination) | REQ-UI-003, FR-ADM-001, FR-P9-STD-003 |
 
 ## Widget system
 
@@ -230,7 +240,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Resources/views/admin/layout.html.twig` | Admin shell layout | FR-ADM-002, FR-CFG-002, REQ-UI-001 |
+| `Resources/views/admin/layout.html.twig` | Deprecated 1.x layout (extends the UiKit admin layout) | FR-ADM-002, FR-CFG-002, REQ-UI-003 |
+| `Resources/views/admin/_legacy_layout.html.twig` | Deprecated bridge around a 1.x host layout | REQ-UI-003 |
 | `Resources/views/admin/pages/index.html.twig` | Page list UI (engine badges) | FR-ADM-001, FR-P5-UI-003, FR-P9-UX-001, FR-P9-STD-003, FR-P9-STD-004 |
 | `Resources/views/admin/pages/canvas.html.twig` | Grapes canvas host | FR-ADM-002, FR-P2-ADM-001 |
 | `Resources/views/admin/pages/sections.html.twig` | Classic Sections UI (legacy banner) | FR-P2-ADM-004, FR-P9-UX-002, FR-P9-STD-004 |
@@ -264,12 +275,15 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Resources/assets/src/grapes-types.ts` | Typed canvas config/structure helpers | FR-P9-FE-001, REQ-ASSETS-003 |
 | `Resources/assets/src/page-builder-canvas.ts` | Grapes canvas ESM source (strict TS) | FR-ADM-002, FR-P2-ADM-001, FR-P7-TAG-001, FR-P9-FE-002 |
 | `Resources/assets/src/page-builder-inline-edit.ts` | Inline content-field editor source | FR-P5-SCH-005 |
-| `Resources/assets/src/page-builder-admin.ts` | CSP-friendly admin helpers (`data-pbk-confirm`, no inline handlers) | FR-ADM-001, FR-SEC-004 |
+| `Resources/assets/src/page-builder-admin.ts` | Admin IIFE entry (content-page image upload + media library) | FR-ADM-001, FR-SEC-004 |
+| `Resources/assets/src/admin-media.ts` | Upload / media library picker logic (safe URLs, text names, UiKit dialog) | FR-P7-MED-002, FR-SEC-004, REQ-UI-003 |
 | `Resources/assets/src/page-builder.css` | Source stylesheet | FR-ADM-002, REQ-ASSETS-001 |
 | `Resources/public/js/page-builder-canvas.js` | Built Grapes canvas script | FR-ADM-002, FR-P9-FE-003 |
 | `Resources/public/js/page-builder-inline-edit.js` | Built inline-edit script | FR-P5-SCH-005 |
 | `Resources/public/js/page-builder-admin.js` | Built admin helpers script | FR-ADM-001, FR-SEC-004 |
 | `Resources/public/css/page-builder.css` | Published stylesheet | FR-ADM-002, REQ-ASSETS-004 |
+| `Resources/public/css/grapes.min.css` | Vendored GrapesJS 0.22.9 editor styles (no CDN link) | FR-P2-ADM-001, REQ-UI-003 |
+| `Resources/public/css/grapick.min.css` | Vendored grapick 0.1.13 styles (gradient picker of `style_bg`) | FR-P2-ADM-001, REQ-UI-003 |
 
 ## Resources — translations
 
@@ -288,6 +302,8 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Path | Notes |
 | --- | --- |
 | `docs/COOKBOOK.md` | FR-P9-DX-001 |
+| `src/Resources/assets/tests/*.test.ts` | Vitest suite of the TypeScript sources (REQ-TEST-003; excluded from the Composer archive) |
+| `docs/TEMPLATES.md` | REQ-UI-003 page contract (pages, scaffolds, data blocks, unique canvas page) |
 | `examples/acme-grapes-block-pack/` | FR-P9-DX-002 (Composer example; not under `src/`) |
 
 ## Coverage summary
@@ -295,9 +311,9 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Category | Files | Mapped |
 | --- | ---: | ---: |
 | Bundle entry | 1 | 1 |
-| Controllers | 11 | 11 |
+| Controllers | 12 | 12 |
 | Debug / Web Profiler | 4 | 4 |
-| Dependency injection and compiler | 7 | 7 |
+| Dependency injection and compiler | 8 | 8 |
 | Entities | 6 | 6 |
 | Enums and locale | 6 | 6 |
 | Event subscribers | 2 | 2 |
@@ -309,11 +325,12 @@ Maps production files under `src/` to functional requirements across shipped pha
 | HTML | 2 | 2 |
 | Content fields and bind slots | 4 | 4 |
 | Utilities | 1 | 1 |
-| Security | 10 | 10 |
+| Security | 11 | 11 |
 | Twig | 2 | 2 |
+| UiKit page contract | 2 | 2 |
 | Widget system | 12 | 12 |
 | Resources — config and routing | 2 | 2 |
-| Resources — admin and public Twig | 26 | 26 |
-| Resources — frontend assets | 9 | 9 |
+| Resources — admin and public Twig | 27 | 27 |
+| Resources — frontend assets | 12 | 12 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`)** | **165** | **165** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **174** | **174** |

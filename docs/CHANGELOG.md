@@ -35,6 +35,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Admin pages on the UiKit page contract (REQ-UI-003); TypeScript test suite with a coverage gate (REQ-TEST-003). See
+[UPGRADING](UPGRADING.md#unreleased).
+
+### Added
+
+- `Ui\PageBuilderKitPageFactory` (UiKit view models of the eight admin pages) and `Ui\PageBuilderKitPages` (layout and
+  per-page template resolution, 1.x layout bridge).
+- `web_ui.templates.<page>` per-page template overrides (`index`, `canvas`, `content`, `seo`, `sections`, `revisions`,
+  `revision_diff`, `templates`; unknown ids fail the container compilation).
+- `docs/TEMPLATES.md`: pages, scaffolds, view models, data blocks, unique page, overridable subpaths, freeze rule.
+- UiKit `PageContractTestCase` contract test (15 page fixtures, strict missing translations) plus render tests of the
+  1.x layout, the bridge, the dialogs and the canvas hooks.
+- Vitest suite for every TypeScript source (canvas, inline edit, admin media picker, shared types) with a coverage gate
+  (≥ 99 % lines / statements, ≥ 98 % functions, ≥ 96 % branches), `make test-ts` (typecheck + coverage + global TS
+  percentage, in `release-check`), CI job "Frontend (Vitest + Vite build)" that also checks the committed build.
+- Vendored GrapesJS editor styles (`css/grapes.min.css` from grapesjs 0.22.9, `css/grapick.min.css` from grapick
+  0.1.13) served by the bundle asset package.
+- 25 translation keys in the seven catalogues (columns, dialogs, locale tabs, status line).
+
+### Changed
+
+- **Template contract:** the admin pages extend UiKit scaffolds (pages / versions / templates → `page/list`, content
+  fields → `page/settings`, SEO / classic sections → `page/form`, version diff → `page/show`); the GrapesJS canvas is a
+  unique page extending `nowo_ui_kit.layouts.admin`. The page variable `page` is now the view model; the `BuilderPage`
+  entity is passed as `builder_page`. The other 1.x variables are kept.
+- `web_ui.layout_template` defaults to `null` (= `nowo_ui_kit.layouts.admin`); the 1.x default value is normalised to
+  `null`. A 1.x layout without the UiKit canonical blocks is wrapped in the deprecated bridge
+  `admin/_legacy_layout.html.twig`.
+- `admin/layout.html.twig` (deprecated) no longer prints `<html>` nor loads Bootstrap from `cdn.jsdelivr.net`: it
+  extends the UiKit admin layout. The canvas no longer links GrapesJS / grapick styles from `unpkg.com`.
+- Duplicate, restore, apply-template, delete-template and remove-field use the UiKit confirm `<dialog>` (duplicate and
+  apply ask their fields inside it); `page-builder-admin.js` no longer handles `data-pbk-confirm` / `window.confirm()`.
+- The content-page media library is the UiKit `dialog` partial (native `<dialog>`, no Bootstrap modal) and its inline
+  script moved to `page-builder-admin.js` (no inline `<script>`; library names rendered as text, only http(s) /
+  root-relative image URLs accepted).
+- Flash messages are translated when the controllers add them (any host layout prints them as is).
+- Form types carry no Bootstrap classes or inline styles; editor-defined labels, placeholders and select options are
+  printed as given instead of being looked up in the catalogue; the duplicate form shows the new page key.
+- FormKit profile `page_builder_kit` defaults are theme-neutral (`nowo-ui-input`, no `form-control` / `mb-2`).
+- `page-builder-canvas.js` swaps the UiKit slot classes it reads from `data-pbk-class-*` (status badge, active locale
+  tab) and marks the status line with `data-pbk-state` instead of Bootstrap utility classes.
+- `nowo-tech/ui-kit-bundle` constraint `^1.4 || ^2.2` → `^2.17.3`; `twig/twig` `^3.8` → `^3.15`.
+- `make assets` builds inside the PHP container (Node 22 + pnpm 9.14.2 added to the dev image).
+
+### Deprecated
+
+- `web_ui.css_framework` (the admin pages use `nowo_ui_kit.css_framework`; it only seeds the default GrapesJS canvas
+  iframe styles — set `grapesjs.canvas_styles`).
+- Twig functions `nowo_page_builder_layout_template()` and `nowo_page_builder_css_framework()`, `admin/layout.html.twig`
+  and the bridge `admin/_legacy_layout.html.twig` (removal in 2.0).
+
 ## [1.11.1] - 2026-10-29
 
 PageBuilderKit: GrapesJS project JSON sanitised on save and canvas load See [UPGRADING](UPGRADING.md#to-1111).

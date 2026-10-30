@@ -132,7 +132,7 @@ Nowo-tech kit convention: when the request attribute `csp_nonce` is set, every `
 <script{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>…</script>
 ```
 
-The kit templates contain **no inline event handlers**: confirmations use `form[data-pbk-confirm]` + `js/page-builder-admin.js`, and the inline-edit modal form is blocked by a `submit` listener in `js/page-builder-inline-edit.js`. Host sketch:
+The kit templates contain **no inline scripts or event handlers**: confirmations use the UiKit confirm `<dialog>` (REQ-UI-003), the content-page upload / media library lives in `js/page-builder-admin.js`, and the inline-edit modal form is blocked by a `submit` listener in `js/page-builder-inline-edit.js`. The admin markup links no CDN asset; the GrapesJS editor scripts are still fetched at run time from esm.sh by `js/page-builder-canvas.js` (see [CONFIGURATION](CONFIGURATION.md#grapesjs)). Host sketch:
 
 ```php
 #[AsEventListener(KernelEvents::REQUEST, priority: 512)]
