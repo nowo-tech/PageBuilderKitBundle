@@ -41,6 +41,8 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+No action needed when you import `@NowoPageBuilderKitBundle/Resources/config/routing.yaml` (the documented setup). If on Symfony >= 7.3 the page builder routes appeared without that import (through the default `controllers: { resource: routing.controllers }` of `config/routes.yaml`), they are gone now: import the bundle routes explicitly (see [INSTALLATION](INSTALLATION.md)).
+
 ## To 1.12.0
 
 From **1.11.1**:

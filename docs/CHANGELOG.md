@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Bundle routes registered without being imported (REQ-SF-004 rule 7):** on Symfony >= 7.3 the `#[Route]` controllers were autoconfigured with the `routing.controller` tag, so a host whose `config/routes.yaml` has the default `controllers: { resource: routing.controllers }` exposed the public renderer `/p/{pageKey}` and the admin routes without `web_ui.path_prefix` (e.g. `/pages`, `/assets/upload`) even when it never imported `@NowoPageBuilderKitBundle/Resources/config/routing.yaml`. The controllers are now registered explicitly (`autoconfigure: false`, `controller.service_arguments` + `container.service_subscriber`); the routes exist only where the host imports `routing.yaml`. Regression test with a kernel that only loads `routing.controllers`.
+
 ## [1.12.0] - 2026-10-30
 
 PageBuilderKit: UiKit page contract (scaffolds, confirm dialogs, vendored GrapesJS CSS); SEC-004 BO: stored XSS in hydrate_binds fixed (DOM-based), hardened sanitizers, gadget attributes dropped, service strategy fail-closed See [UPGRADING](UPGRADING.md#to-1120).
