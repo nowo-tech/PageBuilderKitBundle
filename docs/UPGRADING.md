@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.13.0](#to-1130)
 - [To 1.12.1](#to-1121)
 - [To 1.12.0](#to-1120)
   - [Security (Appendix BO)](#security-appendix-bo)
@@ -41,6 +42,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.13.0
+
+From **1.12.1**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 - **FormKit is required and must be registered.** `nowo-tech/form-kit-bundle` (`^2.16`) is a `require` dependency;
   the page form types are now FormKit Types and need `Nowo\FormKitBundle\NowoFormKitBundle` in `config/bundles.php`
