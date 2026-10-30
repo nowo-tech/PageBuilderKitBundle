@@ -229,6 +229,41 @@ jobs:
       - name: PHPStan (level and ignoreErrors from phpstan.neon.dist; fails the build on any error)
         run: composer phpstan --no-interaction
 
+  frontend:
+    name: Frontend (Vitest + Vite build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.14.2
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test with coverage (thresholds in vitest.config.ts)
+        run: |
+          set -o pipefail
+          pnpm run test:coverage 2>&1 | tee coverage-ts.txt
+          sh .scripts/ts-coverage-percent.sh coverage-ts.txt
+
+      - name: Build assets
+        run: pnpm build
+
+      - name: Committed build is up to date
+        run: git diff --exit-code -- src/Resources/public
+
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
