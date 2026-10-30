@@ -63,13 +63,13 @@ final class PageBuilderProtectionTest extends TestCase
     }
 
     #[Test]
-    public function serviceStrategyFallsBackToNullSanitizerWithoutCustom(): void
+    public function serviceStrategyFailsClosedToTheAllowlistWithoutCustom(): void
     {
         $protection = new PageBuilderProtection(
             new PageBuilderProtectionConfig(HtmlSanitizeStrategy::Service, null),
         );
 
-        self::assertInstanceOf(NullPageBuilderHtmlSanitizer::class, $protection->htmlSanitizer());
+        self::assertInstanceOf(AllowlistPageBuilderHtmlSanitizer::class, $protection->htmlSanitizer());
     }
 
     private function protection(HtmlSanitizeStrategy $strategy): PageBuilderProtection

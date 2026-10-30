@@ -68,6 +68,9 @@ final class AllowlistPageBuilderHtmlSanitizer implements PageBuilderHtmlSanitize
         }
 
         $xpath = new DOMXPath($document);
+        // Comments / PIs / CDATA are serialised verbatim by libxml; under HTML5 `<!-->` ends a comment early, so
+        // `<!--><img onerror=…>-->` would become a live element (Appendix BO, L1).
+        HtmlNodePurger::purgeNonElementMarkup($xpath);
         $nodes = $xpath->query('//*');
         if ($nodes === false) {
             return '';

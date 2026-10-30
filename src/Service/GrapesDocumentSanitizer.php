@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Service;
 
+use DOMAttr;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMXPath;
+use Nowo\PageBuilderKitBundle\Security\Html\HtmlNodePurger;
 use Nowo\PageBuilderKitBundle\Security\Html\SafeUrl;
 
 use function array_is_list;
@@ -16,6 +18,7 @@ use function html_entity_decode;
 use function in_array;
 use function is_array;
 use function is_string;
+use function iterator_to_array;
 use function libxml_clear_errors;
 use function libxml_use_internal_errors;
 use function preg_replace;
@@ -38,7 +41,15 @@ use const LIBXML_HTML_NOIMPLIED;
 final readonly class GrapesDocumentSanitizer
 {
     /** Elements removed from HTML and from the GrapesJS component tree (`script` only when scripts are off). */
-    private const array BLOCKED_TAGS = ['script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base'];
+    private const array BLOCKED_TAGS = [
+        'script', 'iframe', 'object', 'embed', 'form', 'link', 'meta', 'base',
+        // Raw-text / foreign-content mXSS vectors and elements that can host or load markup (Appendix BO, L1).
+        'style', 'math', 'template', 'portal', 'frame', 'frameset', 'noscript', 'noembed', 'noframes', 'xmp',
+        'plaintext', 'animate', 'animatemotion', 'animatetransform', 'set', 'foreignobject', 'handler', 'listener',
+    ];
+
+    /** Attributes removed regardless of value (any element). */
+    private const array BLOCKED_ATTRIBUTES = ['formaction', 'xlink:href', 'srcdoc', 'xml:base', 'shadowrootmode'];
 
     /** Attributes whose value is a URL; script schemes (and non-image `data:`) are dropped. */
     private const array URL_ATTRIBUTES = ['href', 'src', 'action', 'poster', 'background', 'data'];
@@ -75,6 +86,9 @@ final readonly class GrapesDocumentSanitizer
         }
 
         $xpath = new DOMXPath($dom);
+        // Comments, processing instructions and CDATA are serialised verbatim by libxml (HTML4); an HTML5 parser
+        // closes `<!-->` early, so their text could become markup: never keep them.
+        HtmlNodePurger::purgeNonElementMarkup($xpath);
         foreach (self::BLOCKED_TAGS as $tag) {
             if ($tag === 'script' && $this->allowScripts) {
                 continue;
@@ -86,23 +100,24 @@ final readonly class GrapesDocumentSanitizer
             }
         }
 
-        foreach ($xpath->query('//@*') ?: [] as $attrNode) {
-            if (!$attrNode instanceof DOMNode) {
+        foreach (iterator_to_array($xpath->query('//@*') ?: []) as $attrNode) {
+            if (!$attrNode instanceof DOMAttr) {
                 continue; // @codeCoverageIgnore
             }
-            $name = strtolower($attrNode->nodeName);
-            if (str_starts_with($name, 'on') || $name === 'formaction' || $name === 'xlink:href') {
-                if ($attrNode->parentNode instanceof DOMElement) {
-                    $attrNode->parentNode->removeAttribute($attrNode->nodeName);
-                }
+            $name  = strtolower($attrNode->nodeName);
+            $owner = $attrNode->parentNode;
+            if (!$owner instanceof DOMElement) {
+                continue; // @codeCoverageIgnore
             }
-            if (in_array($name, ['href', 'src', 'xlink:href'], true)) {
-                $value = strtolower(trim($attrNode->nodeValue ?? ''));
-                if (str_starts_with($value, 'javascript:')) {
-                    if ($attrNode->parentNode instanceof DOMElement) {
-                        $attrNode->parentNode->removeAttribute($attrNode->nodeName);
-                    }
-                }
+            // removeAttributeNode(): removeAttribute('xml:base') would look the name up as a namespaced one and miss it.
+            if (str_starts_with($name, 'on') || in_array($name, self::BLOCKED_ATTRIBUTES, true)) {
+                $owner->removeAttributeNode($attrNode);
+
+                continue;
+            }
+            // Same scheme policy as the allowlist sanitizer and `pbk_safe_url` (javascript:, vbscript:, non-image data:).
+            if (in_array($name, ['href', 'src'], true) && !SafeUrl::isSafe($attrNode->nodeValue ?? '', $name === 'src')) {
+                $owner->removeAttributeNode($attrNode);
             }
         }
 

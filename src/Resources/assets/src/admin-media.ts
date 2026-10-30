@@ -23,6 +23,8 @@ export function safeAssetUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const url = value.trim();
   if (url === '') return null;
+  // Browsers treat `\` as `/` in http(s) URLs: `/\host` is protocol-relative, so no backslash is accepted.
+  if (url.includes('\\')) return null;
   if (/^https?:\/\//i.test(url)) return url;
   if (url.startsWith('/') && !url.startsWith('//')) return url;
   return null;

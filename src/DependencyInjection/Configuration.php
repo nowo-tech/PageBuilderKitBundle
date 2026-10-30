@@ -15,6 +15,7 @@ use function array_diff_key;
 use function array_keys;
 use function implode;
 use function is_string;
+use function preg_match;
 use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
@@ -211,6 +212,14 @@ final class Configuration implements ConfigurationInterface
                     ->children()
                         ->booleanNode('enabled')->defaultTrue()->end()
                         ->scalarNode('cdn_version')->defaultValue('0.22.9')->end()
+                        ->scalarNode('module_base_url')
+                            ->defaultValue('https://esm.sh')
+                            ->info('ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#^(https://[^/\s\\\\]+|/(?![/\\\\]))[^\s\\\\]*$#', $v) !== 1)
+                                ->thenInvalid('grapesjs.module_base_url must be an https:// URL or a root-relative path (got %s).')
+                            ->end()
+                        ->end()
                         ->scalarNode('height')->defaultValue('calc(100vh - 220px)')->end()
                         ->booleanNode('allow_scripts')
                             ->defaultFalse()

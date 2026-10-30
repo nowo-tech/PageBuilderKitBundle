@@ -136,4 +136,25 @@ final class ConfigurationTest extends TestCase
         self::assertSame('1.12', $deprecation['version']);
         self::assertStringContainsString('grapesjs.canvas_styles', $deprecation['message']);
     }
+
+    #[Test]
+    public function grapesModuleBaseUrlAcceptsHttpsAndRootRelativeOnly(): void
+    {
+        $config = new Processor()->processConfiguration(new Configuration(), [[]]);
+        self::assertSame('https://esm.sh', $config['grapesjs']['module_base_url']);
+
+        foreach (['https://cdn.example.com/esm', '/vendor/esm'] as $ok) {
+            $config = new Processor()->processConfiguration(new Configuration(), [['grapesjs' => ['module_base_url' => $ok]]]);
+            self::assertSame($ok, $config['grapesjs']['module_base_url']);
+        }
+
+        foreach (['http://cdn.example.com', '//evil.example', '/\\evil.example', 'javascript:alert(1)', 'https://a b'] as $bad) {
+            try {
+                new Processor()->processConfiguration(new Configuration(), [['grapesjs' => ['module_base_url' => $bad]]]);
+                self::fail('Accepted ' . $bad);
+            } catch (InvalidConfigurationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
 }

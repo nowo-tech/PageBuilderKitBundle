@@ -6,10 +6,12 @@ namespace Nowo\PageBuilderKitBundle\Html;
 
 use Dom\Element;
 use Dom\HTMLDocument;
+use Dom\XPath;
 use Nowo\PageBuilderKitBundle\Security\Html\AllowlistPageBuilderHtmlSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 
 use function in_array;
+use function iterator_to_array;
 use function preg_match;
 use function preg_replace;
 use function preg_split;
@@ -29,7 +31,9 @@ use const LIBXML_NOERROR;
  * based. This pass parses the final markup with the HTML5 algorithm ({@see HTMLDocument}, PHP 8.4+, the
  * same one browsers use) and always re-serializes it, so what is checked is exactly what the browser will
  * build: no parser differential (HTML5 entities such as `&colon;`, `<!-->` comments, `<xmp>` / `<noembed>`
- * raw text, `<svg/onload>` …). It drops executable elements, event handlers and script URLs.
+ * raw text, `<svg/onload>` …). It drops comments, executable elements, event handlers, script URLs, form
+ * hijack attributes (`form`, `formaction`) and front-end framework gadget attributes (`x-*`, `hx-*`, `v-*`, `ng-*`,
+ * `:*`, `@*`, `data-turbo*`).
  *
  * Idempotent: `harden(harden($x)) === harden($x)`.
  */
@@ -45,7 +49,14 @@ final readonly class PublicHtmlHardener
     ];
 
     /** Attributes removed regardless of value. */
-    private const array DROP_ATTRIBUTES = ['formaction', 'srcdoc', 'action'];
+    private const array DROP_ATTRIBUTES = ['formaction', 'srcdoc', 'action', 'form', 'xml:base', 'xmlns:xlink'];
+
+    /**
+     * Attribute prefixes of front-end frameworks that evaluate attribute values as code when they run over the
+     * content (script gadgets): Alpine (`x-`, `:`, `@`), htmx (`hx-`), Vue (`v-`), AngularJS (`ng-`), Turbo
+     * (`data-turbo`), plus the `data-` spellings Alpine / htmx / AngularJS also accept.
+     */
+    private const array DROP_ATTRIBUTE_PREFIXES = ['x-', 'hx-', 'v-', 'ng-', ':', '@', 'data-turbo', 'data-hx-', 'data-ng-', 'data-x-'];
 
     /** Attributes whose value is a URL (or URL list) and must not use a script scheme. */
     private const array URL_ATTRIBUTES = [
@@ -84,6 +95,12 @@ final readonly class PublicHtmlHardener
             return ''; // @codeCoverageIgnore
         }
 
+        // Comments never reach the output: an HTML5 serialiser keeps `</span>` / `<img …>` text inside them verbatim, so
+        // any later string processing (or a different parser) could turn them into markup.
+        foreach (iterator_to_array(new XPath($document)->query('//comment()', $body)) as $comment) {
+            $comment->parentNode?->removeChild($comment);
+        }
+
         /** @var list<Element> $drop */
         $drop = [];
         foreach ($body->querySelectorAll('*') as $element) {
@@ -118,7 +135,7 @@ final readonly class PublicHtmlHardener
         $remove = [];
         foreach ($element->attributes as $attribute) {
             $name = strtolower($attribute->name);
-            if (str_starts_with($name, 'on') || in_array($name, self::DROP_ATTRIBUTES, true)) {
+            if (str_starts_with($name, 'on') || in_array($name, self::DROP_ATTRIBUTES, true) || $this->isGadgetAttribute($name)) {
                 $remove[] = $attribute->name;
 
                 continue;
@@ -131,6 +148,11 @@ final readonly class PublicHtmlHardener
         foreach ($remove as $name) {
             $element->removeAttribute($name);
         }
+    }
+
+    private function isGadgetAttribute(string $name): bool
+    {
+        return array_any(self::DROP_ATTRIBUTE_PREFIXES, static fn (string $prefix): bool => str_starts_with($name, $prefix));
     }
 
     /**

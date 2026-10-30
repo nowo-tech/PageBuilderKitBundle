@@ -38,6 +38,8 @@ describe('admin-media helpers', () => {
     expect(safeAssetUrl(' https://a.test/x.png ')).toBe('https://a.test/x.png');
     expect(safeAssetUrl('/uploads/x.png')).toBe('/uploads/x.png');
     expect(safeAssetUrl('//evil.test/x.png')).toBeNull();
+    expect(safeAssetUrl('/\\evil.test/x.png')).toBeNull();
+    expect(safeAssetUrl('https://evil.test\\@ok.test/x.png')).toBeNull();
     expect(safeAssetUrl('javascript:alert(1)')).toBeNull();
     expect(safeAssetUrl('data:image/png;base64,AA')).toBeNull();
     expect(safeAssetUrl('')).toBeNull();

@@ -1595,7 +1595,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "3ea70f8071a70f6d5a2a57f781ff1656d1e4c564"
+                "reference": "ba1bc695741a4fca4be6fef080d5ae35b245eb28"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",
@@ -1622,7 +1622,7 @@
                 "symfony/yaml": "^7.4 || ^8.0",
                 "twig/extra-bundle": "^3.12",
                 "twig/string-extra": "^3.12",
-                "twig/twig": "^3.15"
+                "twig/twig": "^3.19"
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",

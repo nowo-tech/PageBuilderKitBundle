@@ -24,7 +24,7 @@ final readonly class PageBuilderProtection
             HtmlSanitizeStrategy::None      => new NullPageBuilderHtmlSanitizer(),
             HtmlSanitizeStrategy::Strip     => new StripPageBuilderHtmlSanitizer(),
             HtmlSanitizeStrategy::Allowlist => new AllowlistPageBuilderHtmlSanitizer(),
-            HtmlSanitizeStrategy::Service   => $this->customSanitizer ?? new NullPageBuilderHtmlSanitizer(),
+            HtmlSanitizeStrategy::Service   => $this->customSanitizer ?? new AllowlistPageBuilderHtmlSanitizer(), // fail closed
         };
     }
 }

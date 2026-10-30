@@ -57,7 +57,7 @@
         "symfony/yaml": "^7.4 || ^8.0",
         "twig/extra-bundle": "^3.12",
         "twig/string-extra": "^3.12",
-        "twig/twig": "^3.15"
+        "twig/twig": "^3.19"
     },
     "suggest": {
         "nowo-tech/tiptap-editor-bundle": "Rich text editing for text widgets in the canvas.",

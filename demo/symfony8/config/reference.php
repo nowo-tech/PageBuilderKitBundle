@@ -1341,6 +1341,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     grapesjs?: array{
  *         enabled?: bool|Param, // Default: true
  *         cdn_version?: scalar|Param|null, // Default: "0.22.9"
+ *         module_base_url?: scalar|Param|null, // ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src. // Default: "https://esm.sh"
  *         height?: scalar|Param|null, // Default: "calc(100vh - 220px)"
  *         allow_scripts?: bool|Param, // When true, GrapesJS custom script blocks may be persisted and rendered. XSS risk — keep false unless editors are fully trusted. // Default: false
  *         allow_custom_code?: bool|Param, // Expose Custom HTML / grapesjs-custom-code plugin. // Default: true

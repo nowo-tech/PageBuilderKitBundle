@@ -161,6 +161,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->getDefinition(GrapesJsFrontendConfig::class)
             ->setArgument('$enabled', (bool) $grapesConfig['enabled'])
             ->setArgument('$cdnVersion', (string) $grapesConfig['cdn_version'])
+            ->setArgument('$moduleBaseUrl', (string) $grapesConfig['module_base_url'])
             ->setArgument('$height', (string) $grapesConfig['height'])
             ->setArgument('$allowScripts', (bool) $grapesConfig['allow_scripts'])
             ->setArgument('$allowCustomCode', (bool) $grapesConfig['allow_custom_code'])
@@ -382,6 +383,10 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             ]);
 
         $customSanitizer = $this->optionalServiceId($html['service'] ?? null);
+        if ($html['strategy'] === HtmlSanitizeStrategy::Service->value && $customSanitizer === null) {
+            // Fail closed: a custom strategy without its service would persist editor HTML unsanitized.
+            throw new LogicException('nowo_page_builder_kit.html.sanitize.service is required when html.sanitize.strategy is "service".');
+        }
 
         $container->register(PageBuilderProtection::class)
             ->setAutowired(false)
