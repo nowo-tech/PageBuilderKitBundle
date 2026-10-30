@@ -1,2 +1,4 @@
 twig:
     default_path: '%kernel.project_dir%/templates'
+    # Host form theme of the demo (the bundle forms carry no framework classes; REQ-UI-003).
+    form_themes: ['bootstrap_5_layout.html.twig']

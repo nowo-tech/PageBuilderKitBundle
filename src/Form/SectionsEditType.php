@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -63,12 +64,10 @@ final class SectionsEditType extends AbstractType
                             ? TextareaType::class
                             : TextType::class;
                         $widgetForm->add($field, $type, [
-                            'label'    => $field,
+                            'label'    => new TranslatableText($field),
                             'required' => false,
                             'data'     => $str,
-                            'attr'     => $type === TextareaType::class
-                                ? ['class' => 'form-control form-control-sm', 'rows' => 3]
-                                : ['class' => 'form-control form-control-sm'],
+                            'attr'     => $type === TextareaType::class ? ['rows' => 3] : [],
                         ]);
                     }
 

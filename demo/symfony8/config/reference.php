@@ -1309,8 +1309,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     web_ui?: array{
  *         path_prefix?: scalar|Param|null, // URL prefix for all admin UI and document API routes. Public /p/{pageKey} is unaffected. Host should firewall this path. // Default: "/admin/page-builder"
- *         layout_template?: scalar|Param|null, // Default: "@NowoPageBuilderKitBundle/admin/layout.html.twig"
- *         css_framework?: "bootstrap"|"bootstrap4"|"bootstrap5"|"tabler"|"tailwind"|"foundation"|"custom"|"none"|Param, // Default: "tailwind"
+ *         layout_template?: scalar|Param|null, // Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. A 1.x layout without the UiKit canonical blocks (it renders {% block admin %}) is wrapped in a deprecated bridge. // Default: null
+ *         css_framework?: "bootstrap"|"bootstrap4"|"bootstrap5"|"tabler"|"tailwind"|"foundation"|"custom"|"none"|Param, // Deprecated: The "nowo_page_builder_kit.web_ui.css_framework.css_framework" option is deprecated: the admin pages use nowo_ui_kit.css_framework (REQ-UI-003). Set nowo_page_builder_kit.grapesjs.canvas_styles for the GrapesJS canvas iframe instead. // Deprecated since 1.12: the admin pages take the CSS stack from nowo_ui_kit.css_framework. Only picks the default GrapesJS canvas iframe stylesheets when grapesjs.canvas_styles is empty, and feeds the deprecated nowo_page_builder_css_framework() Twig function. // Default: "tailwind"
+ *         templates?: array<string, scalar|Param|null>,
  *     },
  *     seo?: array{ // Defaults for page-level SEO / Open Graph when translation fields are empty.
  *         site_name?: scalar|Param|null, // Default: ""
@@ -1340,6 +1341,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     grapesjs?: array{
  *         enabled?: bool|Param, // Default: true
  *         cdn_version?: scalar|Param|null, // Default: "0.22.9"
+ *         module_base_url?: scalar|Param|null, // ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src. // Default: "https://esm.sh"
  *         height?: scalar|Param|null, // Default: "calc(100vh - 220px)"
  *         allow_scripts?: bool|Param, // When true, GrapesJS custom script blocks may be persisted and rendered. XSS risk — keep false unless editors are fully trusted. // Default: false
  *         allow_custom_code?: bool|Param, // Expose Custom HTML / grapesjs-custom-code plugin. // Default: true
@@ -1478,6 +1480,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         tokens_dark?: array<string, mixed>,
  *         confirm_message_in_header?: bool|Param, // Confirm dialogs and the full-page confirm render the message inside the header, under the title (hosts whose dialog header is title + message). View\Confirm::messageInHeader wins when set. // Default: false
  *         popover_menus?: bool|Param, // 2.4: menu / kebab / row-action menus render their panel as a native [popover] (browser top layer: never clipped by table scrollers or cards; nowo-ui-popover.js places it). The partial option `popover` wins. // Default: false
+ *         form_errors_after_widget?: bool|Param, // 2.10: the UiKit form theme (form/nowo_ui_layout.html.twig) prints a field's errors after its widget (and before the help), instead of Symfony's order (label, errors, widget, help). // Default: false
  *         bundles?: array<string, array{ // Default: []
  *             framework_defaults?: bool|Param, // Override of theme.framework_defaults for this bundle (unset = inherit).
  *             classes?: array<string, mixed>,
@@ -1497,6 +1500,35 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             attributes?: array<string, array<string, mixed>>,
  *             header_actions_in_filters?: bool|Param, // list only: render the page-header actions at the end of the filter row instead of the page header (ListPage::headerActionsInFilters wins when set; unset = false).
  *         }>,
+ *     },
+ *     error_pages?: array{ // Kit error pages (2.6): templates/bundles/TwigBundle/Exception/error.html.twig = {% extends '@NowoUiKit/error/status.html.twig' %}.
+ *         layout_template?: scalar|Param|null, // Document the status template extends: the kit layout, or a host template extending it (own <head> assets, brand, chat dock…). // Default: "@NowoUiKit/error/layout.html.twig"
+ *         translation_domain?: scalar|Param|null, // Domain of the page texts (e.g. messages). Keys missing there fall back to UiKit's own NowoUiKitBundle error.* texts. // Default: "NowoUiKitBundle"
+ *         translation_prefix?: scalar|Param|null, // Key prefix: <prefix>.<code>.title|lead|hint|image_alt, <prefix>.generic.*, <prefix>.home|retry|back|retry_after|auto_retry|skip_to_content. // Default: "error"
+ *         home_path?: scalar|Param|null, // Href of the "Back to home" button. // Default: "/"
+ *         illustrations?: array<string, Param|string|array{ // Default: []
+ *             path?: scalar|Param|null,
+ *             width?: int|Param, // Default: null
+ *             height?: int|Param, // Default: null
+ *             webp?: bool|Param|null, // Default: null
+ *             extension?: scalar|Param|null, // Default: null
+ *         }>,
+ *         illustration_width?: int|Param, // Default intrinsic width of the illustrations. // Default: 1024
+ *         illustration_height?: int|Param, // Default intrinsic height of the illustrations. // Default: 683
+ *         webp?: bool|Param, // Illustrations ship a .webp next to the fallback image (<source type="image/webp">). // Default: true
+ *         retry_statuses?: list<int|Param>,
+ *         back_link_statuses?: list<int|Param>,
+ *         auto_retry_seconds?: int|Param, // A 5xx on GET reloads itself after this many seconds (REQ-ERROR-001 item 10; 0 = never). Never on POST. // Default: 600
+ *         theme_storage?: scalar|Param|null, // localStorage key of the theme (data-nowo-ui-theme-storage on <html> and the toggle), e.g. the host's beacon-theme. // Default: "nowo-ui-theme"
+ *         theme_toggle?: bool|Param, // Render the light / dark toggle in the top controls. // Default: true
+ *         html_attributes?: array<string, mixed>,
+ *     },
+ *     shell?: array{ // Signed-in app shell (2.6, @NowoUiKit/shell/_open|_close|_shell|_burger.html.twig; Twig global nowo_ui_kit_shell).
+ *         kit_styles?: bool|Param, // Add the kit shell classes (nowo-ui-shell, nowo-ui-header, nowo-ui-aside…) painted by nowo-ui.css and driven by nowo-ui-shell.js. false: only the app_* slot classes (host shell CSS / JS). // Default: true
+ *         sidebar_cookie?: scalar|Param|null, // Cookie holding the desktop aside mode (e.g. beacon_sidebar), read server-side so the first paint is already collapsed / rail; null = expanded unless the template passes collapsed. // Default: null
+ *         sidebar_hidden_value?: scalar|Param|null, // Cookie value of the hidden aside. // Default: "collapsed"
+ *         sidebar_rail_value?: scalar|Param|null, // Cookie value of the icons-only rail. // Default: "rail"
+ *         sidebar_storage?: scalar|Param|null, // localStorage key of the aside mode (data-nowo-ui-sidebar-storage on the shell root; kit_styles + rail only). // Default: null
  *     },
  * }
  * @psalm-type NowoFormKitConfig = array{

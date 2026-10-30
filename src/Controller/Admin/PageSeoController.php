@@ -10,6 +10,7 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageSeoType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,10 +21,13 @@ use function sprintf;
 
 final class PageSeoController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public function __construct(
         private readonly BuilderPageRepository $pageRepository,
         private readonly BuilderLocales $builderLocales,
         private readonly EntityManagerInterface $entityManager,
+        private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
 
@@ -68,12 +72,15 @@ final class PageSeoController extends AbstractController
             ]);
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/seo.html.twig', [
-            'page'     => $page,
-            'page_key' => $pageKey,
-            'locales'  => $locales,
-            'locale'   => $locale,
-            'form'     => $form,
-        ]);
+        $formView = $form->createView();
+
+        return $this->render($this->pageFactory->template('seo'), $this->pageFactory->context([
+            'page'         => $this->pageFactory->seo($page, $formView),
+            'builder_page' => $page,
+            'page_key'     => $pageKey,
+            'locales'      => $locales,
+            'locale'       => $locale,
+            'form'         => $formView,
+        ]), new Response(null, $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 }

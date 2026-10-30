@@ -164,4 +164,23 @@ final class GrapesDocumentSanitizerTest extends TestCase
         self::assertSame([], $out['grapes']['components'][0]['attributes']);
         self::assertSame([], $out['localeContent']['en']['grapes']['components'][0]['attributes']);
     }
+
+    #[Test]
+    public function dropsCommentsMxssVectorsAndUnsafeUrls(): void
+    {
+        $html = new GrapesDocumentSanitizer(false)->sanitizeHtml(
+            '<p>a<!--><img src=x onerror=alert(2)>--></p><?x <img src=x onerror=alert(4)> ?>'
+            . '<a href="vbscript:msgbox(1)">v</a><a href="data:text/html,<script>alert(1)</script>">d</a><a href="https://ok.test/">ok</a>'
+            . '<svg><animate attributeName="href" values="javascript:alert(1)"/><set attributeName="href" to="javascript:alert(1)"/></svg>'
+            . '<math><mtext><style>x</style></mtext></math><template shadowrootmode="open">t</template><portal src="https://x"></portal>'
+            . '<div srcdoc="&lt;script&gt;" xml:base="javascript:alert(1)//">s</div><img src="data:image/png;base64,AA" alt="">',
+            false,
+        );
+
+        foreach (['<!--', 'onerror', 'vbscript', 'data:text', '<animate', '<set', '<math', '<template', '<portal', 'srcdoc', 'xml:base', '<style'] as $needle) {
+            self::assertStringNotContainsString($needle, $html, $needle);
+        }
+        self::assertStringContainsString('<a href="https://ok.test/">ok</a>', $html);
+        self::assertStringContainsString('src="data:image/png;base64,AA"', $html);
+    }
 }

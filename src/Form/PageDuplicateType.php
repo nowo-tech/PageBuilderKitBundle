@@ -22,12 +22,11 @@ final class PageDuplicateType extends AbstractType
     {
         $builder
             ->add('pageKey', TextType::class, [
-                'label'       => false,
+                'label'       => 'admin.pages.duplicate_key',
                 'constraints' => [
                     new Assert\NotBlank(),
                     new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
                 ],
-                'attr' => ['class' => 'd-none'],
             ])
             ->add('_redirect', HiddenType::class, [
                 'required' => false,

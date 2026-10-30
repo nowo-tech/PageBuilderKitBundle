@@ -351,4 +351,19 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
 
         self::assertFalse($container->hasDefinition('nowo_page_builder_kit.access_checker.default'));
     }
+
+    #[Test]
+    public function loadThrowsForServiceSanitizeStrategyWithoutService(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', []);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('html.sanitize.service is required');
+
+        new NowoPageBuilderKitExtension()->load([[
+            'security' => ['allow_unauthenticated' => true],
+            'html'     => ['sanitize' => ['strategy' => 'service']],
+        ]], $container);
+    }
 }

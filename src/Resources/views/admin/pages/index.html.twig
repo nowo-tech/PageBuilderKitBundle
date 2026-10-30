@@ -1,122 +1,42 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Pages list (REQ-UI-003): UiKit list scaffold. Variable: page (View\ListPage from PageBuilderKitPageFactory::index():
+  header admin.pages.title / admin.pages.intro with Templates (templates capability); columns pageKey (required),
+  status, engine (priority 2); rows = list<BuilderPage>; row actions by capability: Edit (canvas, or the classic
+  sections editor), Content, SEO, Export, Duplicate (POST form behind a dialog asking the new key) and Revisions;
+  Pagination (50 per page); EmptyState admin.pages.empty). Also: engines (page key => grapesjs | classic),
+  create_form (FormView, null without the layout capability), pages, current_page, total_pages, duplicate_forms.
+  Data blocks filled: nowo_ui_list_row (cells), nowo_ui_list_after (the "Create page" card).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% set _css_fw = nowo_page_builder_css_framework() %}
-{% if _css_fw starts with 'bootstrap' or _css_fw == 'tabler' %}
-    {% form_theme create_form 'bootstrap_5_layout.html.twig' %}
-{% endif %}
-
-{% block page_title %}{{ 'admin.pages.title'|trans }}{% endblock %}
-
-{% block header_actions %}
-    {% if nowo_page_builder_can('templates') %}
-        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates') }}">{{ 'admin.templates.title'|trans }}</a>
-    {% endif %}
+{% block nowo_ui_list_row %}
+    {% set _b = page.bundle %}
+    {% set _cell = nowo_ui_class('table_cell', _b) %}
+    {% set _engine = engines[row.pageKey]|default('classic') %}
+    <td class="{{ _cell }}" data-label="{{ 'admin.pages.col_key'|trans }}" data-required="1"><code class="{{ nowo_ui_class('code', _b) }}">{{ row.pageKey }}</code></td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.pages.col_status'|trans }}">
+        <span class="{{ nowo_ui_class(row.status.value == 'published' ? 'badge_success' : 'badge_neutral', _b) }}">{{ ('admin.status.' ~ row.status.value)|trans }}</span>
+    </td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.pages.col_engine'|trans }}" data-nowo-ui-priority="2">
+        {% if _engine == 'grapesjs' %}
+            <span class="{{ nowo_ui_class('badge_info', _b) }}">{{ 'admin.pages.engine_grapesjs'|trans }}</span>
+        {% else %}
+            <span class="{{ nowo_ui_class('badge_warning', _b) }}">{{ 'admin.pages.legacy'|trans }}</span>
+        {% endif %}
+    </td>
 {% endblock %}
 
-{% block admin %}
-    <section class="pbk-pages mb-4">
-        <h2 class="h4">{{ 'admin.pages.list'|trans }}</h2>
-        {% if pages is empty %}
-            <p class="text-muted">{{ 'admin.pages.empty'|trans }}</p>
-        {% else %}
-            <ul class="list-group">
-                {% for page in pages %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                        <span>
-                            <strong>{{ page.pageKey }}</strong>
-                            <span class="badge bg-secondary ms-2">{{ page.status.value }}</span>
-                            {% set _engine = page.document and page.document.structure.engine|default('classic') %}
-                            {% if _engine == 'grapesjs' %}
-                                <span class="badge text-bg-primary ms-1">Grapes</span>
-                            {% else %}
-                                <span class="badge text-bg-warning ms-1">{{ 'admin.pages.legacy'|trans }}</span>
-                            {% endif %}
-                        </span>
-                        <span class="d-flex gap-2 flex-wrap">
-                        {% if nowo_page_builder_can('content') or nowo_page_builder_can('layout') %}
-                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_content', {pageKey: page.pageKey}) }}">
-                                {{ 'admin.pages.content'|trans }}
-                            </a>
-                        {% endif %}
-                        {% if nowo_page_builder_can('content') %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_seo', {pageKey: page.pageKey}) }}">
-                            {{ 'admin.pages.seo'|trans }}
-                        </a>
-                        {% endif %}
-                        {% if nowo_page_builder_can('layout') or nowo_page_builder_can('content') or nowo_page_builder_can('templates') %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_document_export', {pageKey: page.pageKey}) }}">
-                            {{ 'admin.pages.export'|trans }}
-                        </a>
-                        {% endif %}
-                        {% if nowo_page_builder_can('layout') %}
-                        {{ form_start(duplicate_forms[page.pageKey], { attr: { class: 'd-inline' } }) }}
-                            {% for child in duplicate_forms[page.pageKey] %}
-                                {% if not child.rendered %}
-                                    {{ form_widget(child) }}
-                                {% endif %}
-                            {% endfor %}
-                            <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'admin.pages.duplicate'|trans }}</button>
-                        {{ form_end(duplicate_forms[page.pageKey]) }}
-                        {% endif %}
-                        {% if nowo_page_builder_revisions_enabled() and nowo_page_builder_can('layout') %}
-                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_revisions', {pageKey: page.pageKey}) }}">
-                                {{ 'admin.pages.revisions'|trans }}
-                            </a>
-                        {% endif %}
-                        {% if nowo_page_builder_can('layout') %}
-                            {% if _engine == 'grapesjs' %}
-                                <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_canvas', {pageKey: page.pageKey}) }}">
-                                    {{ 'admin.pages.edit'|trans }}
-                                </a>
-                            {% else %}
-                                <a class="btn btn-sm btn-warning" href="{{ path('admin_page_builder_sections', {pageKey: page.pageKey}) }}">
-                                    {{ 'admin.pages.sections'|trans }}
-                                    <span class="badge text-bg-dark ms-1">{{ 'admin.pages.legacy'|trans }}</span>
-                                </a>
-                            {% endif %}
-                        {% elseif nowo_page_builder_can('content') %}
-                            <a class="btn btn-sm btn-primary" href="{{ path('admin_page_builder_content', {pageKey: page.pageKey}) }}">
-                                {{ 'admin.pages.content'|trans }}
-                            </a>
-                        {% endif %}
-                        </span>
-                    </li>
-                {% endfor %}
-            </ul>
-            {% if total_pages|default(1) > 1 %}
-                <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="{{ 'admin.pages.pagination'|trans }}">
-                    {% if current_page > 1 %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_list', {page: current_page - 1}) }}">{{ 'admin.pages.previous'|trans }}</a>
-                    {% else %}
-                        <span></span>
-                    {% endif %}
-                    <span class="text-muted small">{{ 'admin.pages.page_of'|trans({'%page%': current_page, '%pages%': total_pages}) }}</span>
-                    {% if current_page < total_pages %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ path('admin_page_builder_list', {page: current_page + 1}) }}">{{ 'admin.pages.next'|trans }}</a>
-                    {% else %}
-                        <span></span>
-                    {% endif %}
-                </nav>
-            {% endif %}
-        {% endif %}
-    </section>
-
-    {% if nowo_page_builder_can('layout') %}
-    <section class="pbk-create card">
-        <div class="card-header fw-semibold">{{ 'admin.pages.create'|trans }}</div>
-        <div class="card-body">
-            {{ form_start(create_form, { attr: { class: 'pbk-create-form row g-3' } }) }}
-                {% for child in create_form %}
-                    {% if not child.rendered %}
-                        <div class="col-md-4">{{ form_row(child) }}</div>
-                    {% endif %}
-                {% endfor %}
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-success w-100">{{ 'admin.pages.create_submit'|trans }}</button>
-                </div>
-            {{ form_end(create_form) }}
-        </div>
-    </section>
+{% block nowo_ui_list_after %}
+    {% if create_form|default(null) %}
+        {% set _b = page.bundle %}
+        <section class="{{ nowo_ui_class('card', _b) }} pbk-create"{{ nowo_ui_attrs('card', _b) }} data-testid="pbk-create-page">
+            <header class="{{ nowo_ui_class('card_header', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'admin.pages.create'|trans }}</h2>
+            </header>
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                {{ include(nowo_ui_partial('section_form', _b), {form: create_form, submit_label: 'admin.pages.create_submit'|trans, bundle: _b, nowo_ui_page_type: nowo_ui_page_type}, false) }}
+            </div>
+        </section>
     {% endif %}
 {% endblock %}

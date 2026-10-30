@@ -11,6 +11,7 @@ use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -29,6 +30,7 @@ final class PageCanvasController extends AbstractController
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
         private readonly GrapesJsFrontendConfig $grapesJsFrontendConfig,
         private readonly GrapesDocumentSanitizer $grapesDocumentSanitizer,
+        private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
 
@@ -60,8 +62,9 @@ final class PageCanvasController extends AbstractController
         $schema                        = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
         $grapesConfig['contentFields'] = $this->buildContentFieldCatalog($schema);
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/canvas.html.twig', [
-            'page'                   => $page,
+        return $this->render($this->pageFactory->template('canvas'), $this->pageFactory->context([
+            'page'                   => $this->pageFactory->canvas($page),
+            'builder_page'           => $page,
             'page_key'               => $pageKey,
             'locales'                => $this->builderLocales->getAll(),
             'default_locale'         => $this->builderLocales->getDefault(),
@@ -75,7 +78,7 @@ final class PageCanvasController extends AbstractController
             'document_unpublish_url' => $this->generateUrl('admin_page_builder_document_unpublish', ['pageKey' => $pageKey]),
             'page_status'            => $page->getStatus()->value,
             'preview_url'            => $this->generateUrl('page_builder_public_render', ['pageKey' => $pageKey]),
-        ]);
+        ]));
     }
 
     /**

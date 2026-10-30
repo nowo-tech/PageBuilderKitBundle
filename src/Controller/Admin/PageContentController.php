@@ -17,6 +17,7 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -39,6 +40,8 @@ use function trim;
 
 final class PageContentController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public function __construct(
         private readonly BuilderPageRepository $pageRepository,
         private readonly BuilderLocales $builderLocales,
@@ -48,6 +51,7 @@ final class PageContentController extends AbstractController
         private readonly PageBuilderKitAccessGuard $accessGuard,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
         private readonly AssetUploadHandler $assetUploadHandler,
+        private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
 
@@ -173,23 +177,29 @@ final class PageContentController extends AbstractController
             ])->createView();
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/content.html.twig', [
-            'page'            => $page,
-            'pageKey'         => $pageKey,
-            'schema'          => $schemaView,
-            'fieldValues'     => $values,
-            'locales'         => $locales,
-            'active_locale'   => $active,
-            'field_types'     => ContentFieldType::values(),
-            'can_edit_schema' => $this->accessGuard->checker()->canLayout(),
-            'can_edit_values' => $this->accessGuard->checker()->canContent(),
-            'reference_pages' => $referencePages,
-            'schema_add_form' => $this->createForm(ContentSchemaAddType::class, [
-                'schema_action' => 'add',
-            ], [
-                'action' => $schemaAction,
-                'method' => 'POST',
-            ])->createView(),
+        $canSchema     = $this->accessGuard->checker()->canLayout();
+        $canValues     = $this->accessGuard->checker()->canContent();
+        $schemaAddForm = $this->createForm(ContentSchemaAddType::class, [
+            'schema_action' => 'add',
+        ], [
+            'action' => $schemaAction,
+            'method' => 'POST',
+        ])->createView();
+
+        return $this->render($this->pageFactory->template('content'), $this->pageFactory->context([
+            'page'                  => $this->pageFactory->content($page, $schemaAddForm, $valuesForm, $canSchema, $canValues),
+            'schema_table'          => $this->pageFactory->schemaTable($schemaView, $removeForms),
+            'builder_page'          => $page,
+            'pageKey'               => $pageKey,
+            'schema'                => $schemaView,
+            'fieldValues'           => $values,
+            'locales'               => $locales,
+            'active_locale'         => $active,
+            'field_types'           => ContentFieldType::values(),
+            'can_edit_schema'       => $canSchema,
+            'can_edit_values'       => $canValues,
+            'reference_pages'       => $referencePages,
+            'schema_add_form'       => $schemaAddForm,
             'schema_remove_forms'   => $removeForms,
             'values_form'           => $valuesForm,
             'asset_upload_enabled'  => $assetUploadEnabled,
@@ -203,7 +213,7 @@ final class PageContentController extends AbstractController
             'asset_upload_csrf' => $assetUploadEnabled
                 ? $this->csrfTokenManager->getToken(PageAssetUploadController::CSRF_TOKEN_ID)->getValue()
                 : '',
-        ]);
+        ]));
     }
 
     #[Route(

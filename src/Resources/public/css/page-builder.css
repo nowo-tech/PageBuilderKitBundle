@@ -1,29 +1,106 @@
-/* Admin forms (SEO, create page) — readable when Bootstrap form theme is active */
-.pbk-admin .pbk-seo-form .form-label,
-.pbk-admin .pbk-create-form .form-label {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-weight: 600;
+/*
+ * Admin pages (REQ-UI-003): the UiKit scaffolds and theme slots style the chrome (cards, tables, forms, buttons);
+ * these rules only lay out bundle-specific content and read UiKit tokens (--nowo-ui-*), never a CSS framework.
+ */
+.pbk-canvas__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
 }
-.pbk-admin .pbk-seo-form .form-control,
-.pbk-admin .pbk-create-form .form-control {
+.pbk-canvas__status {
+    min-height: 1.25rem;
+    margin-top: 0.5rem;
+}
+.pbk-canvas__status[data-pbk-state="error"] {
+    color: var(--nowo-ui-danger, #b91c1c);
+}
+.pbk-canvas__status[data-pbk-state="success"] {
+    color: var(--nowo-ui-success, #15803d);
+}
+.pbk-content-field,
+.pbk-seo-group {
+    margin: 0 0 1rem;
+}
+.pbk-media-actions {
+    margin: 0.25rem 0 0.5rem;
+}
+.pbk-image-preview {
     display: block;
+    max-height: 80px;
+    border: 1px solid var(--nowo-ui-border, #e2e8f0);
+    border-radius: var(--nowo-ui-radius, 0.375rem);
+}
+.pbk-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    gap: 0.5rem;
+}
+.pbk-media-grid__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--nowo-ui-border, #e2e8f0);
+    border-radius: var(--nowo-ui-radius, 0.375rem);
+    background: var(--nowo-ui-surface, #fff);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.pbk-media-grid__item img {
     width: 100%;
-    max-width: 100%;
+    max-height: 96px;
+    object-fit: cover;
+    border-radius: var(--nowo-ui-radius, 0.375rem);
 }
-.pbk-admin .pbk-seo-form textarea.form-control {
-    min-height: 5rem;
+.pbk-media-grid__name {
+    overflow: hidden;
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.pbk-admin .pbk-seo-form .card-header,
-.pbk-admin .pbk-create.card .card-header {
-    background: #f8fafc;
+.pbk-input--code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.875rem;
 }
-
-.pbk-admin .pbk-canvas {
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    padding: 1rem;
-    background: #fff;
+.pbk-template-tools {
+    margin-bottom: 1rem;
+}
+.pbk-template-save {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+.pbk-sections-block {
+    margin-bottom: 1rem;
+}
+.pbk-sections-block > summary {
+    cursor: pointer;
+}
+.pbk-sections-block__column {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border: 1px dashed var(--nowo-ui-border, #e2e8f0);
+    border-radius: var(--nowo-ui-radius, 0.375rem);
+}
+.pbk-sections-block__widget[data-pbk-depth="1"] { margin-inline-start: 1.25rem; }
+.pbk-sections-block__widget[data-pbk-depth="2"] { margin-inline-start: 2.5rem; }
+.pbk-sections-block__widget[data-pbk-depth="3"] { margin-inline-start: 3.75rem; }
+.pbk-diff-summary,
+.pbk-diff-paths {
+    margin: 0 0 0.75rem;
+    padding-inline-start: 1.25rem;
+}
+.pbk-diff-panel {
+    margin-bottom: 1rem;
+}
+.pbk-diff-sbs__cell--empty {
+    color: var(--nowo-ui-muted, #64748b);
 }
 
 .pbk-canvas--grapesjs-full {

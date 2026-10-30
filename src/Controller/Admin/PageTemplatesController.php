@@ -15,6 +15,7 @@ use Nowo\PageBuilderKitBundle\Form\TemplateSaveType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,6 +34,8 @@ use function trim;
 
 final class PageTemplatesController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public const string CSRF_TOKEN_ID = 'page_builder_document';
 
     public function __construct(
@@ -40,6 +43,7 @@ final class PageTemplatesController extends AbstractController
         private readonly BuilderPageRepository $pageRepository,
         private readonly BuilderLocales $builderLocales,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
+        private readonly PageBuilderKitPageFactory $pageFactory,
         private readonly PageBuilderKitTraceInterface $trace = new NullPageBuilderKitTrace(),
     ) {
     }
@@ -75,7 +79,8 @@ final class PageTemplatesController extends AbstractController
             ])->createView();
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/templates.html.twig', [
+        return $this->render($this->pageFactory->template('templates'), $this->pageFactory->context([
+            'page'        => $this->pageFactory->templates($templates, $applyForms, $deleteForms),
             'templates'   => $templates,
             'pages'       => $pages,
             'save_forms'  => $saveForms,
@@ -85,7 +90,7 @@ final class PageTemplatesController extends AbstractController
             ])->createView(),
             'apply_forms'  => $applyForms,
             'delete_forms' => $deleteForms,
-        ]);
+        ]));
     }
 
     #[Route('/pages/{pageKey}/templates', name: 'admin_page_builder_templates_save', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['POST'])]

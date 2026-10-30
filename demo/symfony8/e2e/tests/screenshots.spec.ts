@@ -108,11 +108,12 @@ test.describe('PageBuilderKit screenshots (builder manual)', () => {
     await shot(page, 'builder-04-fields-public.png');
   });
 
-  test('builder-01 — admin page list', async ({ page }) => {
+  test('builder-01 / pages — admin page list (UiKit list scaffold)', async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto('/admin/page-builder/pages');
-    await expect(page.getByText(/home|pages|páginas/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="pbk-pages"] tbody tr').first()).toBeVisible({ timeout: 15000 });
     await shot(page, 'builder-01-page-list.png');
+    await shot(page, 'pages.png');
   });
 
   test('builder-02 / interaction — GrapesJS canvas', async ({ page }) => {

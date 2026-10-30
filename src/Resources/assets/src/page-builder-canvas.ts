@@ -1,6 +1,7 @@
 /**
  * Page Builder Kit — GrapesJS canvas (ESM + official plugins).
- * Loads GrapesJS and community plugins from esm.sh; persists schema v2.
+ * Loads GrapesJS and community plugins from `pluginCdnBase` (default esm.sh); persists schema v2. The editor stylesheet
+ * is a local asset (css/grapes.min.css) linked by the canvas page.
  * Built with Vite from this file → src/Resources/public/js/page-builder-canvas.js
  *
  * GrapesJS itself is typed loosely (CDN ESM); local config/structure helpers live in grapes-types.ts.
@@ -57,19 +58,23 @@ const PLUGIN_SPECS: Record<string, PluginSpec> = {
   },
 };
 
-async function importDefault(url: string): Promise<GrapesModule> {
+/** Loads one ESM module by URL and returns its default export (injectable for tests). */
+export type ModuleImporter = (url: string) => Promise<GrapesModule>;
+
+/* v8 ignore next 4 -- native dynamic import of a remote ESM URL; tests inject an importer */
+export async function importDefault(url: string): Promise<GrapesModule> {
   const mod = await import(/* @vite-ignore */ url);
   return mod.default || mod;
 }
 
-async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{
+export async function loadGrapesStack(config: GrapesFrontendConfig, importer: ModuleImporter = importDefault): Promise<{
   grapesjs: GrapesModule;
   plugins: GrapesModule[];
   pluginsOpts: Record<PropertyKey, Record<string, unknown>>;
 }> {
   const base = (config.pluginCdnBase || 'https://esm.sh').replace(/\/$/, '');
   const version = config.cdnVersion || '0.22.9';
-  const grapesjs = await importDefault(`${base}/grapesjs@${version}`);
+  const grapesjs = await importer(`${base}/grapesjs@${version}`);
   const plugins: GrapesModule[] = [];
   // GrapesJS indexes pluginsOpts by plugin function reference.
   const pluginsOpts: Record<PropertyKey, Record<string, unknown>> = {};
@@ -88,7 +93,7 @@ async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{
     const spec = PLUGIN_SPECS[key];
     if (!spec) continue;
     try {
-      const plugin = await importDefault(`${base}/${spec.pkg}`);
+      const plugin = await importer(`${base}/${spec.pkg}`);
       plugins.push(plugin);
       pluginsOpts[plugin as PropertyKey] = { ...spec.opts };
       if (key === 'preset_webpage') {
@@ -103,7 +108,36 @@ async function loadGrapesStack(config: GrapesFrontendConfig): Promise<{
   return { grapesjs, plugins, pluginsOpts };
 }
 
-async function boot() {
+/** Status line state: `error` / `success` (styled through `[data-pbk-state]`, no CSS framework class). */
+function setStatusState(el: Element, msg: string, isError: boolean): void {
+  el.textContent = msg || '';
+  if (isError) {
+    el.setAttribute('data-pbk-state', 'error');
+  } else if (msg) {
+    el.setAttribute('data-pbk-state', 'success');
+  } else {
+    el.removeAttribute('data-pbk-state');
+  }
+}
+
+/** Marks the active locale tab: swaps the UiKit `tab` / `tab_active` slot classes and `aria-current`. */
+function markLocaleTabs(root: Element, tabs: Element[], locale: string): void {
+  const inactive = root.getAttribute('data-pbk-class-tab');
+  const active = root.getAttribute('data-pbk-class-tab-active');
+  tabs.forEach(function (btn) {
+    const current = btn.getAttribute('data-pbk-locale-tab') === locale;
+    if (active !== null && inactive !== null) {
+      btn.className = current ? active : inactive;
+    }
+    if (current) {
+      btn.setAttribute('aria-current', 'page');
+    } else {
+      btn.removeAttribute('aria-current');
+    }
+  });
+}
+
+export async function boot(importer: ModuleImporter = importDefault): Promise<void> {
   const rootEl = document.getElementById('page-builder-canvas');
   if (!rootEl) return;
   const root: HTMLElement = rootEl;
@@ -111,12 +145,10 @@ async function boot() {
   const statusEl = root.querySelector('[data-pbk-status]');
   const setBootStatus = (msg: string, isError = false): void => {
     if (!statusEl) return;
-    statusEl.textContent = msg || '';
-    statusEl.classList.toggle('text-danger', !!isError);
-    statusEl.classList.toggle('text-success', !isError && !!msg);
+    setStatusState(statusEl, msg, isError);
   };
 
-  setBootStatus('Loading GrapesJS…');
+  setBootStatus(root.getAttribute('data-pbk-label-loading') || 'Loading GrapesJS…');
 
   const saveUrl = root.getAttribute('data-pbk-save-url');
   const publishUrl = root.getAttribute('data-pbk-publish-url');
@@ -148,7 +180,7 @@ async function boot() {
   let plugins: GrapesModule[];
   let pluginsOpts: Record<PropertyKey, Record<string, unknown>>;
   try {
-    ({ grapesjs, plugins, pluginsOpts } = await loadGrapesStack(config));
+    ({ grapesjs, plugins, pluginsOpts } = await loadGrapesStack(config, importer));
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : String(err);
@@ -212,12 +244,7 @@ async function boot() {
   setBootStatus('');
 
     function setStatus(msg: string, isError = false): void {
-      if (!statusEl) {
-        return;
-      }
-      statusEl.textContent = msg || '';
-      statusEl.classList.toggle('text-danger', !!isError);
-      statusEl.classList.toggle('text-success', !isError && !!msg);
+      setBootStatus(msg, isError);
     }
 
     function loadLocale(locale: string): void {
@@ -233,9 +260,7 @@ async function boot() {
         editor.setComponents('');
         editor.setStyle('');
       }
-      localeTabs.forEach(function (btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-pbk-locale-tab') === locale);
-      });
+      markLocaleTabs(root, localeTabs, locale);
     }
 
     function captureActiveLocale() {
@@ -1033,7 +1058,8 @@ async function boot() {
     loadLocale(activeLocale);
 
     localeTabs.forEach(function (btn) {
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault();
         var next = btn.getAttribute('data-pbk-locale-tab');
         if (!next || next === activeLocale) {
           return;
@@ -1086,8 +1112,10 @@ async function boot() {
       if (badge) {
         badge.setAttribute('data-pbk-status-value', status);
         badge.textContent = status === 'published' ? labelPublished : labelDraft;
-        badge.classList.toggle('text-bg-success', status === 'published');
-        badge.classList.toggle('text-bg-secondary', status !== 'published');
+        var badgeClass = badge.getAttribute(status === 'published' ? 'data-pbk-class-published' : 'data-pbk-class-draft');
+        if (badgeClass !== null) {
+          badge.className = badgeClass;
+        }
       }
       document.querySelectorAll('[data-pbk-action="publish"]').forEach(function (btn) {
         (btn as HTMLElement).hidden = status === 'published';
@@ -1148,12 +1176,13 @@ async function boot() {
     });
 }
 
-boot().catch((err: unknown) => {
+export function reportBootError(err: unknown): void {
   console.error(err);
   const el = document.querySelector('[data-pbk-status]');
   if (el) {
     const message = err instanceof Error ? err.message : String(err);
-    el.textContent = 'GrapesJS boot error: ' + message;
-    el.classList.add('text-danger');
+    setStatusState(el, 'GrapesJS boot error: ' + message, true);
   }
-});
+}
+
+boot().catch(reportBootError);

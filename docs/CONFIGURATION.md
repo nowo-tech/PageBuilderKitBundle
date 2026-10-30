@@ -37,8 +37,8 @@ nowo_page_builder_kit:
         allow_unauthenticated: false
     web_ui:
         path_prefix: /admin/page-builder
-        layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
-        css_framework: tailwind
+        layout_template: null          # null = nowo_ui_kit.layouts.admin (REQ-UI-003)
+        templates: {}                  # per-page overrides, e.g. { index: 'admin/pbk/index.html.twig' }
     seo:
         site_name: ''
         default_og_image: ''
@@ -61,6 +61,7 @@ nowo_page_builder_kit:
     grapesjs:
         enabled: true
         cdn_version: '0.22.9'
+        module_base_url: 'https://esm.sh'   # ESM mirror of GrapesJS + plugins (https:// URL or root-relative path)
         height: 'calc(100vh - 220px)'
         allow_scripts: false
         allow_custom_code: true
@@ -81,7 +82,7 @@ nowo_page_builder_kit:
                 folder: page-builder
                 private: false
                 public_base_url: ''
-        canvas_styles: []   # empty → derive from web_ui.css_framework
+        canvas_styles: []   # CSS URLs of the canvas iframe; empty → derived from the deprecated web_ui.css_framework
         assets: []          # empty → stock picsum/pravatar placeholders
         plugins:
             preset_webpage: true
@@ -109,7 +110,7 @@ PHP default and Flex recipe use `html.sanitize.strategy: allowlist`. Set `none` 
 | `default_locale` | string | `es` | Default locale for fallback and `BuilderLocales`. |
 | `locales` | list<string> | `[es, en]` | Locales persisted for widget props and admin UI. |
 | `security` | map | see YAML | Access control for admin routes. |
-| `web_ui` | map | see YAML | Admin shell layout and CSS framework hint. |
+| `web_ui` | map | see YAML | Admin URL prefix, layout and per-page template overrides (UiKit page contract). |
 | `seo` | map | see YAML | Defaults for page-level meta / Open Graph / robots. |
 | `doctrine` | map | see YAML | Table prefixing and connection name for host alignment. |
 | `html` | map | see YAML | Rich-text sanitization for widgets that store HTML. |
@@ -179,8 +180,60 @@ Twig: `nowo_page_builder_can('content')`, `nowo_page_builder_can_edit()`.
 | Key | Default | Description |
 | --- | --- | --- |
 | `path_prefix` | `/admin/page-builder` | URL prefix for **all admin** routes (list, canvas, sections, SEO, versions, document API, asset upload). Must start with `/` and must **not** end with `/`. Public `/p/{pageKey}` is unchanged. |
-| `layout_template` | `@NowoPageBuilderKitBundle/admin/layout.html.twig` | Base layout for admin screens. |
-| `css_framework` | `tailwind` | Styling hint for admin and widget templates. Allowed: `bootstrap`, `bootstrap4`, `bootstrap5`, `tabler`, `tailwind`, `foundation`, `custom`, `none`. |
+| `layout_template` | `null` | Layout the admin pages extend (REQ-UI-003). `null` = UiKit `nowo_ui_kit.layouts.admin` (set it once for every Nowo bundle). A layout rendering the UiKit canonical blocks is used as is; a 1.x layout rendering `{% block admin %}` is wrapped in the deprecated bridge `admin/_legacy_layout.html.twig`. The 1.x default `@NowoPageBuilderKitBundle/admin/layout.html.twig` is normalised to `null`. |
+| `templates` | `{}` | Per-page template overrides, page id ⇒ template. Ids: `index`, `canvas`, `content`, `seo`, `sections`, `revisions`, `revision_diff`, `templates` (others fail the compilation). Use a thin `{% extends '@!NowoPageBuilderKitBundle/admin/pages/<page>.html.twig' %}` that overrides one data block — see [TEMPLATES](TEMPLATES.md). |
+| `css_framework` | `tailwind` | **Deprecated since 1.12.** The admin pages take the CSS stack from `nowo_ui_kit.css_framework` (theme slots). The value only seeds the default GrapesJS canvas iframe styles when `grapesjs.canvas_styles` is empty (Bootstrap 4 / 5, Tabler, Foundation from jsDelivr) and feeds the deprecated `nowo_page_builder_css_framework()`. Allowed: `bootstrap`, `bootstrap4`, `bootstrap5`, `tabler`, `tailwind`, `foundation`, `custom`, `none`. |
+
+**Host integration (UiKit page contract).** The admin pages are UiKit scaffolds (see [TEMPLATES](TEMPLATES.md)), so the
+host configures the shell and the look once in UiKit, not here:
+
+```yaml
+nowo_ui_kit:
+    css_framework: bootstrap5          # or tailwind | foundation | tabler | custom | none
+    layouts:
+        admin: 'layouts/admin.html.twig'   # your admin layout, or a bridge using @NowoUiKit/layout/_bridge.html.twig
+    theme:
+        bundles:
+            NowoPageBuilderKitBundle: { classes: { table: 'table table-sm' } }   # optional per-bundle exception
+```
+
+CSS stack per host (no bundle template is copied; markup switches through the UiKit theme slots):
+
+```yaml
+# Bootstrap 5 host (Tabler: tabler)
+nowo_ui_kit: { css_framework: bootstrap5, icon_set: bootstrap-icons }
+```
+
+```yaml
+# Tailwind host: map the slots you want to restyle
+nowo_ui_kit:
+    css_framework: tailwind
+    icon_set: svg_inline
+    theme: { classes: { btn_primary: 'rounded bg-indigo-600 px-3 py-1.5 text-white', table: 'min-w-full text-sm' } }
+```
+
+```yaml
+# Foundation host
+nowo_ui_kit: { css_framework: foundation, icon_set: none }
+```
+
+```yaml
+# Own design system: semantic nowo-ui-* classes + tokens only
+nowo_ui_kit:
+    css_framework: custom
+    row_actions_display: text
+    theme: { tokens: { primary: 'var(--brand)', radius: '0.5rem' } }
+```
+
+- **Row actions** (edit, content, SEO, export, duplicate, versions; diff / restore; export / create page / delete;
+  remove field) follow `nowo_ui_kit.row_actions_display` (`icon`, `text`, `icon_text`) through the UiKit `action`
+  partial.
+- **Dialogs**: duplicate, restore, create-from-template, delete and remove use the UiKit confirm `<dialog>`; the media
+  library of the content page is the UiKit `dialog` partial. Both need the UiKit `scripts` partial in the layout (the
+  UiKit document layout and `@NowoUiKit/layout/_bridge.html.twig` include it).
+- **Form themes**: the admin forms render with the host form theme (`twig.form_themes`, e.g.
+  `bootstrap_5_layout.html.twig`, a Tailwind or Foundation theme); the bundle adds no framework class to its form
+  types. The FormKit profile `page_builder_kit` (when FormKit is installed) only adds `nowo-ui-input`.
 
 Example — mount admin under `/cms`:
 
@@ -223,7 +276,8 @@ Sanitization runs when `DocumentService` saves widget props and when widgets san
 | Key | Default | Description |
 | --- | --- | --- |
 | `enabled` | `true` | Feature flag for the GrapesJS canvas. |
-| `cdn_version` | `0.22.9` | GrapesJS core version loaded from esm.sh / CSS CDN. |
+| `cdn_version` | `0.22.9` | GrapesJS core version imported from `module_base_url` (`<base>/grapesjs@<cdn_version>`). The editor CSS is the vendored 0.22.9 copy: keep both in sync. |
+| `module_base_url` | `https://esm.sh` | ESM base the canvas imports GrapesJS and the enabled plugins from (`<base>/<package>@<version>`). Set it to your own mirror (an `https://` URL or a root-relative path) to remove the esm.sh dependency and keep third-party hosts out of `script-src` — see [SECURITY](SECURITY.md#content-security-policy-nonce). Other schemes, protocol-relative URLs and backslashes are rejected. |
 | `height` | `calc(100vh - 220px)` | Editor container height. |
 | `allow_scripts` | `false` | Persist/render `<script>` blocks. **XSS risk**. |
 | `allow_custom_code` | `true` | Enable Custom HTML + `grapesjs-custom-code` plugin. |
@@ -233,7 +287,7 @@ Sanitization runs when `DocumentService` saves widget props and when widgets san
 | `notice_on_unload` | `false` | Browser “unsaved changes” prompt. |
 | `asset_embed_as_base64` | `true` | Embed dropped files as base64 when upload is disabled. Forced `false` when `assets_upload.enabled`. |
 | `assets_upload` | map | See [Asset uploads](#asset-uploads). |
-| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe. Empty → derive from `web_ui.css_framework` (Bootstrap, etc.). |
+| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe (what the edited page looks like). Empty → derived from the deprecated `web_ui.css_framework` (Bootstrap, etc.); set it explicitly instead. The editor's own styles are local assets (`css/grapes.min.css`, `css/grapick.min.css`); the GrapesJS scripts are loaded at run time from `module_base_url` at `cdn_version`. |
 | `assets` | `[]` | Initial Asset Manager entries (`type`, `src`, `name`, `width`, `height`). Empty → stock demo images. |
 | `plugins.*` | mostly `true` | Toggle official plugins (see below). |
 
@@ -333,8 +387,8 @@ The bundle registers Twig functions (not globals):
 
 | Function | Meaning |
 | --- | --- |
-| `nowo_page_builder_layout_template()` | Active admin layout template id |
-| `nowo_page_builder_css_framework()` | Selected CSS framework hint |
+| `nowo_page_builder_layout_template()` | **Deprecated since 1.12** — layout of 1.x page copies (`web_ui.layout_template`, else the deprecated `admin/layout.html.twig`, which extends the UiKit admin layout) |
+| `nowo_page_builder_css_framework()` | **Deprecated since 1.12** — the deprecated `web_ui.css_framework` value |
 | `nowo_page_builder_render(pageKey, locale?)` | Rendered page tree for Twig |
 | `nowo_page_builder_widget_types()` | Registered widget type metadata |
 

@@ -21,7 +21,7 @@ final class TemplateImportType extends AbstractType
             'label'       => 'admin.templates.payload',
             'constraints' => [new Assert\NotBlank()],
             'attr'        => [
-                'class'       => 'form-control font-monospace small mb-2',
+                'class'       => 'pbk-input--code',
                 'rows'        => 6,
                 'placeholder' => 'admin.templates.payload',
             ],

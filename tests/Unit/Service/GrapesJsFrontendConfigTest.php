@@ -111,4 +111,11 @@ final class GrapesJsFrontendConfigTest extends TestCase
         self::assertSame('test/pack', $array['blockPacks'][0]['name']);
         self::assertSame('test-block', $array['blockPacks'][0]['blocks'][0]['id']);
     }
+
+    #[Test]
+    public function moduleBaseUrlIsConfigurable(): void
+    {
+        self::assertSame('https://esm.sh', new GrapesJsFrontendConfig()->toArray()['pluginCdnBase']);
+        self::assertSame('/vendor/esm', new GrapesJsFrontendConfig(moduleBaseUrl: '/vendor/esm')->toArray()['pluginCdnBase']);
+    }
 }

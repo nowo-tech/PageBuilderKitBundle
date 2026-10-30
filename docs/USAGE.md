@@ -553,8 +553,11 @@ Declare a multilingual variable in any host template. Visitors see the stored va
 | Type | Display | Persist |
 | --- | --- | --- |
 | `string` / `text` / `number` / `url` / `image` / `icon` / `bool` / `select` | escaped (or semantic HTML) | as-is |
-| `html` / `richtext` | `|raw` after allowlist sanitize on save | sanitized |
-| `raw` | `|raw` trusted | **not** sanitized |
+| `html` / `richtext` | HTML through `|pbk_harden_html` (HTML5 final gate), after the allowlist sanitize on save | sanitized |
+| `raw` | HTML through `|pbk_harden_html` (trusted editors; the gate still drops scripts, handlers and script URLs) | **not** sanitized |
+
+Host templates never need `|raw` for editor HTML: `nowo_page_builder_field()` and `nowo_page_builder_hydrate_binds()`
+return safe markup, and `|pbk_harden_html` covers any other editor HTML you print.
 
 - Field **labels** are multilingual: `labels[locale]` with fallback to `default_locale`, then singular `label`, then the field key.
 - First save from the modal **creates** the field definition on the page document (`structure.fields` + `fieldValues`).
@@ -691,13 +694,34 @@ Controllers may inject `PageBuilderKitAccessGuard` (`assertLayout()`, …). Twig
 
 ## Twig overrides
 
-Override bundle templates in the host:
+The admin pages follow the UiKit page contract (REQ-UI-003): theme them once through `nowo_ui_kit` (layout, CSS stack,
+theme slots, tokens) — see [CONFIGURATION](CONFIGURATION.md#web_ui) — and, for a bundle-specific change, override one
+data block through `web_ui.templates.<page>`:
+
+```yaml
+nowo_page_builder_kit:
+    web_ui:
+        templates:
+            index: 'admin/pbk/index.html.twig'
+```
+
+```twig
+{# templates/admin/pbk/index.html.twig #}
+{% extends '@!NowoPageBuilderKitBundle/admin/pages/index.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    <p class="nowo-ui-muted">Pages go live after review.</p>
+    {{ parent() }}
+{% endblock %}
+```
+
+Full-file overrides remain possible for public and widget templates (frozen forks — read the freeze rule and the list
+of subpaths in [TEMPLATES](TEMPLATES.md#overriding-templates-req-twig-001)):
 
 ```text
 templates/bundles/NowoPageBuilderKitBundle/
 ├── widgets/heading.html.twig
-├── public/page.html.twig
-└── admin/pages/canvas.html.twig
+└── public/page.html.twig
 ```
 
 Widget types resolve public templates via `@NowoPageBuilderKitBundle/widgets/{type}.html.twig`.
@@ -740,7 +764,7 @@ See [CONFIGURATION.md](CONFIGURATION.md#debug).
 
 ## Public bind hydration, section filter and status query
 
-**Bind hydration.** Grapes public HTML may contain `<span data-pbk-bind="hero_title">Resolved text</span>` slots. For users with the `content` capability, `PublicBindHydratorInterface::hydrate($html, $pageKey)` (or `{{ nowo_page_builder_hydrate_binds(html, pageKey)|raw }}`) wraps each slot with the inline-edit pencil/modal, using the slot inner HTML as value (no page query). Visitors receive the HTML unchanged. Field types and labels come from your `ContentFieldDefinitionProviderInterface`:
+**Bind hydration.** Grapes public HTML may contain `<span data-pbk-bind="hero_title">Resolved text</span>` slots. For users with the `content` capability, `PublicBindHydratorInterface::hydrate($html, $pageKey)` (or `{{ nowo_page_builder_hydrate_binds(html, pageKey) }}` — no `|raw`: the function output is already safe HTML) wraps each slot with the inline-edit pencil/modal, using the slot content as value (no page query). The input always goes through the HTML5 final gate first and the slots are found on the parsed HTML5 tree (never by regex), so a `</span>` inside an attribute or a comment cannot end a slot early (fixed in 1.12.0, Appendix BO M1). Visitors receive the hardened HTML. Field types and labels come from your `ContentFieldDefinitionProviderInterface`:
 
 ```php
 final class ClinicContentFieldDefinitionProvider implements ContentFieldDefinitionProviderInterface

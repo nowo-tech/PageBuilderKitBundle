@@ -39,6 +39,7 @@ final readonly class GrapesJsFrontendConfig
         private bool $twigCanvasHelpers = true,
         private array $twigVariables = [],
         private GrapesBlockPackRegistry $blockPackRegistry = new GrapesBlockPackRegistry(),
+        private string $moduleBaseUrl = 'https://esm.sh',
     ) {
     }
 
@@ -69,7 +70,7 @@ final readonly class GrapesJsFrontendConfig
             'assets'              => $this->assets !== [] ? $this->assets : $this->defaultAssets(),
             'assetEmbedAsBase64'  => $embedAsBase64,
             'assetsUploadEnabled' => $this->assetsUploadEnabled,
-            'pluginCdnBase'       => 'https://esm.sh',
+            'pluginCdnBase'       => $this->moduleBaseUrl,
             'blockPacks'          => $this->blockPackRegistry->toFrontend(),
             'twig'                => [
                 'enabled'       => $this->twigEnabled,

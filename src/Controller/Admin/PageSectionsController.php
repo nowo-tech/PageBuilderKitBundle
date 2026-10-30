@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,12 +30,15 @@ use function sprintf;
  */
 final class PageSectionsController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public function __construct(
         private readonly BuilderPageRepository $pageRepository,
         private readonly DocumentService $documentService,
         private readonly DocumentNormalizer $documentNormalizer,
         private readonly BuilderLocales $builderLocales,
         private readonly WidgetTypeRegistry $widgetTypeRegistry,
+        private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
 
@@ -96,23 +100,28 @@ final class PageSectionsController extends AbstractController
             'locale'  => $locale,
         ]);
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/sections.html.twig', [
-            'page'          => $page,
-            'page_key'      => $pageKey,
-            'locales'       => $locales,
-            'locale'        => $locale,
-            'sections_tree' => $sectionsTree,
-            'is_classic'    => true,
-            'form'          => $form->createView(),
-            'publish_form'  => $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
-                'action' => $this->generateUrl('admin_page_builder_document_publish', ['pageKey' => $pageKey]),
-                'method' => 'POST',
-            ])->createView(),
-            'unpublish_form' => $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
-                'action' => $this->generateUrl('admin_page_builder_document_unpublish', ['pageKey' => $pageKey]),
-                'method' => 'POST',
-            ])->createView(),
-        ]);
+        $formView    = $form->createView();
+        $publishForm = $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
+            'action' => $this->generateUrl('admin_page_builder_document_publish', ['pageKey' => $pageKey]),
+            'method' => 'POST',
+        ])->createView();
+        $unpublishForm = $this->createForm(CsrfPostType::class, ['_redirect' => $redirect], [
+            'action' => $this->generateUrl('admin_page_builder_document_unpublish', ['pageKey' => $pageKey]),
+            'method' => 'POST',
+        ])->createView();
+
+        return $this->render($this->pageFactory->template('sections'), $this->pageFactory->context([
+            'page'           => $this->pageFactory->sections($page, $formView, $sectionsTree !== [], $locale, $publishForm, $unpublishForm),
+            'builder_page'   => $page,
+            'page_key'       => $pageKey,
+            'locales'        => $locales,
+            'locale'         => $locale,
+            'sections_tree'  => $sectionsTree,
+            'is_classic'     => true,
+            'form'           => $formView,
+            'publish_form'   => $publishForm,
+            'unpublish_form' => $unpublishForm,
+        ]), new Response(null, $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
     /**

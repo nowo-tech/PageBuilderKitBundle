@@ -73,11 +73,23 @@ nowo_page_builder_kit:
         allow_unauthenticated: false
     web_ui:
         path_prefix: /admin/page-builder   # change to remount admin URLs
-        layout_template: '@NowoPageBuilderKitBundle/admin/layout.html.twig'
-        css_framework: tailwind
+        layout_template: null              # null = nowo_ui_kit.layouts.admin (UiKit page contract)
     doctrine:
         table_prefix: ''                   # e.g. 'app_' → app_pb_page
 ```
+
+The admin pages render inside the UiKit admin layout. Point it at your application layout (or a one-file bridge)
+once for every Nowo bundle, and pick the CSS stack there:
+
+```yaml
+# config/packages/nowo_ui_kit.yaml
+nowo_ui_kit:
+    css_framework: bootstrap5            # tailwind | foundation | tabler | custom | none
+    layouts:
+        admin: 'layouts/admin.html.twig' # renders the UiKit canonical blocks, e.g. via @NowoUiKit/layout/_bridge.html.twig
+```
+
+See [TEMPLATES](TEMPLATES.md) and [CONFIGURATION](CONFIGURATION.md#web_ui).
 
 ## Routes
 

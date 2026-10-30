@@ -79,9 +79,9 @@ final class PageAssetUploadController extends AbstractController
 
     private function validateCsrf(Request $request): bool
     {
+        // Header or POST body only: a token in the query string leaks through logs and the Referer header.
         $token = $request->headers->get('X-CSRF-TOKEN')
-            ?? $request->request->get('_token')
-            ?? $request->query->get('_token');
+            ?? $request->request->get('_token');
 
         return is_string($token)
             && $this->csrfTokenManager->isTokenValid(new CsrfToken(self::CSRF_TOKEN_ID, $token));

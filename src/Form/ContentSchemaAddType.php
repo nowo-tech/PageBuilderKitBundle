@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Form;
 
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
+use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -39,38 +40,38 @@ final class ContentSchemaAddType extends AbstractType
                     new Assert\NotBlank(),
                     new Assert\Regex(pattern: '/^[a-z][a-z0-9_]*$/'),
                 ],
-                'attr' => ['placeholder' => 'hero_title', 'class' => 'form-control'],
+                'attr' => ['placeholder' => new TranslatableText('hero_title')],
             ])
             ->add('type', ChoiceType::class, [
-                'label'   => 'admin.content.field_type',
-                'choices' => $typeChoices,
-                'attr'    => ['class' => 'form-select'],
+                'label'                     => 'admin.content.field_type',
+                'choices'                   => $typeChoices,
+                'choice_translation_domain' => false,
             ])
             ->add('label', TextType::class, [
                 'label'    => 'admin.content.field_label',
                 'required' => false,
-                'attr'     => ['placeholder' => 'Hero title', 'class' => 'form-control'],
+                'attr'     => ['placeholder' => new TranslatableText('Hero title')],
             ])
             ->add('options', TextType::class, [
                 'label'    => 'admin.content.field_options',
                 'required' => false,
-                'attr'     => ['placeholder' => 'a,b,c', 'class' => 'form-control'],
+                'attr'     => ['placeholder' => new TranslatableText('a,b,c')],
             ])
             ->add('subfields', TextType::class, [
                 'label'    => 'admin.content.field_subfields',
                 'required' => false,
-                'attr'     => ['placeholder' => 'question:string,answer:text', 'class' => 'form-control'],
+                'attr'     => ['placeholder' => new TranslatableText('question:string,answer:text')],
                 'help'     => 'admin.content.field_subfields_hint',
             ])
             ->add('min', IntegerType::class, [
                 'label'    => 'admin.content.field_min',
                 'required' => false,
-                'attr'     => ['min' => 0, 'placeholder' => '0', 'class' => 'form-control'],
+                'attr'     => ['min' => 0, 'placeholder' => new TranslatableText('0')],
             ])
             ->add('max', IntegerType::class, [
                 'label'    => 'admin.content.field_max',
                 'required' => false,
-                'attr'     => ['min' => 0, 'class' => 'form-control'],
+                'attr'     => ['min' => 0],
             ])
             ->add('required', CheckboxType::class, [
                 'label'    => 'admin.content.field_required',

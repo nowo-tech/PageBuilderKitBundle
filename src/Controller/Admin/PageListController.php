@@ -11,6 +11,8 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
+use Nowo\UiKitBundle\View\Pagination;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,6 +21,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class PageListController extends AbstractController
 {
+    use TranslatesFlashes;
+
     /** Pages per admin list page (REQ-PERF-001: the list is never loaded unbounded). */
     public const int PAGE_SIZE = 50;
 
@@ -27,6 +31,7 @@ final class PageListController extends AbstractController
         private readonly DocumentService $documentService,
         private readonly BuilderLocales $builderLocales,
         private readonly PageBuilderKitAccessGuard $accessGuard,
+        private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
 
@@ -63,8 +68,10 @@ final class PageListController extends AbstractController
         $pages       = $this->pageRepository->findOrderedSlice(($currentPage - 1) * self::PAGE_SIZE, self::PAGE_SIZE);
         /** @var array<string, FormView> $duplicateForms */
         $duplicateForms = [];
+        $engines        = [];
         foreach ($pages as $page) {
             $key                  = $page->getPageKey();
+            $engines[$key]        = PageBuilderKitPageFactory::engine($page);
             $duplicateForms[$key] = $this->createForm(PageDuplicateType::class, [
                 'pageKey' => $key . '-copy',
             ], [
@@ -73,12 +80,16 @@ final class PageListController extends AbstractController
             ])->createView();
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/index.html.twig', [
+        $pagination = Pagination::fromTotal($total, $currentPage, self::PAGE_SIZE, [self::PAGE_SIZE], self::PAGE_SIZE, 'admin_page_builder_list');
+
+        return $this->render($this->pageFactory->template('index'), $this->pageFactory->context([
+            'page'            => $this->pageFactory->index($pages, $pagination, $duplicateForms),
             'pages'           => $pages,
+            'engines'         => $engines,
             'current_page'    => $currentPage,
             'total_pages'     => $totalPages,
-            'create_form'     => $createForm,
+            'create_form'     => $this->accessGuard->checker()->canLayout() ? $createForm->createView() : null,
             'duplicate_forms' => $duplicateForms,
-        ]);
+        ]), new Response(null, $createForm->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 }

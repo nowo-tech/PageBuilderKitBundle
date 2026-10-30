@@ -1,310 +1,137 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Content fields (REQ-UI-003): UiKit settings scaffold. Variable: page (View\SettingsPage from
+  PageBuilderKitPageFactory::content(): header admin.content.title / admin.content.hint with Edit (layout capability)
+  and a back link to the list; section `schema` (layout capability, form = the add-field form, submit
+  admin.content.add_field) and section `values` (content capability, form = the values form of the active locale or
+  null, submit admin.content.save_values)). Also: schema_table (View\Table from schemaTable(): key, type, label; row
+  action Remove behind a confirm), schema, fieldValues, locales, active_locale, pageKey, builder_page,
+  asset_upload_enabled / asset_library_enabled / asset_upload_url / asset_library_url / asset_upload_csrf, and the 1.x
+  variables (schema_add_form, schema_remove_forms, values_form, can_edit_schema, can_edit_values, field_types,
+  reference_pages).
+  Data block filled: nowo_ui_settings_section (schema: field table + add form; values: locale tabs + values form with
+  the media picker on image fields). nowo_ui_modals: the media library <dialog> (UiKit `dialog` partial).
+  Scripts: page-builder-admin.js (upload + library picker; no inline script).
+#}
+{% extends '@NowoUiKit/page/settings.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% block page_title %}{{ 'admin.content.title'|trans({'%key%': pageKey}) }}{% endblock %}
-
-{% block header_actions %}
-    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.title'|trans }}</a>
-    {% if nowo_page_builder_can('layout') %}
-        {% set _engine = page.document and page.document.structure.engine|default('classic') %}
-        {% if _engine == 'grapesjs' %}
-            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: pageKey}) }}">{{ 'admin.pages.edit'|trans }}</a>
+{% block nowo_ui_settings_section %}
+    {% set _b = page.bundle %}
+    {% if section.id == 'schema' %}
+        {% if schema_table.rows is empty %}
+            <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.content.schema_empty'|trans }}</p>
         {% else %}
-            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_sections', {pageKey: pageKey}) }}">{{ 'admin.pages.sections'|trans }}</a>
+            {% embed nowo_ui_partial('table', bundle) with {table: schema_table, bundle: _b, nowo_ui_page_type: nowo_ui_page_type} only %}
+                {% block nowo_ui_table_row %}
+                    {% set _cell = nowo_ui_class('table_cell', bundle) %}
+                    <td class="{{ _cell }}" data-label="{{ 'admin.content.col_key'|trans({}, 'NowoPageBuilderKitBundle') }}" data-required="1">
+                        <code class="{{ nowo_ui_class('code', bundle) }}">{{ row.key }}</code>
+                        {% if row.required|default(false) %}<span class="{{ nowo_ui_class('badge_warning', bundle) }}">{{ 'admin.content.field_required'|trans({}, 'NowoPageBuilderKitBundle') }}</span>{% endif %}
+                    </td>
+                    <td class="{{ _cell }}" data-label="{{ 'admin.content.col_type'|trans({}, 'NowoPageBuilderKitBundle') }}">
+                        <span class="{{ nowo_ui_class('badge_neutral', bundle) }}">{{ row.type }}</span>
+                        {% if row.fields is defined and row.fields is not empty %}
+                            <span class="{{ nowo_ui_class('muted', bundle) }}">[{% for sub in row.fields %}{{ sub.key }}:{{ sub.type }}{% if not loop.last %}, {% endif %}{% endfor %}]</span>
+                        {% endif %}
+                    </td>
+                    <td class="{{ _cell }}" data-label="{{ 'admin.content.col_label'|trans({}, 'NowoPageBuilderKitBundle') }}" data-nowo-ui-priority="2">{{ row.display_label|default(row.label|default('')) }}</td>
+                {% endblock %}
+            {% endembed %}
+        {% endif %}
+        {% if section.form %}
+            {{ include(nowo_ui_partial('section_form', _b), {form: section.form, submit_label: section.submitLabel, bundle: _b, nowo_ui_page_type: nowo_ui_page_type}, false) }}
+        {% endif %}
+    {% elseif section.id == 'values' %}
+        {% set _tabs = [] %}
+        {% for locale in locales %}
+            {% set _tabs = _tabs|merge([{label: locale|upper, href: path('admin_page_builder_content', {pageKey: pageKey, locale: locale}), current: locale == active_locale}]) %}
+        {% endfor %}
+        {{ include(nowo_ui_partial('tabs', _b), {items: _tabs, aria_label: 'admin.content.locales'|trans, bundle: _b, region: 'locales', level: 'secondary'}, false) }}
+        {% set values_form = section.form %}
+        {% if values_form is null %}
+            <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.content.no_fields'|trans }}</p>
+        {% else %}
+            {{ form_start(values_form, {attr: {class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}}) }}
+                {% set labels_locale = values_form.fieldLabels[active_locale]|default(null) %}
+                {% set values_locale = values_form.fieldValues[active_locale]|default(null) %}
+                {% for field in schema %}
+                    {% set current = fieldValues[active_locale][field.key]|default(field.default|default(field.type == 'bool' ? false : '')) %}
+                    <fieldset class="{{ nowo_ui_class('section', _b) }} pbk-content-field" data-pbk-field-key="{{ field.key }}">
+                        {% if labels_locale is not null and labels_locale[field.key] is defined %}
+                            {{ form_row(labels_locale[field.key], {label: 'admin.content.field_label_locale'|trans({'%locale%': active_locale}), translation_domain: false}) }}
+                        {% endif %}
+                        {% if values_locale is not null and values_locale[field.key] is defined %}
+                            {% if field.type == 'image' %}
+                                {{ form_row(values_locale[field.key]) }}
+                                {% if asset_library_enabled|default(false) or asset_upload_enabled|default(false) %}
+                                    <div class="{{ nowo_ui_class('toolbar', _b) }} pbk-media-actions">
+                                        {% if asset_library_enabled|default(false) %}
+                                            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}"
+                                                    data-nowo-ui-dialog-open="pbk-media-library"
+                                                    aria-haspopup="dialog" aria-controls="pbk-media-library"
+                                                    data-pbk-media-pick
+                                                    data-target="#field-{{ field.key }}"
+                                                    data-library-url="{{ asset_library_url }}">{{ 'admin.content.browse_library'|trans }}</button>
+                                        {% endif %}
+                                        {% if asset_upload_enabled|default(false) %}
+                                            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}"
+                                                    data-pbk-image-upload-btn
+                                                    data-target="#field-{{ field.key }}"
+                                                    data-upload-url="{{ asset_upload_url }}"
+                                                    data-csrf="{{ asset_upload_csrf }}"
+                                                    data-error-label="{{ 'admin.content.upload_failed'|trans }}">{{ 'admin.content.upload_image'|trans }}</button>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                <img{% if current %} src="{{ current|pbk_safe_url(true)|e('html_attr') }}"{% else %} hidden{% endif %} alt="" class="pbk-image-preview" data-pbk-image-preview="#field-{{ field.key }}">
+                            {% elseif field.type == 'repeater' %}
+                                {{ form_row(values_locale[field.key]) }}
+                                <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.content.repeater_hint'|trans }}</p>
+                            {% else %}
+                                {{ form_row(values_locale[field.key]) }}
+                            {% endif %}
+                        {% endif %}
+                    </fieldset>
+                {% endfor %}
+                {% if labels_locale is not null %}{% do labels_locale.setRendered %}{% endif %}
+                {% if values_locale is not null %}{% do values_locale.setRendered %}{% endif %}
+                {% if values_form.fieldLabels is defined %}{% do values_form.fieldLabels.setRendered %}{% endif %}
+                {% if values_form.fieldValues is defined %}{% do values_form.fieldValues.setRendered %}{% endif %}
+                {% for child in values_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
+                <div class="{{ nowo_ui_class('form_actions', _b) }}">
+                    <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}">{{ section.submitLabel|nowo_ui_trans }}</button>
+                </div>
+            {{ form_end(values_form) }}
         {% endif %}
     {% endif %}
 {% endblock %}
 
-{% block admin %}
-{% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
-    <p class="text-muted">{{ 'admin.content.hint'|trans }}</p>
-
-    {% if can_edit_schema %}
-        <section class="card mb-4">
-            <div class="card-header fw-semibold">{{ 'admin.content.schema'|trans }}</div>
-            <div class="card-body">
-                {% if schema is empty %}
-                    <p class="text-muted mb-3">{{ 'admin.content.schema_empty'|trans }}</p>
-                {% else %}
-                    <ul class="list-group mb-3">
-                        {% for field in schema %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span>
-                                    <code>{{ field.key }}</code>
-                                    <span class="badge bg-secondary ms-2">{{ field.type }}</span>
-                                    {{ field.display_label|default(field.label) }}
-                                    {% if field.required %}<span class="text-danger">*</span>{% endif %}
-                                    {% if field.fields is defined and field.fields is not empty %}
-                                        <small class="text-muted ms-1">[
-                                            {% for sub in field.fields %}{{ sub.key }}:{{ sub.type }}{% if not loop.last %}, {% endif %}{% endfor %}
-                                        ]</small>
-                                    {% endif %}
-                                </span>
-                                {{ form_start(schema_remove_forms[field.key], { attr: { class: 'd-inline' } }) }}
-                                    {% for child in schema_remove_forms[field.key] %}
-                                        {% if not child.rendered %}
-                                            {{ form_widget(child) }}
-                                        {% endif %}
-                                    {% endfor %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">{{ 'admin.content.remove_field'|trans }}</button>
-                                {{ form_end(schema_remove_forms[field.key]) }}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                {{ form_start(schema_add_form, { attr: { class: 'row g-2 align-items-end' } }) }}
-                    {% for name in ['key', 'type', 'label', 'options', 'subfields', 'min', 'max'] %}
-                        {% if schema_add_form[name] is defined and not schema_add_form[name].rendered %}
-                            <div class="col-md-{% if name in ['min', 'max'] %}1{% elseif name in ['key', 'type'] %}2{% else %}3{% endif %}">
-                                {{ form_row(schema_add_form[name]) }}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                    {% if schema_add_form.required is defined and not schema_add_form.required.rendered %}
-                        <div class="col-md-1 form-check mt-4">
-                            {{ form_widget(schema_add_form.required) }}
-                            {{ form_label(schema_add_form.required) }}
-                        </div>
-                    {% endif %}
-                    {% for child in schema_add_form %}
-                        {% if not child.rendered %}
-                            {{ form_row(child) }}
-                        {% endif %}
-                    {% endfor %}
-                    <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100">{{ 'admin.content.add_field'|trans }}</button>
-                    </div>
-                {{ form_end(schema_add_form) }}
-            </div>
-        </section>
+{% block nowo_ui_modals %}
+    {{ parent() }}
+    {% if asset_library_enabled|default(false) %}
+        {% set _b = page.bundle %}
+        {% set _body %}
+            <p class="{{ nowo_ui_class('muted', _b) }}" data-pbk-media-empty hidden>{{ 'admin.content.media_library_empty'|trans }}</p>
+            <p class="{{ nowo_ui_class('muted', _b) }}" data-pbk-media-error hidden>{{ 'admin.content.media_library_error'|trans }}</p>
+            <div class="pbk-media-grid" data-pbk-media-grid></div>
+        {% endset %}
+        {{ include(nowo_ui_partial('dialog', _b), {id: 'pbk-media-library', title: 'admin.content.media_library'|trans, body: _body, size: 'lg', bundle: _b, attr: {'data-pbk-media-dialog': true, 'data-testid': 'pbk-media-library'}}, false) }}
     {% endif %}
+{% endblock %}
 
-    {% if can_edit_values %}
-        <section class="card">
-            <div class="card-header fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>{{ 'admin.content.values'|trans }}</span>
-                <span class="btn-group btn-group-sm">
-                    {% for locale in locales %}
-                        <a class="btn btn-outline-secondary{% if locale == active_locale %} active{% endif %}"
-                           href="{{ path('admin_page_builder_content', {pageKey: pageKey, locale: locale}) }}">{{ locale }}</a>
-                    {% endfor %}
-                </span>
-            </div>
-            <div class="card-body">
-                {% if schema is empty or values_form is null %}
-                    <p class="text-muted">{{ 'admin.content.no_fields'|trans }}</p>
-                {% else %}
-                    {{ form_start(values_form) }}
-                        {% set labels_locale = values_form.fieldLabels[active_locale]|default(null) %}
-                        {% set values_locale = values_form.fieldValues[active_locale]|default(null) %}
-                        {% for field in schema %}
-                            {% set current = fieldValues[active_locale][field.key]|default(field.default|default(field.type == 'bool' ? false : '')) %}
-                            <div class="mb-3">
-                                <div class="mb-2">
-                                    {% if labels_locale is not null and labels_locale[field.key] is defined %}
-                                        {{ form_label(labels_locale[field.key], 'admin.content.field_label_locale'|trans({'%locale%': active_locale})) }}
-                                        {{ form_widget(labels_locale[field.key]) }}
-                                    {% endif %}
-                                </div>
-                                {% if values_locale is not null and values_locale[field.key] is defined %}
-                                    {% if field.type == 'image' %}
-                                        <label class="form-label" for="field-{{ field.key }}">
-                                            {{ field.display_label|default(field.label) }}
-                                            {% if field.required %}<span class="text-danger">*</span>{% endif %}
-                                            <small class="text-muted">({{ field.key }} · {{ field.type }})</small>
-                                        </label>
-                                        <div class="input-group">
-                                            {{ form_widget(values_locale[field.key]) }}
-                                            {% if asset_library_enabled|default(false) %}
-                                                <button type="button" class="btn btn-outline-secondary"
-                                                        data-pbk-media-pick
-                                                        data-target="#field-{{ field.key }}"
-                                                        data-library-url="{{ asset_library_url }}">
-                                                    {{ 'admin.content.browse_library'|trans }}
-                                                </button>
-                                            {% endif %}
-                                            {% if asset_upload_enabled|default(false) %}
-                                                <button type="button" class="btn btn-outline-secondary"
-                                                        data-pbk-image-upload-btn
-                                                        data-target="#field-{{ field.key }}"
-                                                        data-upload-url="{{ asset_upload_url }}"
-                                                        data-csrf="{{ asset_upload_csrf }}">
-                                                    {{ 'admin.content.upload_image'|trans }}
-                                                </button>
-                                            {% endif %}
-                                        </div>
-                                        {% if current %}
-                                            <div class="mt-2"><img src="{{ current|pbk_safe_url(true)|e('html_attr') }}" alt="" style="max-height:80px" class="rounded border" data-pbk-image-preview="#field-{{ field.key }}"></div>
-                                        {% endif %}
-                                    {% elseif field.type == 'group' or field.type == 'repeater' %}
-                                        <div class="border rounded p-2 bg-light">
-                                            {{ form_row(values_locale[field.key]) }}
-                                            {% if field.type == 'repeater' %}
-                                                <p class="form-text mb-0">{{ 'admin.content.repeater_hint'|trans }}</p>
-                                            {% endif %}
-                                        </div>
-                                    {% else %}
-                                        {{ form_row(values_locale[field.key]) }}
-                                    {% endif %}
-                                {% endif %}
-                            </div>
-                        {% endfor %}
-                        {% if labels_locale is not null %}{% do labels_locale.setRendered %}{% endif %}
-                        {% if values_locale is not null %}{% do values_locale.setRendered %}{% endif %}
-                        {% if values_form.fieldLabels is defined %}{% do values_form.fieldLabels.setRendered %}{% endif %}
-                        {% if values_form.fieldValues is defined %}{% do values_form.fieldValues.setRendered %}{% endif %}
-                        {% for child in values_form %}
-                            {% if not child.rendered %}
-                                {{ form_row(child) }}
-                            {% endif %}
-                        {% endfor %}
-                        <button type="submit" class="btn btn-success">{{ 'admin.content.save_values'|trans }}</button>
-                    {{ form_end(values_form) }}
-                {% endif %}
-            </div>
-        </section>
-    {% endif %}
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
+{% endblock %}
 
+{% block nowo_ui_scripts %}
+    {{ parent() }}
     {% if asset_upload_enabled|default(false) or asset_library_enabled|default(false) %}
-        <div class="modal fade" id="pbk-media-library-modal" tabindex="-1" aria-labelledby="pbk-media-library-title" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title h5" id="pbk-media-library-title">{{ 'admin.content.media_library'|trans }}</h2>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-muted small mb-3" data-pbk-media-empty hidden>{{ 'admin.content.media_library_empty'|trans }}</p>
-                        <div class="row g-2" data-pbk-media-grid></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>
-            (function () {
-                function setFieldUrl(target, url) {
-                    if (!target || !url) return;
-                    target.value = url;
-                    target.dispatchEvent(new Event('change'));
-                    var preview = document.querySelector('[data-pbk-image-preview="#' + target.id + '"]');
-                    if (preview) {
-                        preview.src = url;
-                    } else if (target.id) {
-                        var wrap = target.closest('.mb-3, .form-group, div');
-                        if (wrap) {
-                            var img = wrap.querySelector('img');
-                            if (img) img.src = url;
-                        }
-                    }
-                }
-
-                function uploadFile(file, uploadUrl, csrf, target) {
-                    if (!file || !uploadUrl || !target) return;
-                    var data = new FormData();
-                    data.append('files[]', file);
-                    fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': csrf || '', Accept: 'application/json' },
-                        credentials: 'same-origin',
-                        body: data
-                    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                      .then(function (res) {
-                          var url = res.j && (res.j.data && res.j.data[0] && (res.j.data[0].src || res.j.data[0].url));
-                          if (!url && res.j && res.j.files && res.j.files[0]) url = res.j.files[0];
-                          if (!url && Array.isArray(res.j) && res.j[0]) url = res.j[0].src || res.j[0];
-                          if (res.ok && url) {
-                              setFieldUrl(target, url);
-                          } else {
-                              alert((res.j && res.j.error) || 'Upload failed');
-                          }
-                      }).catch(function () { alert('Upload failed'); });
-                }
-
-                document.querySelectorAll('[data-pbk-image-upload-btn]').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        var target = document.querySelector(btn.getAttribute('data-target'));
-                        if (!target) return;
-                        var picker = document.createElement('input');
-                        picker.type = 'file';
-                        picker.accept = 'image/*';
-                        picker.hidden = true;
-                        picker.addEventListener('change', function () {
-                            if (!picker.files || !picker.files[0]) return;
-                            uploadFile(
-                                picker.files[0],
-                                btn.getAttribute('data-upload-url'),
-                                btn.getAttribute('data-csrf'),
-                                target
-                            );
-                        });
-                        document.body.appendChild(picker);
-                        picker.click();
-                        picker.remove();
-                    });
-                });
-
-                var modalEl = document.getElementById('pbk-media-library-modal');
-                var grid = modalEl ? modalEl.querySelector('[data-pbk-media-grid]') : null;
-                var emptyEl = modalEl ? modalEl.querySelector('[data-pbk-media-empty]') : null;
-                var activeTarget = null;
-
-                function openLibrary(target, libraryUrl) {
-                    activeTarget = target;
-                    if (!modalEl || !grid || !libraryUrl) return;
-                    grid.innerHTML = '';
-                    if (emptyEl) emptyEl.hidden = true;
-                    fetch(libraryUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-                        .then(function (r) { return r.json(); })
-                        .then(function (j) {
-                            var assets = (j && Array.isArray(j.data)) ? j.data : [];
-                            if (!assets.length) {
-                                if (emptyEl) emptyEl.hidden = false;
-                                return;
-                            }
-                            assets.forEach(function (asset) {
-                                if (!asset || !asset.src) return;
-                                var col = document.createElement('div');
-                                col.className = 'col-6 col-md-3';
-                                var pickBtn = document.createElement('button');
-                                pickBtn.type = 'button';
-                                pickBtn.className = 'btn btn-light border w-100 p-1 text-start';
-                                pickBtn.innerHTML = '<img src="' + String(asset.src).replace(/"/g, '&quot;') + '" alt="" class="img-fluid rounded mb-1" style="max-height:96px;object-fit:cover;width:100%">'
-                                    + '<span class="d-block text-truncate small">' + String(asset.name || asset.src).replace(/</g, '&lt;') + '</span>';
-                                pickBtn.addEventListener('click', function () {
-                                    setFieldUrl(activeTarget, asset.src);
-                                    if (window.bootstrap && bootstrap.Modal) {
-                                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-                                    } else {
-                                        modalEl.classList.remove('show');
-                                        modalEl.style.display = 'none';
-                                    }
-                                });
-                                col.appendChild(pickBtn);
-                                grid.appendChild(col);
-                            });
-                        })
-                        .catch(function () {
-                            if (emptyEl) {
-                                emptyEl.hidden = false;
-                                emptyEl.textContent = 'Library unavailable';
-                            }
-                        });
-                    if (window.bootstrap && bootstrap.Modal) {
-                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                    } else {
-                        modalEl.classList.add('show');
-                        modalEl.style.display = 'block';
-                    }
-                }
-
-                document.querySelectorAll('[data-pbk-media-pick]').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        var target = document.querySelector(btn.getAttribute('data-target'));
-                        openLibrary(target, btn.getAttribute('data-library-url'));
-                    });
-                });
-            })();
-        </script>
+        {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
+        <script src="{{ asset('js/page-builder-admin.js', 'nowo_page_builder_kit') }}" defer{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}></script>
     {% endif %}
 {% endblock %}

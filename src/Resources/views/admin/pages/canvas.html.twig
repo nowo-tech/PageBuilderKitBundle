@@ -1,35 +1,28 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  GrapesJS canvas (REQ-UI-003 unique page, listed in docs/TEMPLATES.md): extends the layout directly
+  (page.layout ?? nowo_ui_layout.admin) and fills the canonical blocks. Variable: page (View\ShowPage from
+  PageBuilderKitPageFactory::canvas(): header admin.canvas.title with SEO, Revisions and Preview, back link to the
+  list). The save / publish / unpublish buttons are script buttons (page-builder-canvas.js, no inline handlers).
+  Also: builder_page, page_key, locales, default_locale, structure, grapesjs_config, csrf_token, document_*_url,
+  page_status, preview_url. The GrapesJS editor scripts are loaded by page-builder-canvas.js from
+  grapesjs_config.pluginCdnBase; its stylesheets are local assets — this template prints no CDN asset.
+#}
+{% extends page.layout ?? nowo_ui_layout.admin %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
+{% set nowo_ui_bundle = page.bundle %}
 
-{% block page_title %}{{ 'admin.canvas.title'|trans({'%key%': page_key}) }}{% endblock %}
+{% block nowo_ui_document_title %}{{ page.header.title|nowo_ui_trans }}{% endblock %}
 
-{% block header_actions %}
-    <div class="pbk-canvas-actions d-flex gap-2 flex-wrap align-items-center">
-        <span class="badge {% if page_status == 'published' %}text-bg-success{% else %}text-bg-secondary{% endif %}"
-              data-pbk-status-badge
-              data-pbk-status-value="{{ page_status }}">
-            {{ page_status == 'published' ? 'admin.status.published'|trans : 'admin.status.draft'|trans }}
-        </span>
-        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_seo', {pageKey: page_key}) }}">{{ 'admin.pages.seo'|trans }}</a>
-        {% if nowo_page_builder_revisions_enabled() %}
-            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
-        {% endif %}
-        <a class="btn btn-outline-secondary btn-sm" href="{{ preview_url }}" target="_blank" rel="noopener">{{ 'admin.canvas.preview'|trans }}</a>
-        <button type="button" class="btn btn-primary btn-sm" data-pbk-action="save">{{ 'admin.canvas.save'|trans }}</button>
-        <button type="button"
-                class="btn btn-success btn-sm"
-                data-pbk-action="publish"
-                {% if page_status == 'published' %}hidden{% endif %}>{{ 'admin.canvas.publish'|trans }}</button>
-        <button type="button"
-                class="btn btn-outline-warning btn-sm"
-                data-pbk-action="unpublish"
-                {% if page_status != 'published' %}hidden{% endif %}>{{ 'admin.canvas.unpublish'|trans }}</button>
-    </div>
-{% endblock %}
+{% block nowo_ui_page_header %}{{ nowo_ui_page_header(page.header, page.bundle) }}{% endblock %}
 
-{% block admin %}
+{% block nowo_ui_content %}
+    {% set _b = page.bundle %}
+    {% set _published = page_status == 'published' %}
+    {% set _badge_published = nowo_ui_class('badge_success', _b) %}
+    {% set _badge_draft = nowo_ui_class('badge_neutral', _b) %}
     <div id="page-builder-canvas"
          class="pbk-canvas pbk-canvas--grapesjs pbk-canvas--grapesjs-full"
+         data-nowo-ui-page="canvas"{{ nowo_ui_html_attrs(page.attributes) }}
          data-pbk-engine="grapesjs"
          data-pbk-save-url="{{ document_save_url }}"
          data-pbk-publish-url="{{ document_publish_url }}"
@@ -37,35 +30,45 @@
          data-pbk-page-status="{{ page_status }}"
          data-pbk-label-draft="{{ 'admin.status.draft'|trans|e('html_attr') }}"
          data-pbk-label-published="{{ 'admin.status.published'|trans|e('html_attr') }}"
+         data-pbk-label-loading="{{ 'admin.canvas.loading'|trans }}"
+         data-pbk-class-tab="{{ nowo_ui_class('tab', _b) }}"
+         data-pbk-class-tab-active="{{ nowo_ui_class('tab_active', _b) }}"
          data-pbk-csrf="{{ csrf_token }}"
          data-pbk-default-locale="{{ default_locale }}"
          data-pbk-grapes-config="{{ grapesjs_config|json_encode|e('html_attr') }}"
          data-pbk-structure="{{ structure|json_encode|e('html_attr') }}">
 
-        <ul class="nav nav-tabs mb-2" role="tablist">
-            {% for locale in locales %}
-                <li class="nav-item" role="presentation">
-                    <button type="button"
-                            class="nav-link{% if locale == default_locale %} active{% endif %}"
-                            data-pbk-locale-tab="{{ locale }}">{{ locale|upper }}</button>
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="{{ nowo_ui_class('toolbar', _b) }} pbk-canvas__toolbar" data-nowo-ui-region="toolbar">
+            <span class="{{ _published ? _badge_published : _badge_draft }}"
+                  data-pbk-status-badge
+                  data-pbk-status-value="{{ page_status }}"
+                  data-pbk-class-published="{{ _badge_published }}"
+                  data-pbk-class-draft="{{ _badge_draft }}">{{ _published ? 'admin.status.published'|trans : 'admin.status.draft'|trans }}</span>
+            <button type="button" class="{{ nowo_ui_class('btn_primary', _b) }}" data-pbk-action="save">{{ 'admin.canvas.save'|trans }}</button>
+            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-pbk-action="publish"{% if _published %} hidden{% endif %}>{{ 'admin.canvas.publish'|trans }}</button>
+            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-pbk-action="unpublish"{% if not _published %} hidden{% endif %}>{{ 'admin.canvas.unpublish'|trans }}</button>
+        </div>
 
-        <p class="text-muted small mb-2">{{ 'admin.canvas.grapes_hint'|trans }}</p>
+        {% set _tabs = [] %}
+        {% for locale in locales %}
+            {% set _tabs = _tabs|merge([{label: locale|upper, href: '#gjs', current: locale == default_locale, attr: {'data-pbk-locale-tab': locale}}]) %}
+        {% endfor %}
+        {{ include(nowo_ui_partial('tabs', _b), {items: _tabs, aria_label: 'admin.canvas.locales'|trans, bundle: _b, region: 'tabs'}, false) }}
+
         <div id="gjs" class="pbk-gjs"></div>
-        <p class="text-muted small mt-2" data-pbk-status></p>
+        <p class="{{ nowo_ui_class('muted', _b) }} pbk-canvas__status" data-pbk-status role="status" aria-live="polite"></p>
     </div>
 {% endblock %}
 
-{% block stylesheets %}
+{% block nowo_ui_styles %}
     {{ parent() }}
-    <link rel="stylesheet" href="https://unpkg.com/grapesjs@{{ grapesjs_cdn_version }}/dist/css/grapes.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/grapick/dist/grapick.min.css">
+    {# GrapesJS editor + gradient picker styles: vendored copies (grapesjs 0.22.9, grapick 0.1.13), never a CDN. #}
+    <link rel="stylesheet" href="{{ asset('css/grapes.min.css', 'nowo_page_builder_kit') }}">
+    <link rel="stylesheet" href="{{ asset('css/grapick.min.css', 'nowo_page_builder_kit') }}">
     <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
 {% endblock %}
 
-{% block javascripts %}
+{% block nowo_ui_scripts %}
     {{ parent() }}
     {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
     <script type="module"{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %} src="{{ asset('js/page-builder-canvas.js', 'nowo_page_builder_kit') }}"></script>

@@ -13,7 +13,7 @@ endif
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra check-composer-archive check-no-raw-html-form
+.PHONY: help up down down-dev build shell install test test-coverage test-coverage-100 coverage-php-percent cs-check cs-fix rector rector-dry phpstan igor qa release-check release-check-demos composer-sync clean update validate validate-translations assets test-ts setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke check-twig-extra check-composer-archive check-no-raw-html-form
 
 # Default target
 help:
@@ -48,7 +48,8 @@ help:
 	@echo "  update-deps   Update bundle and demo dependencies (REQ-MAKE-008)"
 	@echo "  validate      Run composer validate --strict"
 	@echo "  validate-translations Check translation YAML key parity (REQ-MAKE-004)"
-	@echo "  assets        pnpm install + Vite build (TS → src/Resources/public)"
+	@echo "  assets        pnpm install + Vite build in the container (TS → src/Resources/public)"
+	@echo "  test-ts       Typecheck + Vitest with coverage gate, then the global TS percentage (REQ-TEST-003/009)"
 	@echo "  setup-hooks   Install git pre-commit hooks"
 	@echo ""
 	@echo "Demos: use make -C demo or make -C demo/<demo-name>"
@@ -149,7 +150,7 @@ check-composer-archive:
 	@chmod +x .scripts/check-composer-archive-excludes-demo.sh
 	@./.scripts/check-composer-archive-excludes-demo.sh
 
-release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-no-raw-html-form check-composer-archive composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage release-check-demos
+release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-no-raw-html-form check-composer-archive composer-sync cs-fix cs-check rector-dry phpstan igor validate-translations test-coverage test-ts release-check-demos
 
 # REQ-TEST-011 — boot demo stack and assert one HTTP 200
 # classic mode keeps FrankenPHP up before vendor/ is installed on fresh CI checkouts
@@ -202,21 +203,16 @@ update: ensure-up
 validate: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict
 
-# TypeScript sources under src/Resources/assets → Vite → src/Resources/public
-assets:
-	@if [ ! -f package.json ]; then \
-		echo "No package.json found in bundle root."; \
-		exit 1; \
-	fi
-	@if ! command -v pnpm >/dev/null 2>&1; then \
-		echo "pnpm is required to build frontend assets."; \
-		exit 1; \
-	fi
-	@echo "Installing frontend dependencies..."
-	@pnpm install
-	@echo "Building Vite assets..."
-	@pnpm run build
-	@echo "Frontend assets built in src/Resources/public"
+# TypeScript sources under src/Resources/assets → Vite → src/Resources/public (REQ-ASSETS-001)
+assets: ensure-up
+	$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) pnpm install --frozen-lockfile
+	$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) pnpm run build
+
+# REQ-TEST-003 / REQ-TEST-009 — typecheck, Vitest coverage gate (vitest.config.ts thresholds), global TS percentage
+test-ts: ensure-up
+	$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) pnpm install --frozen-lockfile
+	$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) sh -c 'set -e; pnpm typecheck; pnpm run test:coverage > coverage-ts.txt 2>&1 || { cat coverage-ts.txt; exit 1; }; cat coverage-ts.txt'
+	./.scripts/ts-coverage-percent.sh coverage-ts.txt
 
 # Setup git hooks for pre-commit checks
 check-no-cursor-coauthor:

@@ -132,6 +132,18 @@ services:
         arguments:
             $assetBasePath: '/bundles/nowopagebuilderkit'
 
+    # REQ-UI-003: UiKit page contract of the admin pages (layout + per-page templates, view models).
+    Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages:
+        arguments:
+            $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
+            $templates: '%nowo_page_builder_kit.web_ui.templates%'
+            $twig: '@twig'
+
+    Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory:
+        arguments:
+            $access: '@Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface'
+            $revisionsEnabled: '%nowo_page_builder_kit.revisions.enabled%'
+
     Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension:
         arguments:
             $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'

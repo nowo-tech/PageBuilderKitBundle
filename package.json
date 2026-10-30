@@ -9,15 +9,23 @@
     "build:canvas": "VITE_ENTRY=canvas vite build",
     "build:inline-edit": "VITE_ENTRY=inline-edit vite build",
     "build:admin": "VITE_ENTRY=admin vite build",
-    "build:css": "mkdir -p src/Resources/public/css && cp src/Resources/assets/src/page-builder.css src/Resources/public/css/page-builder.css",
+    "build:css": "mkdir -p src/Resources/public/css && cp src/Resources/assets/src/page-builder.css src/Resources/public/css/page-builder.css && cp node_modules/grapesjs/dist/css/grapes.min.css src/Resources/public/css/grapes.min.css && cp node_modules/grapick/dist/grapick.min.css src/Resources/public/css/grapick.min.css",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "dev:canvas": "VITE_ENTRY=canvas vite build --watch",
     "dev:inline-edit": "VITE_ENTRY=inline-edit vite build --watch"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "grapesjs": "0.22.9",
+    "grapick": "0.1.13",
+    "jsdom": "^30.1.3",
     "only-allow": "^1.2.2",
     "typescript": "~5.7.3",
-    "vite": "^6.4.4"
-  }
+    "vite": "^6.4.4",
+    "vitest": "^5.0.5"
+  },
+  "description": "Build and unit tests of the Page Builder Kit Bundle TypeScript (GrapesJS canvas, inline edit, admin media picker)"
 }

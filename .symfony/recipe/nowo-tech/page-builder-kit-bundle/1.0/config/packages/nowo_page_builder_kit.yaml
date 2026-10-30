@@ -4,7 +4,7 @@ nowo_page_builder_kit:
     security:
         access_roles: [ROLE_EDITOR]
     web_ui:
-        css_framework: tailwind
+        layout_template: null   # null = nowo_ui_kit.layouts.admin
     html:
         sanitize:
             strategy: allowlist

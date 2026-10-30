@@ -13,11 +13,14 @@
     "noEmit": true,
     "types": [
       "vite/client",
+      "vitest/globals",
       "node"
     ]
   },
   "include": [
     "src/Resources/assets/src/**/*.ts",
+    "src/Resources/assets/tests/**/*.ts",
+    "vitest.config.ts",
     "vite.config.ts"
   ]
 }
