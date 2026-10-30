@@ -20,6 +20,7 @@ services:
             - '../../Security/ConfigurablePageBuilderKitAccessChecker.php'
             - '../../Security/PageBuilderKitAccessGuard.php'
             - '../../Security/Html/'
+            - '../../Controller/'
 
     Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace: ~
 
@@ -37,9 +38,13 @@ services:
     Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepository
 
-    # REQ-SF-003: controllers (AbstractController) and form types are tagged by autoconfiguration.
+    # REQ-SF-004 rule 7: controllers are registered explicitly, NOT autoconfigured. On Symfony >= 7.3 a #[Route]
+    # class is autoconfigured with the routing.controller tag and the host's `routing.controllers` resource would
+    # expose the admin and public routes (without web_ui.path_prefix) even when the host never imports routing.yaml.
     Nowo\PageBuilderKitBundle\Controller\:
         resource: '../../Controller/'
+        autoconfigure: false
+        tags: ['controller.service_arguments', 'container.service_subscriber']
 
     Nowo\PageBuilderKitBundle\Locale\BuilderLocales:
         public: true
