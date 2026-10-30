@@ -94,9 +94,9 @@ nowo_page_builder_kit:
 | Strategy | Behaviour |
 | --- | --- |
 | `none` | Trusted editors only; HTML stored/rendered as-is (opt-in; not the default) |
-| `allowlist` (default) | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer`; drops `script` / `style` / `iframe` / `object` / `embed` / `link` / `meta` / `svg` with content, removes `on*` handlers, and rejects `javascript:` / `vbscript:` / non-image `data:` URLs (after stripping whitespace / control characters) |
+| `allowlist` (default) | DOM allowlist via `AllowlistPageBuilderHtmlSanitizer`; drops comments / processing instructions, `script` / `style` / `iframe` / `object` / `embed` / `link` / `meta` / `svg` with content, removes `on*` handlers, and rejects `javascript:` / `vbscript:` / non-image `data:` URLs (after stripping whitespace / control characters) |
 | `strip` | Remove all tags |
-| `service` | Host `PageBuilderHtmlSanitizerInterface` |
+| `service` | Host `PageBuilderHtmlSanitizerInterface` (`html.sanitize.service` is required: the container refuses to compile without it) |
 
 Only trusted editors should receive roles covered by the access checker.
 
@@ -112,7 +112,8 @@ It parses with PHP 8.4 `Dom\HTMLDocument` (the HTML5 algorithm browsers use) and
 | Removed | Items |
 | --- | --- |
 | Elements (with content) | `script`, `style`, `iframe`, `frame(set)`, `object`, `embed`, `applet`, `base`, `meta`, `link`, `form`, `math`, `portal`, `noscript`, `template`, `xmp`, `noembed`, `noframes`, `plaintext`, SVG `animate*`, `set`, `foreignObject`, `handler`, `listener` |
-| Attributes | `on*`, `formaction`, `srcdoc`, `action` |
+| Comments | every comment node |
+| Attributes | `on*`, `formaction`, `srcdoc`, `action`, `form`, `xml:base`, `xmlns:xlink`; front-end framework "script gadget" prefixes `x-`, `:`, `@` (Alpine), `hx-` / `data-hx-` (htmx), `v-` (Vue), `ng-` / `data-ng-` (AngularJS), `data-turbo*` (Turbo) |
 | URL values | `javascript:` / `vbscript:` / non-image `data:` in `href`, `src`, `xlink:href`, `srcset` (each candidate), `poster`, `data-src`, SVG `values`/`from`/`to`/`by`, … (ASCII whitespace/control chars ignored) |
 
 CSS: every `<` becomes the CSS escape `\3C `, so nested `</sty</stylele>` can never close the element. It runs regardless of `html.sanitize.strategy` (also `none`). `grapesjs.allow_scripts: true` keeps `<script>` elements only. The pass is idempotent. PHP 8.4 is the bundle minimum, so there is no non-HTML5 fallback.
@@ -132,7 +133,7 @@ Nowo-tech kit convention: when the request attribute `csp_nonce` is set, every `
 <script{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>…</script>
 ```
 
-The kit templates contain **no inline scripts or event handlers**: confirmations use the UiKit confirm `<dialog>` (REQ-UI-003), the content-page upload / media library lives in `js/page-builder-admin.js`, and the inline-edit modal form is blocked by a `submit` listener in `js/page-builder-inline-edit.js`. The admin markup links no CDN asset; the GrapesJS editor scripts are still fetched at run time from esm.sh by `js/page-builder-canvas.js` (see [CONFIGURATION](CONFIGURATION.md#grapesjs)). Host sketch:
+The kit templates contain **no inline scripts or event handlers**: confirmations use the UiKit confirm `<dialog>` (REQ-UI-003), the content-page upload / media library lives in `js/page-builder-admin.js`, and the inline-edit modal form is blocked by a `submit` listener in `js/page-builder-inline-edit.js`. The admin markup links no CDN asset; the GrapesJS editor scripts are still fetched at run time by `js/page-builder-canvas.js` from `grapesjs.module_base_url` (default `https://esm.sh`, see [CONFIGURATION](CONFIGURATION.md#grapesjs)). Host sketch:
 
 ```php
 #[AsEventListener(KernelEvents::REQUEST, priority: 512)]
@@ -145,10 +146,27 @@ public function onRequest(RequestEvent $event): void
 
 Element `style="…"` attributes from GrapesJS still require `style-src-attr 'unsafe-inline'` (or `'unsafe-hashes'`).
 
+**Known residual — GrapesJS scripts from a module CDN (Appendix BO L2).** The canvas `import()`s GrapesJS and its
+plugins from `grapesjs.module_base_url` (default `https://esm.sh`): esm.sh builds packages server side and dynamic
+`import()` cannot carry Subresource Integrity, and the code runs in the admin origin next to the CSRF tokens. A CSP
+that allows `https://esm.sh` in `script-src` also lets any HTML injection load arbitrary npm code. Mitigations:
+
+- Self-host a mirror of the pinned packages (`grapesjs@<cdn_version>` and the enabled `grapesjs-*` plugins) and set
+  `grapesjs.module_base_url` to it (an `https://` URL or a root-relative path on your own origin); then `script-src`
+  needs no third-party host.
+- Otherwise scope the CDN to the admin: send `script-src 'self' 'nonce-…' https://esm.sh` only on the
+  `web_ui.path_prefix` routes and keep it out of the public pages' CSP.
+- Disable the plugins you do not use (`grapesjs.plugins.*: false`) to shrink the imported code.
+
+**Front-end framework gadgets.** The final gate removes Alpine / htmx / Vue / AngularJS / Turbo attribute prefixes
+(see above). If the host runs such a framework over the public content area with other syntaxes (e.g. AngularJS
+`{{ }}` interpolation of text), keep it off the elements that print editor HTML.
+
 ## Asset uploads
 
 When `assets_upload.enabled` is true (`admin_page_builder_asset_upload` / `admin_page_builder_assets_list`, both require the **layout** capability):
 
+- The upload CSRF token is read from the `X-CSRF-TOKEN` header or the POST body only (never the query string, since 1.12.0).
 - The MIME type is detected from the file bytes (finfo) and checked against `assets_upload.allowed_mime`.
 - The stored file name is random and its extension is derived from the detected MIME type, never from the client name; a mismatching client extension (e.g. a GIF/PHP polyglot named `x.php`) is rejected, so nothing executable lands under `public/`.
 - `image/svg+xml` is not allowed by default (scriptable SVG served same-origin = stored XSS). Opt in only for trusted uploaders or with a separate asset origin / strict CSP.
@@ -194,11 +212,33 @@ See also [CONFIGURATION.md](CONFIGURATION.md) and [USAGE.md](USAGE.md).
 
 | Field | Value |
 |-------|--------|
-| **Date** | 2026-10-29 |
-| **Method** | Claude Code static re-audit (`src/`, templates, Flex recipe, demo, this doc) |
-| **Overall risk** | **Low** (after 1.10.2, 1.11.0 and 1.11.1) |
-| **Grade** | **Pass (good)** |
-| **Record** | This document (in-package). Monorepo catalog: `BUNDLES_SECURITY_ANALYSIS.md` §4 / §7 / Appendix AY |
+| **Date** | 2026-10-30 |
+| **Method** | Claude Code static delta review of 1.12.0 (UiKit page contract) + sanitizer stress test (130 payloads × 8 pipelines, PHP 8.4 / 8.5, parse5 cross-check) |
+| **Overall risk** | **Low** after 1.12.0 (Medium before: M1 below) |
+| **Grade** | **Pass (good)** after 1.12.0 — Pass (conditional) for `>= 1.5.0, < 1.12.0` |
+| **Record** | This document (in-package). Monorepo catalog: `BUNDLES_SECURITY_ANALYSIS.md` §4 / §7 / Appendix BO (2026-10-30), Appendix AY (2026-10-29) |
+
+Findings of the 2026-10-30 re-audit (Appendix BO):
+
+- **M1 (fixed in 1.12.0, GHSA, affected `>= 1.5.0, < 1.12.0`, CWE-79):** `nowo_page_builder_hydrate_binds()` /
+  `PublicBindHydrator` found bind slots with a regex on the already-hardened page HTML; a `</span>` inside an
+  attribute value or a comment ended the slot early and turned inert markup into live elements (stored XSS against
+  users with the `content` capability, authored by `layout` users or via html fields placed in bind slots). The
+  hydrator now hardens its input and works on the HTML5 tree (`Dom\HTMLDocument`); the final gate drops comments.
+- **L1 (patched in 1.12.0):** the libxml persist sanitizers kept comments (`<!--><img onerror>-->` re-parses as an
+  element under HTML5) and the GrapesJS pass was a short denylist. Both now drop comments / processing instructions;
+  the GrapesJS pass also blocks `style`, `math`, `template`, `portal`, `frame(set)`, `noscript`, SVG `animate*` / `set`
+  / `foreignObject`, `srcdoc`, `xml:base`, `shadowrootmode` and applies the shared URL policy (`vbscript:`,
+  `data:text/html`, …). The migration to `symfony/html-sanitizer` is planned for a later release; every public sink
+  still ends in the HTML5 final gate.
+- **L3 (fixed in 1.12.0):** the final gate drops `form=`, `xml:base` and front-end framework gadget attributes.
+- **L2 (open, documented):** GrapesJS scripts from a module CDN — now configurable (`grapesjs.module_base_url`), see
+  [Content Security Policy](#content-security-policy-nonce).
+- **Info (fixed in 1.12.0):** `html.sanitize.strategy: service` without a service fails closed (compile error; the
+  runtime fallback is the allowlist), `twig/twig` floor `^3.19` (CVE-2025-24374), the media picker rejects backslash
+  URLs, the upload CSRF token is no longer read from the query string.
+- **Info (open):** production guard for `allow_unauthenticated`, guard keyed on the route-name prefix, Twig sandbox
+  `range()`.
 
 Findings of the 2026-10-29 re-audit:
 

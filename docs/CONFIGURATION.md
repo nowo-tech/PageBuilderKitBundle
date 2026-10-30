@@ -61,6 +61,7 @@ nowo_page_builder_kit:
     grapesjs:
         enabled: true
         cdn_version: '0.22.9'
+        module_base_url: 'https://esm.sh'   # ESM mirror of GrapesJS + plugins (https:// URL or root-relative path)
         height: 'calc(100vh - 220px)'
         allow_scripts: false
         allow_custom_code: true
@@ -275,7 +276,8 @@ Sanitization runs when `DocumentService` saves widget props and when widgets san
 | Key | Default | Description |
 | --- | --- | --- |
 | `enabled` | `true` | Feature flag for the GrapesJS canvas. |
-| `cdn_version` | `0.22.9` | GrapesJS core version loaded from esm.sh / CSS CDN. |
+| `cdn_version` | `0.22.9` | GrapesJS core version imported from `module_base_url` (`<base>/grapesjs@<cdn_version>`). The editor CSS is the vendored 0.22.9 copy: keep both in sync. |
+| `module_base_url` | `https://esm.sh` | ESM base the canvas imports GrapesJS and the enabled plugins from (`<base>/<package>@<version>`). Set it to your own mirror (an `https://` URL or a root-relative path) to remove the esm.sh dependency and keep third-party hosts out of `script-src` — see [SECURITY](SECURITY.md#content-security-policy-nonce). Other schemes, protocol-relative URLs and backslashes are rejected. |
 | `height` | `calc(100vh - 220px)` | Editor container height. |
 | `allow_scripts` | `false` | Persist/render `<script>` blocks. **XSS risk**. |
 | `allow_custom_code` | `true` | Enable Custom HTML + `grapesjs-custom-code` plugin. |
@@ -285,7 +287,7 @@ Sanitization runs when `DocumentService` saves widget props and when widgets san
 | `notice_on_unload` | `false` | Browser “unsaved changes” prompt. |
 | `asset_embed_as_base64` | `true` | Embed dropped files as base64 when upload is disabled. Forced `false` when `assets_upload.enabled`. |
 | `assets_upload` | map | See [Asset uploads](#asset-uploads). |
-| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe (what the edited page looks like). Empty → derived from the deprecated `web_ui.css_framework` (Bootstrap, etc.); set it explicitly instead. The editor's own styles are local assets (`css/grapes.min.css`, `css/grapick.min.css`); the GrapesJS scripts are loaded at run time from esm.sh at `cdn_version`. |
+| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe (what the edited page looks like). Empty → derived from the deprecated `web_ui.css_framework` (Bootstrap, etc.); set it explicitly instead. The editor's own styles are local assets (`css/grapes.min.css`, `css/grapick.min.css`); the GrapesJS scripts are loaded at run time from `module_base_url` at `cdn_version`. |
 | `assets` | `[]` | Initial Asset Manager entries (`type`, `src`, `name`, `width`, `height`). Empty → stock demo images. |
 | `plugins.*` | mostly `true` | Toggle official plugins (see below). |
 

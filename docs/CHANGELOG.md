@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Admin pages on the UiKit page contract (REQ-UI-003); TypeScript test suite with a coverage gate (REQ-TEST-003). See
+Security fix for stored XSS in bind-slot hydration (M1, GHSA); admin pages on the UiKit page contract (REQ-UI-003);
+TypeScript test suite with a coverage gate (REQ-TEST-003). See
 [UPGRADING](UPGRADING.md#unreleased).
 
 ### Added
@@ -76,8 +77,30 @@ Admin pages on the UiKit page contract (REQ-UI-003); TypeScript test suite with 
 - FormKit profile `page_builder_kit` defaults are theme-neutral (`nowo-ui-input`, no `form-control` / `mb-2`).
 - `page-builder-canvas.js` swaps the UiKit slot classes it reads from `data-pbk-class-*` (status badge, active locale
   tab) and marks the status line with `data-pbk-state` instead of Bootstrap utility classes.
-- `nowo-tech/ui-kit-bundle` constraint `^1.4 || ^2.2` → `^2.17.3`; `twig/twig` `^3.8` → `^3.15`.
+- `nowo-tech/ui-kit-bundle` constraint `^1.4 || ^2.2` → `^2.17.3`; `twig/twig` `^3.8` → `^3.19`.
 - `make assets` builds inside the PHP container (Node 22 + pnpm 9.14.2 added to the dev image).
+
+### Security
+
+- **M1 (Moderate, CWE-79, GHSA; affected `>= 1.5.0, < 1.12.0`):** `nowo_page_builder_hydrate_binds()` /
+  `PublicBindHydrator` sliced the hardened page HTML with a regex at the first `</span>`; a `</span>` inside an
+  attribute value or a comment turned inert markup into live elements for users with the `content` capability
+  (stored XSS against content editors). Bind slots are now found on the HTML5 tree (`Dom\HTMLDocument`) and the input
+  always passes the final gate, so the function output is safe without `|raw`. SEC-004 re-audit 2026-10-30
+  (Appendix BO); regression tests with the auditor's 130-payload corpus.
+- `PublicHtmlHardener` (final gate) drops comments, `form=`, `xml:base` and front-end framework gadget attributes
+  (`x-*`, `:*`, `@*`, `hx-*`, `v-*`, `ng-*`, `data-turbo*`).
+- The persist sanitizers (`allowlist` strategy, GrapesJS HTML pass) drop comments / processing instructions; the
+  GrapesJS pass also blocks `style`, `math`, `template`, `portal`, `frame(set)`, `noscript`, SVG `animate*` / `set` /
+  `foreignObject`, `srcdoc`, `xml:base`, `shadowrootmode` and uses the shared URL policy (`vbscript:`,
+  `data:text/html`, …).
+- `html.sanitize.strategy: service` without `html.sanitize.service` now fails at container compilation (fail closed;
+  the runtime fallback is the allowlist instead of no sanitizing).
+- `twig/twig` floor `^3.19` (CVE-2025-24374).
+- Content-page media picker: URLs with a backslash (`/\host`) are refused.
+- Asset upload: the CSRF token is read from the `X-CSRF-TOKEN` header or the POST body only (no longer `?_token`).
+- New `grapesjs.module_base_url` (default `https://esm.sh`) to self-host the GrapesJS ESM modules; the esm.sh
+  residual and CSP guidance are documented in `docs/SECURITY.md`.
 
 ### Deprecated
 

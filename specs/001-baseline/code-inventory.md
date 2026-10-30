@@ -196,6 +196,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Security/Html/NullPageBuilderHtmlSanitizer.php` | No-op sanitizer | FR-SEC-003 |
 | `Security/Html/StripPageBuilderHtmlSanitizer.php` | Strip-tags sanitizer | FR-SEC-003 |
 | `Security/Html/AllowlistPageBuilderHtmlSanitizer.php` | DOM allowlist sanitizer | FR-SEC-003, FR-P5-VAL-004 |
+| `Security/Html/HtmlNodePurger.php` | Drops comments / PIs / CDATA from libxml trees (persist sanitizers) | FR-SEC-003, REQ-SEC-005 |
 | `Security/Html/SafeUrl.php` | URL scheme allowlist for href / src (`pbk_safe_url`) | FR-SEC-003, REQ-SEC-005 |
 
 ## Twig
@@ -325,7 +326,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | HTML | 2 | 2 |
 | Content fields and bind slots | 4 | 4 |
 | Utilities | 1 | 1 |
-| Security | 11 | 11 |
+| Security | 12 | 12 |
 | Twig | 2 | 2 |
 | UiKit page contract | 2 | 2 |
 | Widget system | 12 | 12 |
@@ -333,4 +334,4 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Resources — admin and public Twig | 27 | 27 |
 | Resources — frontend assets | 12 | 12 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **174** | **174** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **175** | **175** |

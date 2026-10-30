@@ -553,8 +553,11 @@ Declare a multilingual variable in any host template. Visitors see the stored va
 | Type | Display | Persist |
 | --- | --- | --- |
 | `string` / `text` / `number` / `url` / `image` / `icon` / `bool` / `select` | escaped (or semantic HTML) | as-is |
-| `html` / `richtext` | `|raw` after allowlist sanitize on save | sanitized |
-| `raw` | `|raw` trusted | **not** sanitized |
+| `html` / `richtext` | HTML through `|pbk_harden_html` (HTML5 final gate), after the allowlist sanitize on save | sanitized |
+| `raw` | HTML through `|pbk_harden_html` (trusted editors; the gate still drops scripts, handlers and script URLs) | **not** sanitized |
+
+Host templates never need `|raw` for editor HTML: `nowo_page_builder_field()` and `nowo_page_builder_hydrate_binds()`
+return safe markup, and `|pbk_harden_html` covers any other editor HTML you print.
 
 - Field **labels** are multilingual: `labels[locale]` with fallback to `default_locale`, then singular `label`, then the field key.
 - First save from the modal **creates** the field definition on the page document (`structure.fields` + `fieldValues`).
@@ -761,7 +764,7 @@ See [CONFIGURATION.md](CONFIGURATION.md#debug).
 
 ## Public bind hydration, section filter and status query
 
-**Bind hydration.** Grapes public HTML may contain `<span data-pbk-bind="hero_title">Resolved text</span>` slots. For users with the `content` capability, `PublicBindHydratorInterface::hydrate($html, $pageKey)` (or `{{ nowo_page_builder_hydrate_binds(html, pageKey)|raw }}`) wraps each slot with the inline-edit pencil/modal, using the slot inner HTML as value (no page query). Visitors receive the HTML unchanged. Field types and labels come from your `ContentFieldDefinitionProviderInterface`:
+**Bind hydration.** Grapes public HTML may contain `<span data-pbk-bind="hero_title">Resolved text</span>` slots. For users with the `content` capability, `PublicBindHydratorInterface::hydrate($html, $pageKey)` (or `{{ nowo_page_builder_hydrate_binds(html, pageKey) }}` — no `|raw`: the function output is already safe HTML) wraps each slot with the inline-edit pencil/modal, using the slot content as value (no page query). The input always goes through the HTML5 final gate first and the slots are found on the parsed HTML5 tree (never by regex), so a `</span>` inside an attribute or a comment cannot end a slot early (fixed in 1.12.0, Appendix BO M1). Visitors receive the hardened HTML. Field types and labels come from your `ContentFieldDefinitionProviderInterface`:
 
 ```php
 final class ClinicContentFieldDefinitionProvider implements ContentFieldDefinitionProviderInterface

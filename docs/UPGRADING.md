@@ -42,7 +42,22 @@ composer update nowo-tech/page-builder-kit-bundle nowo-tech/ui-kit-bundle
 php bin/console assets:install
 ```
 
-Requires `nowo-tech/ui-kit-bundle` **^2.17.3** (and `twig/twig` ^3.15). No database change.
+Requires `nowo-tech/ui-kit-bundle` **^2.17.3** (and `twig/twig` ^3.19). No database change.
+
+### Security (Appendix BO)
+
+- **Upgrade if you print `nowo_page_builder_hydrate_binds()`** (M1, stored XSS against content editors in
+  `>= 1.5.0`). Drop any `|raw` after it: the output is safe HTML. The value handed to the inline editor is now the slot
+  text for non-HTML field types (entities decoded once) and the slot markup for `html` / `richtext` / `raw` fields.
+- The public output no longer contains HTML comments, `form=` / `xml:base` attributes or Alpine / htmx / Vue /
+  AngularJS / Turbo attributes (`x-*`, `:*`, `@*`, `hx-*`, `v-*`, `ng-*`, `data-turbo*`) authored in the editor. If a
+  page relied on such attributes in GrapesJS HTML, move that behaviour into the host template.
+- Saved GrapesJS HTML loses comments, `<style>`, `<math>`, `<template>`, SVG animation elements, `srcdoc`,
+  `xml:base` and `vbscript:` / non-image `data:` links on the next save (they were already removed on output).
+- `html.sanitize.strategy: service` now requires `html.sanitize.service` (compile error otherwise).
+- Asset uploads must send the CSRF token in the `X-CSRF-TOKEN` header or the POST body (`?_token=` is ignored); the
+  bundle's canvas and content page already do.
+- Optional: set `grapesjs.module_base_url` to a self-hosted ESM mirror to remove the esm.sh dependency.
 
 ### Layout
 
