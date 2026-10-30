@@ -24,12 +24,12 @@ final class TemplateSaveType extends AbstractType
                     new Assert\NotBlank(),
                     new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
                 ],
-                'attr' => ['class' => 'form-control form-control-sm', 'style' => 'max-width:10rem'],
+                'attr' => ['class' => 'pbk-input--key'],
             ])
             ->add('label', TextType::class, [
                 'label'       => 'admin.templates.label',
                 'constraints' => [new Assert\NotBlank()],
-                'attr'        => ['class' => 'form-control form-control-sm', 'style' => 'max-width:12rem'],
+                'attr'        => ['class' => 'pbk-input--label'],
             ]);
     }
 

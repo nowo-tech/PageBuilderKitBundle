@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\DependencyInjection;
 
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
+use function array_diff_key;
+use function array_keys;
+use function implode;
 use function is_string;
+use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
 
@@ -78,6 +84,17 @@ final class Configuration implements ConfigurationInterface
                 ->end()
                 ->arrayNode('web_ui')
                     ->addDefaultsIfNotSet()
+                    ->beforeNormalization()
+                        ->ifArray()
+                        ->then(static function (array $v): array {
+                            // The 1.x default layout is deprecated (REQ-UI-003): null = nowo_ui_kit.layouts.admin.
+                            if (($v['layout_template'] ?? null) === PageBuilderKitPages::LEGACY_DEFAULT_LAYOUT) {
+                                $v['layout_template'] = null;
+                            }
+
+                            return $v;
+                        })
+                    ->end()
                     ->children()
                         ->scalarNode('path_prefix')
                             ->defaultValue('/admin/page-builder')
@@ -91,11 +108,26 @@ final class Configuration implements ConfigurationInterface
                             ->end()
                         ->end()
                         ->scalarNode('layout_template')
-                            ->defaultValue('@NowoPageBuilderKitBundle/admin/layout.html.twig')
+                            ->defaultNull()
+                            ->info('Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. A 1.x layout without the UiKit canonical blocks (it renders {% block admin %}) is wrapped in a deprecated bridge.')
                         ->end()
                         ->enumNode('css_framework')
                             ->values(self::CSS_FRAMEWORKS)
                             ->defaultValue('tailwind')
+                            ->info('Deprecated since 1.12: the admin pages take the CSS stack from nowo_ui_kit.css_framework. Only picks the default GrapesJS canvas iframe stylesheets when grapesjs.canvas_styles is empty, and feeds the deprecated nowo_page_builder_css_framework() Twig function.')
+                            ->setDeprecated('nowo-tech/page-builder-kit-bundle', '1.12', 'The "%path%.%node%" option is deprecated: the admin pages use nowo_ui_kit.css_framework (REQ-UI-003). Set nowo_page_builder_kit.grapesjs.canvas_styles for the GrapesJS canvas iframe instead.')
+                        ->end()
+                        ->arrayNode('templates')
+                            ->info('Per-page template overrides (REQ-UI-003), page id => template. Ids: ' . implode(', ', array_keys(PageBuilderKitPages::TEMPLATES)) . '. Prefer a thin {% extends \'@!NowoPageBuilderKitBundle/...\' %} that overrides one data block.')
+                            ->useAttributeAsKey('page')
+                            ->scalarPrototype()->cannotBeEmpty()->end()
+                            ->defaultValue([])
+                            ->validate()
+                                ->ifTrue(static fn (array $v): bool => array_diff_key($v, PageBuilderKitPages::TEMPLATES) !== [])
+                                ->then(static function (array $v): array {
+                                    throw new InvalidConfigurationException(sprintf('Unknown nowo_page_builder_kit.web_ui.templates page id(s) "%s"; allowed: %s.', implode('", "', array_keys(array_diff_key($v, PageBuilderKitPages::TEMPLATES))), implode(', ', array_keys(PageBuilderKitPages::TEMPLATES))));
+                                })
+                            ->end()
                         ->end()
                     ->end()
                 ->end()

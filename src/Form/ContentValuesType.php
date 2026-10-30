@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -82,7 +83,7 @@ final class ContentValuesType extends AbstractType
                 'label'    => 'admin.content.field_label_locale',
                 'required' => false,
                 'data'     => $currentLabel,
-                'attr'     => ['class' => 'form-control form-control-sm', 'placeholder' => $key],
+                'attr'     => ['placeholder' => new TranslatableText($key)],
             ]);
 
             $current = $values[$key] ?? ($field['default'] ?? ($type === 'bool' ? false : ''));
@@ -108,9 +109,10 @@ final class ContentValuesType extends AbstractType
         mixed $current,
         array $referencePages,
     ): void {
-        $label = is_string($field['display_label'] ?? null)
+        // Editor-defined label: printed as given (never looked up in the bundle catalogue).
+        $label = new TranslatableText(is_string($field['display_label'] ?? null)
             ? $field['display_label']
-            : (is_string($field['label'] ?? null) ? $field['label'] : $key);
+            : (is_string($field['label'] ?? null) ? $field['label'] : $key));
 
         if ($type === 'bool') {
             $builder->add($key, CheckboxType::class, [
@@ -129,10 +131,10 @@ final class ContentValuesType extends AbstractType
                 is_string(...),
             )) : [];
             $builder->add($key, ChoiceType::class, [
-                'label'   => $label,
-                'choices' => array_combine($opts, $opts),
-                'data'    => is_string($current) ? $current : null,
-                'attr'    => ['class' => 'form-select'],
+                'label'                     => $label,
+                'choices'                   => array_combine($opts, $opts),
+                'choice_translation_domain' => false,
+                'data'                      => is_string($current) ? $current : null,
             ]);
 
             return;
@@ -141,12 +143,12 @@ final class ContentValuesType extends AbstractType
         if ($type === 'reference') {
             $choices = array_combine($referencePages, $referencePages);
             $builder->add($key, ChoiceType::class, [
-                'label'       => $label,
-                'choices'     => $choices,
-                'required'    => false,
-                'placeholder' => 'admin.content.reference_none',
-                'data'        => is_string($current) && $current !== '' ? $current : null,
-                'attr'        => ['class' => 'form-select'],
+                'label'                     => $label,
+                'choices'                   => $choices,
+                'choice_translation_domain' => false,
+                'required'                  => false,
+                'placeholder'               => 'admin.content.reference_none',
+                'data'                      => is_string($current) && $current !== '' ? $current : null,
             ]);
 
             return;
@@ -217,7 +219,7 @@ final class ContentValuesType extends AbstractType
                 'label'    => $label,
                 'required' => false,
                 'data'     => is_string($current) ? $current : (string) $current,
-                'attr'     => ['class' => 'form-control', 'rows' => 4],
+                'attr'     => ['rows' => 4],
             ]);
 
             return;
@@ -230,8 +232,7 @@ final class ContentValuesType extends AbstractType
                 'data'     => is_string($current) ? $current : '',
                 'attr'     => [
                     'id'          => 'field-' . $key,
-                    'class'       => 'form-control',
-                    'placeholder' => $type === 'image' ? 'https://…' : '',
+                    'placeholder' => new TranslatableText($type === 'image' ? 'https://…' : ''),
                 ],
                 'default_protocol' => 'https',
             ]);
@@ -244,7 +245,6 @@ final class ContentValuesType extends AbstractType
                 'label'    => $label,
                 'required' => false,
                 'data'     => is_numeric($current) ? $current + 0 : null,
-                'attr'     => ['class' => 'form-control'],
             ]);
 
             return;
@@ -254,7 +254,6 @@ final class ContentValuesType extends AbstractType
             'label'    => $label,
             'required' => false,
             'data'     => is_string($current) ? $current : (string) $current,
-            'attr'     => ['class' => 'form-control'],
         ]);
     }
 

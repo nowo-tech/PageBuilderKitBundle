@@ -1,87 +1,39 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Page SEO of one locale (REQ-UI-003): UiKit form scaffold. Variable: page (View\FormPage from
+  PageBuilderKitPageFactory::seo(): header admin.seo.title / admin.seo.hint with Revisions and Edit, back link to the
+  list; form = BuilderPageSeoType; submit admin.seo.save; cancel = list). Also: builder_page, page_key, locales,
+  locale, form.
+  Data block filled: nowo_ui_form_body (locale tabs, then the fields grouped in three fieldsets — page, search / meta,
+  Open Graph — and the REQ-TWIG-003 child loop for the rest).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% set _css_fw = nowo_page_builder_css_framework() %}
-{% if _css_fw starts with 'bootstrap' or _css_fw == 'tabler' %}
-    {% form_theme form 'bootstrap_5_layout.html.twig' %}
-{% endif %}
-
-{% block page_title %}{{ 'admin.seo.title'|trans({'%key%': page_key}) }}{% endblock %}
-
-{% block header_actions %}
-    <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
-        {% if nowo_page_builder_revisions_enabled() %}
-            <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">{{ 'admin.pages.revisions'|trans }}</a>
-        {% endif %}
-        <a class="btn btn-primary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">{{ 'admin.pages.edit'|trans }}</a>
-    </div>
+{% block nowo_ui_form_body %}
+    {% set _b = page.bundle %}
+    {% set _tabs = [] %}
+    {% for loc in locales %}
+        {% set _tabs = _tabs|merge([{label: loc|upper, href: path('admin_page_builder_seo', {pageKey: page_key, locale: loc}), current: loc == locale}]) %}
+    {% endfor %}
+    {{ include(nowo_ui_partial('tabs', _b), {items: _tabs, aria_label: 'admin.content.locales'|trans, bundle: _b, region: 'locales', level: 'secondary'}, false) }}
+    {% for group, names in {
+        'admin.seo.section_page': ['title', 'slug'],
+        'admin.seo.section_meta': ['metaTitle', 'robots', 'metaDescription', 'canonicalUrl'],
+        'admin.seo.section_social': ['ogTitle', 'ogImage', 'ogDescription'],
+    } %}
+        <fieldset class="{{ nowo_ui_class('section', _b) }} pbk-seo-group">
+            <legend class="{{ nowo_ui_class('card_title', _b) }}">{{ group|trans }}</legend>
+            {% for child in form %}
+                {% if not child.rendered and child.vars.name in names %}
+                    {{ form_row(child) }}
+                {% endif %}
+            {% endfor %}
+        </fieldset>
+    {% endfor %}
+    {{ parent() }}
 {% endblock %}
 
-{% block admin %}
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        {% for loc in locales %}
-            <li class="nav-item" role="presentation">
-                <a class="nav-link{% if loc == locale %} active{% endif %}"
-                   href="{{ path('admin_page_builder_seo', {pageKey: page_key, locale: loc}) }}">{{ loc|upper }}</a>
-            </li>
-        {% endfor %}
-    </ul>
-
-    <p class="text-muted small mb-4">{{ 'admin.seo.hint'|trans }}</p>
-
-    {{ form_start(form, { attr: { class: 'pbk-seo-form' } }) }}
-        <div class="card mb-3">
-            <div class="card-header fw-semibold">{{ 'admin.seo.section_page'|trans }}</div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% for child in form %}
-                        {% if not child.rendered and child.vars.name in ['title', 'slug'] %}
-                            <div class="col-md-6">{{ form_row(child) }}</div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header fw-semibold">{{ 'admin.seo.section_meta'|trans }}</div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% for child in form %}
-                        {% if not child.rendered and child.vars.name in ['metaTitle', 'robots', 'metaDescription', 'canonicalUrl'] %}
-                            <div class="col-md-{% if child.vars.name == 'robots' %}4{% elseif child.vars.name == 'metaTitle' %}8{% else %}12{% endif %}">
-                                {{ form_row(child) }}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-header fw-semibold">{{ 'admin.seo.section_social'|trans }}</div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% for child in form %}
-                        {% if not child.rendered and child.vars.name in ['ogTitle', 'ogImage', 'ogDescription'] %}
-                            <div class="col-md-{% if child.vars.name == 'ogDescription' %}12{% else %}6{% endif %}">
-                                {{ form_row(child) }}
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        {% for child in form %}
-            {% if not child.rendered %}
-                {{ form_row(child) }}
-            {% endif %}
-        {% endfor %}
-
-        <div class="d-flex justify-content-end gap-2">
-            <button type="submit" class="btn btn-success">{{ 'admin.seo.save'|trans }}</button>
-        </div>
-    {{ form_end(form) }}
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
 {% endblock %}

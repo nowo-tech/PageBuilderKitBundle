@@ -83,8 +83,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
                     'alias'              => 'page_builder_kit',
                     'translation_domain' => 'NowoPageBuilderKitBundle',
                     'defaults'           => [
-                        'attr'     => ['class' => 'nowo-ui-input form-control'],
-                        'row_attr' => ['class' => 'mb-2'],
+                        'attr' => ['class' => 'nowo-ui-input'],
                     ],
                 ],
             ],
@@ -113,6 +112,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.web_ui.path_prefix', $config['web_ui']['path_prefix']);
         $container->setParameter('nowo_page_builder_kit.web_ui.layout_template', $config['web_ui']['layout_template']);
         $container->setParameter('nowo_page_builder_kit.web_ui.css_framework', $config['web_ui']['css_framework']);
+        $container->setParameter('nowo_page_builder_kit.web_ui.templates', $config['web_ui']['templates']);
         $container->setParameter('nowo_page_builder_kit.seo.site_name', $config['seo']['site_name']);
         $container->setParameter('nowo_page_builder_kit.seo.default_og_image', $config['seo']['default_og_image']);
         $container->setParameter('nowo_page_builder_kit.seo.canonical_base_url', $config['seo']['canonical_base_url']);

@@ -15,6 +15,7 @@ use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
+use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,6 +32,8 @@ use const DATE_ATOM;
 
 final class PageRevisionsController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public const string CSRF_TOKEN_ID = 'page_builder_document';
 
     public function __construct(
@@ -39,6 +42,7 @@ final class PageRevisionsController extends AbstractController
         private readonly PageRevisionStore $revisionStore,
         private readonly DocumentNormalizer $documentNormalizer,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
+        private readonly PageBuilderKitPageFactory $pageFactory,
         private readonly PageBuilderKitTraceInterface $trace = new NullPageBuilderKitTrace(),
     ) {
     }
@@ -78,8 +82,9 @@ final class PageRevisionsController extends AbstractController
             ])->createView();
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/revisions.html.twig', [
-            'page'         => $page,
+        return $this->render($this->pageFactory->template('revisions'), $this->pageFactory->context([
+            'page'         => $this->pageFactory->revisions($page, $revisions, $restoreForms, $this->revisionStore->getMaxPerPage()),
+            'builder_page' => $page,
             'page_key'     => $pageKey,
             'revisions'    => $revisions,
             'engine'       => $engine,
@@ -89,7 +94,7 @@ final class PageRevisionsController extends AbstractController
                 'method' => 'POST',
             ])->createView(),
             'restore_forms' => $restoreForms,
-        ]);
+        ]));
     }
 
     #[Route(
@@ -195,12 +200,13 @@ final class PageRevisionsController extends AbstractController
             return new JsonResponse(['ok' => true, 'diff' => $diff]);
         }
 
-        return $this->render('@NowoPageBuilderKitBundle/admin/pages/revision_diff.html.twig', [
-            'page'       => $page,
-            'page_key'   => $pageKey,
-            'revisionId' => $revisionId,
-            'diff'       => $diff,
-        ]);
+        return $this->render($this->pageFactory->template('revision_diff'), $this->pageFactory->context([
+            'page'         => $this->pageFactory->revisionDiff($page, $revisionId),
+            'builder_page' => $page,
+            'page_key'     => $pageKey,
+            'revisionId'   => $revisionId,
+            'diff'         => $diff,
+        ]));
     }
 
     #[Route(

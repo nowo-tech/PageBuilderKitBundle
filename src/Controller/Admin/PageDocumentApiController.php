@@ -29,6 +29,8 @@ use function str_starts_with;
 
 final class PageDocumentApiController extends AbstractController
 {
+    use TranslatesFlashes;
+
     public function __construct(
         private readonly BuilderPageRepositoryInterface $pageRepository,
         private readonly DocumentService $documentService,

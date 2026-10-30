@@ -1,80 +1,31 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Revision history (REQ-UI-003): UiKit list scaffold. Variable: page (View\ListPage from
+  PageBuilderKitPageFactory::revisions(): header admin.revisions.title / admin.revisions.hint with Edit, back link to
+  the list; columns id (required), label, createdAt, engine (priority 2); rows = list<BuilderPageRevision>; row actions
+  Diff and Restore (POST form behind a confirm); EmptyState admin.revisions.empty). Also: create_form (FormView: label
+  of a manual snapshot), builder_page, page_key, revisions, engine, max_per_page, restore_forms.
+  Data blocks filled: nowo_ui_list_filters ("Save version" form, then the default region), nowo_ui_list_row (cells).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% block page_title %}{{ 'admin.revisions.title'|trans({'%key%': page_key}) }}{% endblock %}
-
-{% block header_actions %}
-    <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
-        {% if engine == 'grapesjs' %}
-            <a class="btn btn-primary btn-sm" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">{{ 'admin.pages.edit'|trans }}</a>
-        {% else %}
-            <a class="btn btn-warning btn-sm" href="{{ path('admin_page_builder_sections', {pageKey: page_key}) }}">{{ 'admin.pages.sections'|trans }}</a>
-        {% endif %}
-    </div>
+{% block nowo_ui_list_filters %}
+    {% set _b = page.bundle %}
+    <section class="{{ nowo_ui_class('card', _b) }} pbk-revision-create"{{ nowo_ui_attrs('card', _b) }} data-testid="pbk-revision-create">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            {{ include(nowo_ui_partial('section_form', _b), {form: create_form, submit_label: 'admin.revisions.create'|trans, bundle: _b, nowo_ui_page_type: nowo_ui_page_type}, false) }}
+        </div>
+    </section>
+    {{ parent() }}
 {% endblock %}
 
-{% block admin %}
-    <p class="text-muted">{{ 'admin.revisions.hint'|trans({'%max%': max_per_page}) }}</p>
-
-    {{ form_start(create_form, { attr: { class: 'mb-4 d-flex flex-wrap gap-2 align-items-end' } }) }}
-        {% for child in create_form %}
-            {% if not child.rendered %}
-                {{ form_row(child) }}
-            {% endif %}
-        {% endfor %}
-        <button type="submit" class="btn btn-success btn-sm">{{ 'admin.revisions.create'|trans }}</button>
-    {{ form_end(create_form) }}
-
-    {% if revisions is empty %}
-        <p class="text-muted">{{ 'admin.revisions.empty'|trans }}</p>
-    {% else %}
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead>
-                    <tr>
-                        <th>{{ 'admin.revisions.col_id'|trans }}</th>
-                        <th>{{ 'admin.revisions.col_label'|trans }}</th>
-                        <th>{{ 'admin.revisions.col_when'|trans }}</th>
-                        <th>{{ 'admin.revisions.col_engine'|trans }}</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for revision in revisions %}
-                        <tr>
-                            <td>#{{ revision.id }}</td>
-                            <td>{{ revision.label|default('—') }}</td>
-                            <td><time datetime="{{ revision.createdAt|date('c') }}">{{ revision.createdAt|date('Y-m-d H:i') }}</time></td>
-                            <td>
-                                {% set _engine = revision.structure.engine|default('classic') %}
-                                <span class="badge bg-secondary">{{ _engine }}</span>
-                            </td>
-                            <td class="text-end d-flex gap-2 justify-content-end">
-                                <a class="btn btn-outline-secondary btn-sm"
-                                   href="{{ path('admin_page_builder_revisions_diff', {pageKey: page_key, revisionId: revision.id}) }}">
-                                    {{ 'admin.revisions.diff'|trans }}
-                                </a>
-                                {{ form_start(restore_forms[revision.id|default('')], {
-                                    attr: {
-                                        'data-pbk-confirm': 'admin.revisions.restore_confirm'|trans
-                                    }
-                                }) }}
-                                    {% for child in restore_forms[revision.id] %}
-                                        {% if not child.rendered %}
-                                            {{ form_widget(child) }}
-                                        {% endif %}
-                                    {% endfor %}
-                                    <button type="submit" class="btn btn-outline-primary btn-sm">{{ 'admin.revisions.restore'|trans }}</button>
-                                {{ form_end(restore_forms[revision.id]) }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
-    {# data-pbk-confirm forms: confirm() via listener (no inline onsubmit; strict CSP friendly). #}
-    {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
-    <script src="{{ asset('js/page-builder-admin.js', 'nowo_page_builder_kit') }}" defer{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}></script>
+{% block nowo_ui_list_row %}
+    {% set _b = page.bundle %}
+    {% set _cell = nowo_ui_class('table_cell', _b) %}
+    <td class="{{ _cell }}" data-label="{{ 'admin.revisions.col_id'|trans }}" data-required="1"><code class="{{ nowo_ui_class('code', _b) }}">#{{ row.id }}</code></td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.revisions.col_label'|trans }}">
+        {% if row.label %}{{ row.label }}{% else %}<span class="{{ nowo_ui_class('table_cell_muted', _b) }}">—</span>{% endif %}
+    </td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.revisions.col_when'|trans }}"><time datetime="{{ row.createdAt|date('c') }}">{{ row.createdAt|date('Y-m-d H:i') }}</time></td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.revisions.col_engine'|trans }}" data-nowo-ui-priority="2"><span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ row.structure.engine|default('classic') }}</span></td>
 {% endblock %}

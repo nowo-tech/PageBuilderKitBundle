@@ -1,65 +1,73 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Revision diff (REQ-UI-003): UiKit show scaffold. Variable: page (View\ShowPage from
+  PageBuilderKitPageFactory::revisionDiff(): header admin.revisions.diff_title / admin.revisions.diff_hint, back link
+  to the history). Also: diff (identical, summary, changedPaths, panels), builder_page, page_key, revisionId.
+  Data blocks filled: nowo_ui_show_sections (summary + changed paths card, or the "identical" empty state),
+  nowo_ui_show_after (side-by-side HTML / CSS / structure panels).
+#}
+{% extends '@NowoUiKit/page/show.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% block page_title %}{{ 'admin.revisions.diff_title'|trans({'%key%': page_key, '%id%': revisionId}) }}{% endblock %}
-
-{% block header_actions %}
-    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_revisions', {pageKey: page_key}) }}">
-        {{ 'admin.pages.revisions'|trans }}
-    </a>
+{% block nowo_ui_show_sections %}
+    {% set _b = page.bundle %}
+    {% if diff.identical %}
+        {{ include(nowo_ui_partial('empty', _b), {message: 'admin.revisions.diff_identical'|trans, bundle: _b, region: 'empty', nowo_ui_page_type: nowo_ui_page_type}, false) }}
+    {% else %}
+        <section class="{{ nowo_ui_class('card', _b) }}"{{ nowo_ui_attrs('card', _b) }} data-testid="pbk-diff-summary">
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                <ul class="pbk-diff-summary">
+                    {% for line in diff.summary %}
+                        <li>{{ line }}</li>
+                    {% endfor %}
+                </ul>
+                {% if diff.changedPaths is not empty %}
+                    <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'admin.revisions.diff_paths'|trans }}</h2>
+                    <ul class="pbk-diff-paths">
+                        {% for path in diff.changedPaths|slice(0, 80) %}
+                            <li><code class="{{ nowo_ui_class('code', _b) }}">{{ path }}</code></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
 {% endblock %}
 
-{% block admin %}
-    {% if diff.identical %}
-        <p class="text-muted">{{ 'admin.revisions.diff_identical'|trans }}</p>
-    {% else %}
-        <p>{{ 'admin.revisions.diff_hint'|trans }}</p>
-        <ul>
-            {% for line in diff.summary %}
-                <li>{{ line }}</li>
-            {% endfor %}
-        </ul>
-        {% if diff.changedPaths is not empty %}
-            <h2 class="h5">{{ 'admin.revisions.diff_paths'|trans }}</h2>
-            <ul class="small">
-                {% for path in diff.changedPaths|slice(0, 80) %}
-                    <li><code>{{ path }}</code></li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endif %}
-
+{% block nowo_ui_show_after %}
+    {% set _b = page.bundle %}
     {% set panels = diff.panels|default({}) %}
     {% if panels is not empty %}
-        <p class="text-muted mt-3">{{ 'admin.revisions.diff_panels_hint'|trans }}</p>
-
+        <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.revisions.diff_panels_hint'|trans }}</p>
         {% for panelKey, panel in panels %}
-            {% set panelTitle = 'admin.revisions.diff_panel_' ~ panelKey %}
-            <section class="pbk-diff-panel mb-4">
-                <h2 class="h5">{{ panelTitle|trans }}</h2>
-                <div class="pbk-diff-sbs" role="region" aria-label="{{ panelTitle|trans }}">
-                    <div class="pbk-diff-sbs__col">
-                        <div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_live'|trans }}</div>
+            {% set panelTitle = ('admin.revisions.diff_panel_' ~ panelKey)|trans %}
+            <section class="{{ nowo_ui_class('card', _b) }} pbk-diff-panel"{{ nowo_ui_attrs('card', _b) }}>
+                <header class="{{ nowo_ui_class('card_header', _b) }}"><h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ panelTitle }}</h2></header>
+                <div class="{{ nowo_ui_class('card_body', _b) }}">
+                    <div class="pbk-diff-sbs" role="region" aria-label="{{ panelTitle }}">
+                        <div class="pbk-diff-sbs__col"><div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_live'|trans }}</div></div>
+                        <div class="pbk-diff-sbs__col"><div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_revision'|trans }}</div></div>
+                        {% for row in panel.rows %}
+                            <div class="pbk-diff-sbs__row pbk-diff-sbs__row--{{ row.type }}">
+                                <pre class="pbk-diff-sbs__cell">{{ row.left }}</pre>
+                                <pre class="pbk-diff-sbs__cell">{{ row.right }}</pre>
+                            </div>
+                        {% else %}
+                            <div class="pbk-diff-sbs__row pbk-diff-sbs__row--same">
+                                <pre class="pbk-diff-sbs__cell pbk-diff-sbs__cell--empty">{{ 'admin.revisions.diff_empty'|trans }}</pre>
+                                <pre class="pbk-diff-sbs__cell pbk-diff-sbs__cell--empty">{{ 'admin.revisions.diff_empty'|trans }}</pre>
+                            </div>
+                        {% endfor %}
                     </div>
-                    <div class="pbk-diff-sbs__col">
-                        <div class="pbk-diff-sbs__head">{{ 'admin.revisions.diff_revision'|trans }}</div>
-                    </div>
-                    {% for row in panel.rows %}
-                        <div class="pbk-diff-sbs__row pbk-diff-sbs__row--{{ row.type }}">
-                            <pre class="pbk-diff-sbs__cell">{{ row.left }}</pre>
-                            <pre class="pbk-diff-sbs__cell">{{ row.right }}</pre>
-                        </div>
-                    {% else %}
-                        <div class="pbk-diff-sbs__row pbk-diff-sbs__row--same">
-                            <pre class="pbk-diff-sbs__cell text-muted">(empty)</pre>
-                            <pre class="pbk-diff-sbs__cell text-muted">(empty)</pre>
-                        </div>
-                    {% endfor %}
+                    {% if panel.truncated %}
+                        <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.revisions.diff_truncated'|trans({'%max%': 400}) }}</p>
+                    {% endif %}
                 </div>
-                {% if panel.truncated %}
-                    <p class="small text-muted mt-1">{{ 'admin.revisions.diff_truncated'|trans({'%max%': 400}) }}</p>
-                {% endif %}
             </section>
         {% endfor %}
     {% endif %}
+{% endblock %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
 {% endblock %}

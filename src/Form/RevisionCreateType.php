@@ -22,7 +22,6 @@ final class RevisionCreateType extends AbstractType
             'attr'     => [
                 'maxlength'   => 255,
                 'placeholder' => 'admin.revisions.label_placeholder',
-                'class'       => 'form-control form-control-sm',
             ],
         ]);
     }

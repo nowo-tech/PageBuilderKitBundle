@@ -18,6 +18,8 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Twig\TwigFunction;
 
+use function in_array;
+
 #[CoversClass(PageBuilderKitExtension::class)]
 final class PageBuilderKitExtensionTest extends TestCase
 {
@@ -117,7 +119,14 @@ final class PageBuilderKitExtensionTest extends TestCase
             '@NowoPageBuilderKitBundle/admin/layout.html.twig',
             $extension->layoutTemplate(),
         );
+        self::assertSame('@NowoPageBuilderKitBundle/admin/layout.html.twig', new PageBuilderKitExtension(null, 'tailwind', $renderProvider, $registry, $accessChecker, $inline)->layoutTemplate());
+        self::assertSame('host/admin.html.twig', new PageBuilderKitExtension('host/admin.html.twig', 'tailwind', $renderProvider, $registry, $accessChecker, $inline)->layoutTemplate());
         self::assertSame('tailwind', $extension->cssFramework());
+        foreach ($extension->getFunctions() as $function) {
+            if (in_array($function->getName(), ['nowo_page_builder_layout_template', 'nowo_page_builder_css_framework'], true)) {
+                self::assertTrue($function->isDeprecated(), $function->getName());
+            }
+        }
         self::assertTrue($extension->canEdit());
         self::assertFalse($extension->revisionsEnabled());
         self::assertSame(

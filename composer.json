@@ -37,7 +37,7 @@
         "doctrine/doctrine-bundle": "^2.10 || ^3.0",
         "doctrine/orm": "^3.7",
         "nowo-tech/form-kit-bundle": "^2.4",
-        "nowo-tech/ui-kit-bundle": "^1.4 || ^2.2",
+        "nowo-tech/ui-kit-bundle": "^2.17.3",
         "psr/clock": "^1.0",
         "psr/log": "^2.0 || ^3.0",
         "symfony/asset": "^7.4 || ^8.0",
@@ -57,7 +57,7 @@
         "symfony/yaml": "^7.4 || ^8.0",
         "twig/extra-bundle": "^3.12",
         "twig/string-extra": "^3.12",
-        "twig/twig": "^3.8"
+        "twig/twig": "^3.15"
     },
     "suggest": {
         "nowo-tech/tiptap-editor-bundle": "Rich text editing for text widgets in the canvas.",
@@ -118,7 +118,10 @@
             "/Makefile",
             "/.githooks",
             "/vendor",
-            "/node_modules"
+            "/node_modules",
+            "/coverage-ts",
+            "/vitest.config.ts",
+            "/src/Resources/assets/tests"
         ]
     },
     "scripts": {

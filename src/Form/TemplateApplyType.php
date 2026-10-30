@@ -25,12 +25,12 @@ final class TemplateApplyType extends AbstractType
                     new Assert\NotBlank(),
                     new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
                 ],
-                'attr' => ['class' => 'form-control form-control-sm', 'placeholder' => 'form.page_key'],
+                'attr' => ['placeholder' => 'form.page_key'],
             ])
             ->add('title', TextType::class, [
                 'label'    => 'form.page_title',
                 'required' => false,
-                'attr'     => ['class' => 'form-control form-control-sm', 'placeholder' => 'form.page_title'],
+                'attr'     => ['placeholder' => 'form.page_title'],
             ])
             ->add('include_field_schema', CheckboxType::class, [
                 'label'    => 'admin.templates.include_field_schema',

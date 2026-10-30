@@ -1,98 +1,48 @@
-{% extends nowo_page_builder_layout_template() %}
+{#
+  Templates (REQ-UI-003): UiKit list scaffold. Variable: page (View\ListPage from
+  PageBuilderKitPageFactory::templates(): header admin.templates.title / admin.templates.hint with Export all, back
+  link to the pages list; columns templateKey (required), label; rows = list<BuilderPageTemplate>; row actions Export,
+  Create page (POST form with the target page fields, behind a dialog) and Delete (POST form behind a confirm);
+  EmptyState admin.templates.empty). Also: pages, save_forms (page key => FormView), import_form, templates,
+  apply_forms, delete_forms.
+  Data blocks filled: nowo_ui_list_filters ("Save template from page" and "Import templates" cards, then the default
+  region), nowo_ui_list_row (cells).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
 {% trans_default_domain 'NowoPageBuilderKitBundle' %}
 
-{% block page_title %}{{ 'admin.templates.title'|trans }}{% endblock %}
-
-{% block header_actions %}
-    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_templates_export_all') }}">{{ 'admin.templates.export_all'|trans }}</a>
-    <a class="btn btn-outline-secondary btn-sm" href="{{ path('admin_page_builder_list') }}">{{ 'admin.pages.list'|trans }}</a>
+{% block nowo_ui_list_filters %}
+    {% set _b = page.bundle %}
+    <div class="{{ nowo_ui_class('cards', _b) }} pbk-template-tools">
+        <section class="{{ nowo_ui_class('card', _b) }}"{{ nowo_ui_attrs('card', _b) }} data-testid="pbk-template-save">
+            <header class="{{ nowo_ui_class('card_header', _b) }}"><h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'admin.templates.save_from_page'|trans }}</h2></header>
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                {% for item in pages %}
+                    <div class="pbk-template-save">
+                        <code class="{{ nowo_ui_class('code', _b) }}">{{ item.pageKey }}</code>
+                        {{ include(nowo_ui_partial('section_form', _b), {form: save_forms[item.pageKey], submit_label: 'admin.templates.save'|trans, bundle: _b, nowo_ui_page_type: nowo_ui_page_type}, false) }}
+                    </div>
+                {% else %}
+                    <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'admin.pages.empty'|trans }}</p>
+                {% endfor %}
+            </div>
+        </section>
+        <section class="{{ nowo_ui_class('card', _b) }}"{{ nowo_ui_attrs('card', _b) }} data-testid="pbk-template-import">
+            <header class="{{ nowo_ui_class('card_header', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'admin.templates.import'|trans }}</h2>
+                <p class="{{ nowo_ui_class('card_intro', _b) }}">{{ 'admin.templates.import_hint'|trans }}</p>
+            </header>
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                {{ include(nowo_ui_partial('section_form', _b), {form: import_form, submit_label: 'admin.templates.import_submit'|trans, bundle: _b, nowo_ui_page_type: nowo_ui_page_type}, false) }}
+            </div>
+        </section>
+    </div>
+    {{ parent() }}
 {% endblock %}
 
-{% block admin %}
-    <p class="text-muted">{{ 'admin.templates.hint'|trans }}</p>
-
-    <section class="mb-4">
-        <h2 class="h5">{{ 'admin.templates.save_from_page'|trans }}</h2>
-        {% if pages is empty %}
-            <p class="text-muted">{{ 'admin.pages.empty'|trans }}</p>
-        {% else %}
-            {% for page in pages %}
-                <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-                    <span class="me-2"><code>{{ page.pageKey }}</code></span>
-                    {{ form_start(save_forms[page.pageKey], { attr: { class: 'd-flex flex-wrap gap-2 align-items-end' } }) }}
-                        {% for child in save_forms[page.pageKey] %}
-                            {% if not child.rendered %}
-                                {{ form_row(child) }}
-                            {% endif %}
-                        {% endfor %}
-                        <button type="submit" class="btn btn-success btn-sm">{{ 'admin.templates.save'|trans }}</button>
-                    {{ form_end(save_forms[page.pageKey]) }}
-                </div>
-            {% endfor %}
-        {% endif %}
-    </section>
-
-    <section class="mb-4">
-        <h2 class="h5">{{ 'admin.templates.import'|trans }}</h2>
-        <p class="text-muted small">{{ 'admin.templates.import_hint'|trans }}</p>
-        {{ form_start(import_form) }}
-            {% for child in import_form %}
-                {% if not child.rendered %}
-                    {{ form_row(child) }}
-                {% endif %}
-            {% endfor %}
-            <button type="submit" class="btn btn-primary btn-sm">{{ 'admin.templates.import_submit'|trans }}</button>
-        {{ form_end(import_form) }}
-    </section>
-
-    {% if templates is empty %}
-        <p class="text-muted">{{ 'admin.templates.empty'|trans }}</p>
-    {% else %}
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead>
-                    <tr>
-                        <th>{{ 'admin.templates.key'|trans }}</th>
-                        <th>{{ 'admin.templates.label'|trans }}</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for template in templates %}
-                        <tr>
-                            <td><code>{{ template.templateKey }}</code></td>
-                            <td>{{ template.label }}</td>
-                            <td class="text-end">
-                                <a class="btn btn-outline-secondary btn-sm mb-1" href="{{ path('admin_page_builder_templates_export', {templateKey: template.templateKey}) }}">{{ 'admin.templates.export'|trans }}</a>
-                                {{ form_start(apply_forms[template.templateKey], { attr: { class: 'd-inline-flex flex-wrap gap-1 align-items-center mb-1' } }) }}
-                                    {% for child in apply_forms[template.templateKey] %}
-                                        {% if not child.rendered %}
-                                            {{ form_row(child) }}
-                                        {% endif %}
-                                    {% endfor %}
-                                    <button class="btn btn-primary btn-sm" type="submit">{{ 'admin.templates.apply'|trans }}</button>
-                                {{ form_end(apply_forms[template.templateKey]) }}
-                                {{ form_start(delete_forms[template.templateKey], {
-                                    attr: {
-                                        class: 'd-inline',
-                                        'data-pbk-confirm': 'admin.templates.delete_confirm'|trans
-                                    }
-                                }) }}
-                                    {% for child in delete_forms[template.templateKey] %}
-                                        {% if not child.rendered %}
-                                            {{ form_row(child) }}
-                                        {% endif %}
-                                    {% endfor %}
-                                    <button class="btn btn-outline-danger btn-sm" type="submit">{{ 'admin.templates.delete'|trans }}</button>
-                                {{ form_end(delete_forms[template.templateKey]) }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
-    {# data-pbk-confirm forms: confirm() via listener (no inline onsubmit; strict CSP friendly). #}
-    {% set _csp_nonce = app.request is defined and app.request ? app.request.attributes.get('csp_nonce')|default('') : '' %}
-    <script src="{{ asset('js/page-builder-admin.js', 'nowo_page_builder_kit') }}" defer{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}></script>
+{% block nowo_ui_list_row %}
+    {% set _b = page.bundle %}
+    {% set _cell = nowo_ui_class('table_cell', _b) %}
+    <td class="{{ _cell }}" data-label="{{ 'admin.templates.key'|trans }}" data-required="1"><code class="{{ nowo_ui_class('code', _b) }}">{{ row.templateKey }}</code></td>
+    <td class="{{ _cell }}" data-label="{{ 'admin.templates.label'|trans }}">{{ row.label }}</td>
 {% endblock %}
