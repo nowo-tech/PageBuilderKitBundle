@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -13,24 +15,26 @@ use Symfony\Component\Validator\Constraints as Assert;
 /**
  * @extends AbstractType<array{templateKey: string, label: string}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class TemplateSaveType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('templateKey', TextType::class, [
-                'label'       => 'admin.templates.key',
-                'constraints' => [
-                    new Assert\NotBlank(),
-                    new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
-                ],
-                'attr' => ['class' => 'pbk-input--key'],
-            ])
-            ->add('label', TextType::class, [
-                'label'       => 'admin.templates.label',
-                'constraints' => [new Assert\NotBlank()],
-                'attr'        => ['class' => 'pbk-input--label'],
-            ]);
+        $this->addWithDefaults($builder, 'templateKey', TextType::class, [
+            'label'       => 'admin.templates.key',
+            'constraints' => [
+                new Assert\NotBlank(),
+                new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
+            ],
+            'attr' => ['class' => 'pbk-input--key'],
+        ]);
+        $this->addWithDefaults($builder, 'label', TextType::class, [
+            'label'       => 'admin.templates.label',
+            'constraints' => [new Assert\NotBlank()],
+            'attr'        => ['class' => 'pbk-input--label'],
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

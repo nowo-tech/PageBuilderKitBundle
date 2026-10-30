@@ -48,6 +48,29 @@ use function is_string;
 
 final class NowoPageBuilderKitExtension extends Extension implements PrependExtensionInterface
 {
+    /** FormKit profile (`nowo_form_kit.profiles.page_builder_kit`) of every page form type (REQ-TWIG-005 rule 11). */
+    public const string FORM_KIT_PROFILE = 'page_builder_kit';
+
+    /**
+     * Seeded profile; a host overrides it by defining `nowo_form_kit.profiles.page_builder_kit` itself.
+     * Labels / help / placeholders are explicit on the types, so the convention help / placeholder keys stay off
+     * (no raw keys). Theme-neutral (REQ-UI-003): UiKit styles `nowo-ui-input`; checkboxes and hidden inputs keep
+     * the theme's own classes.
+     */
+    public const array FORM_KIT_PROFILE_CONFIG = [
+        'alias'              => self::FORM_KIT_PROFILE,
+        'translation_domain' => 'NowoPageBuilderKitBundle',
+        'auto_placeholder'   => false,
+        'auto_help'          => false,
+        'defaults'           => [
+            'attr' => ['class' => 'nowo-ui-input'],
+        ],
+        'field_types' => [
+            'checkbox' => ['attr' => ['class' => '']],
+            'hidden'   => ['attr' => ['class' => '']],
+        ],
+    ];
+
     public function prepend(ContainerBuilder $container): void
     {
         $container->prependExtensionConfig('framework', [
@@ -68,7 +91,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         foreach ($container->getExtensionConfig('nowo_form_kit') as $cfg) {
             /** @var array<string, mixed> $cfg */
             $profiles = $cfg['profiles'] ?? null;
-            if (is_array($profiles) && array_key_exists('page_builder_kit', $profiles)) {
+            if (is_array($profiles) && array_key_exists(self::FORM_KIT_PROFILE, $profiles)) {
                 $hostHasProfile = true;
             }
         }
@@ -78,15 +101,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         }
 
         $container->prependExtensionConfig('nowo_form_kit', [
-            'profiles' => [
-                'page_builder_kit' => [
-                    'alias'              => 'page_builder_kit',
-                    'translation_domain' => 'NowoPageBuilderKitBundle',
-                    'defaults'           => [
-                        'attr' => ['class' => 'nowo-ui-input'],
-                    ],
-                ],
-            ],
+            'profiles' => [self::FORM_KIT_PROFILE => self::FORM_KIT_PROFILE_CONFIG],
         ]);
     }
 

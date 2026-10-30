@@ -364,6 +364,7 @@ final class PageFixtures
     private static function forms(): FormFactoryInterface
     {
         return Forms::createFormFactoryBuilder()
+            ->addExtension(FormKitTestSupport::extension())
             ->addExtension(new ValidatorExtension(Validation::createValidator()))
             ->addExtension(new CsrfExtension(new class implements CsrfTokenManagerInterface {
                 public function getToken(string $tokenId): CsrfToken

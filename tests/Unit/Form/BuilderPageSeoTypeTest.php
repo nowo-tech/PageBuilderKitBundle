@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Form;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageSeoType;
+use Nowo\PageBuilderKitBundle\Tests\Support\FormKitTestSupport;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +22,7 @@ final class BuilderPageSeoTypeTest extends TestCase
     public function bindsTranslationSeoFields(): void
     {
         $factory = Forms::createFormFactoryBuilder()
+            ->addExtension(FormKitTestSupport::extension())
             ->addExtension(new ValidatorExtension(Validation::createValidatorBuilder()->getValidator()))
             ->getFormFactory();
 

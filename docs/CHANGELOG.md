@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Forms (REQ-TWIG-005 rule 11): the 13 page form types (`BuilderPageCreateType`, `BuilderPageSeoType`,
+  `ContentSchemaAddType`, `ContentSchemaRemoveType`, `ContentValuesType`, `CsrfPostType`, `InlineFieldModalType`,
+  `PageDuplicateType`, `RevisionCreateType`, `SectionsEditType`, `TemplateApplyType`, `TemplateImportType`,
+  `TemplateSaveType`) are FormKit Types (`#[FormKitConfig('page_builder_kit')]` + `FormOptionsTrait`); their fields
+  are resolved through the FormKit profile `page_builder_kit`. Field names, CSRF field names and token ids are unchanged.
+- The seeded FormKit profile `page_builder_kit` disables the convention help / placeholder keys and keeps checkboxes and
+  hidden inputs free of `nowo-ui-input`.
+- `nowo-tech/form-kit-bundle` constraint raised to `^2.16` (required; register `NowoFormKitBundle`).
+
 ## [1.12.1] - 2026-10-30
 
 Security: Bundle routes are opt-in again: controllers are no longer autoconfigured, so a host's routing.controllers import does not expose them (REQ-SF-004 rule 7). See [UPGRADING](UPGRADING.md#to-1121).

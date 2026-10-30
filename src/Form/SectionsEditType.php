@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
@@ -21,8 +23,11 @@ use function strlen;
  *
  * @extends AbstractType<array{widgets?: array<string, array<string, string>>}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class SectionsEditType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         /** @var list<array{id: string, columns: list<array{widgets: list<array{id: string, fields: list<string>, props: array<string, mixed>}>}>}> $tree */
@@ -63,7 +68,7 @@ final class SectionsEditType extends AbstractType
                         $type  = ($field === 'html' || $field === 'alt' || strlen($str) > 80)
                             ? TextareaType::class
                             : TextType::class;
-                        $widgetForm->add($field, $type, [
+                        $this->addWithDefaults($widgetForm, $field, $type, [
                             'label'    => new TranslatableText($field),
                             'required' => false,
                             'data'     => $str,

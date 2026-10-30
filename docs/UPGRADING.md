@@ -42,6 +42,15 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+- **FormKit is required and must be registered.** `nowo-tech/form-kit-bundle` (`^2.16`) is a `require` dependency;
+  the page form types are now FormKit Types and need `Nowo\FormKitBundle\NowoFormKitBundle` in `config/bundles.php`
+  (FormKit injects its option merger into them). Without it, building a page form fails.
+- **Form theming goes through the FormKit profile.** Field classes / translation domain of the bundle forms come from
+  `nowo_form_kit.profiles.page_builder_kit`. A host that customised them (e.g. through `twig.form_themes` blocks that
+  targeted these forms) should define that profile instead — see
+  [CONFIGURATION](CONFIGURATION.md#web_ui). Field names, CSRF field names and token ids did not change, so template
+  overrides and controllers keep working.
+
 ## To 1.12.1
 
 From **1.12.0**:

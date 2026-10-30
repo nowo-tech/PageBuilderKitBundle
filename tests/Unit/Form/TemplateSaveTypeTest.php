@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Form;
 
 use Nowo\PageBuilderKitBundle\Form\TemplateSaveType;
+use Nowo\PageBuilderKitBundle\Tests\Support\FormKitTestSupport;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +20,7 @@ final class TemplateSaveTypeTest extends TestCase
     public function buildFormAndConfigureOptions(): void
     {
         $factory = Forms::createFormFactoryBuilder()
+            ->addExtension(FormKitTestSupport::extension())
             ->addExtension(new ValidatorExtension(Validation::createValidatorBuilder()->getValidator()))
             ->getFormFactory();
 

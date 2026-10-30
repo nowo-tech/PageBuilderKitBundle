@@ -47,6 +47,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
   - [Phase 7 media library + dynamic tags](#phase-7-media-library--dynamic-tags)
 - [Custom access logic](#custom-access-logic)
 - [Twig overrides](#twig-overrides)
+- [Forms (FormKit)](#forms-formkit)
 - [Custom widgets](#custom-widgets)
 - [GrapesJS block packs](#grapesjs-block-packs)
 - [Template sharing](#template-sharing)
@@ -725,6 +726,17 @@ templates/bundles/NowoPageBuilderKitBundle/
 ```
 
 Widget types resolve public templates via `@NowoPageBuilderKitBundle/widgets/{type}.html.twig`.
+
+## Forms (FormKit)
+
+Every admin and inline-edit form (create page, SEO, content schema add / remove, content values, sections, duplicate,
+revision, template save / import / apply, CSRF-only publish / unpublish / delete / restore, inline field dialog) is a
+Symfony Form Type built as a **FormKit Type** (`#[FormKitConfig('page_builder_kit')]` + `FormOptionsTrait`,
+REQ-TWIG-005 rule 11). The views render them only with `form_start` / the `{% for child in form %}` +
+`{% if not child.rendered %}{{ form_row(child) }}{% endif %}` loop / `form_end` — never raw `<form>` / `<input>`; host
+overrides and demos must keep that pattern. Field options come from the FormKit profile `page_builder_kit` (see
+[CONFIGURATION](CONFIGURATION.md#web_ui)); `nowo-tech/form-kit-bundle` is a required dependency and its bundle must be
+registered.
 
 ## Custom widgets
 

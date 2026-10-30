@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Form;
 
 use Nowo\PageBuilderKitBundle\Form\InlineFieldModalType;
+use Nowo\PageBuilderKitBundle\Tests\Support\FormKitTestSupport;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +23,7 @@ final class InlineFieldModalTypeTest extends TestCase
         self::assertSame(FormType::class, $type->getParent());
 
         $form = Forms::createFormFactoryBuilder()
+            ->addExtension(FormKitTestSupport::extension())
             ->getFormFactory()
             ->create(InlineFieldModalType::class);
 

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3c7df4f7d1015dbe0463f6c7008f2b86",
+    "content-hash": "5c77a10c43f644afaaf074f2cc40c11a",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -1477,16 +1477,16 @@
         },
         {
             "name": "nowo-tech/form-kit-bundle",
-            "version": "v2.14.0",
+            "version": "v2.16.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/FormKitBundle.git",
-                "reference": "d51bc9505d2104b2e71f4013c1ff6a516bfe38fc"
+                "reference": "0e9a4c9b41661dbd622e03b9b2a227da82f2b194"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/d51bc9505d2104b2e71f4013c1ff6a516bfe38fc",
-                "reference": "d51bc9505d2104b2e71f4013c1ff6a516bfe38fc",
+                "url": "https://api.github.com/repos/nowo-tech/FormKitBundle/zipball/0e9a4c9b41661dbd622e03b9b2a227da82f2b194",
+                "reference": "0e9a4c9b41661dbd622e03b9b2a227da82f2b194",
                 "shasum": ""
             },
             "require": {
@@ -1587,20 +1587,20 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-28T09:25:58+00:00"
+            "time": "2026-10-30T07:27:21+00:00"
         },
         {
             "name": "nowo-tech/page-builder-kit-bundle",
-            "version": "dev-req100",
+            "version": "dev-feat/formkit",
             "dist": {
                 "type": "path",
                 "url": "/var/page-builder-kit-bundle",
-                "reference": "ba1bc695741a4fca4be6fef080d5ae35b245eb28"
+                "reference": "1e52ea84b8478e1be12781199d2818c750501922"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.10 || ^3.0",
                 "doctrine/orm": "^3.7",
-                "nowo-tech/form-kit-bundle": "^2.4",
+                "nowo-tech/form-kit-bundle": "^2.16",
                 "nowo-tech/ui-kit-bundle": "^2.17.3",
                 "php": ">=8.4 <8.6",
                 "psr/clock": "^1.0",

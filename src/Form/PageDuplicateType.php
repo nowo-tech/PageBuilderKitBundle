@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -16,21 +18,23 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * @extends AbstractType<array{pageKey: string, _redirect?: string|null}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class PageDuplicateType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('pageKey', TextType::class, [
-                'label'       => 'admin.pages.duplicate_key',
-                'constraints' => [
-                    new Assert\NotBlank(),
-                    new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
-                ],
-            ])
-            ->add('_redirect', HiddenType::class, [
-                'required' => false,
-            ]);
+        $this->addWithDefaults($builder, 'pageKey', TextType::class, [
+            'label'       => 'admin.pages.duplicate_key',
+            'constraints' => [
+                new Assert\NotBlank(),
+                new Assert\Regex(pattern: '/^[a-z0-9_-]+$/'),
+            ],
+        ]);
+        $this->addWithDefaults($builder, '_redirect', HiddenType::class, [
+            'required' => false,
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

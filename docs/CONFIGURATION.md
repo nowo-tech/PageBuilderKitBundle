@@ -231,9 +231,31 @@ nowo_ui_kit:
 - **Dialogs**: duplicate, restore, create-from-template, delete and remove use the UiKit confirm `<dialog>`; the media
   library of the content page is the UiKit `dialog` partial. Both need the UiKit `scripts` partial in the layout (the
   UiKit document layout and `@NowoUiKit/layout/_bridge.html.twig` include it).
-- **Form themes**: the admin forms render with the host form theme (`twig.form_themes`, e.g.
-  `bootstrap_5_layout.html.twig`, a Tailwind or Foundation theme); the bundle adds no framework class to its form
-  types. The FormKit profile `page_builder_kit` (when FormKit is installed) only adds `nowo-ui-input`.
+- **Form themes**: the admin forms are FormKit Types themed by the FormKit profile
+  `nowo_form_kit.profiles.page_builder_kit`, which the bundle prepends unless the host defines that key itself
+  (REQ-TWIG-005 rule 11, the "Form theme" row of the UiKit page contract). The seeded profile is theme-neutral:
+  translation domain `NowoPageBuilderKitBundle`, `nowo-ui-input` on fields (none on checkboxes / hidden inputs), no
+  convention help / placeholder keys (`auto_help` / `auto_placeholder` off; labels and help are explicit on the types).
+  The bundle pages set no `form_themes`; the widget markup comes from the host form theme (`twig.form_themes`, e.g. the
+  UiKit theme, `bootstrap_5_layout.html.twig`, a Tailwind or Foundation theme). To change the field classes, define
+  the whole profile in the host:
+
+```yaml
+# config/packages/nowo_form_kit.yaml
+nowo_form_kit:
+    profiles:
+        page_builder_kit:
+            alias: page_builder_kit
+            translation_domain: NowoPageBuilderKitBundle
+            auto_placeholder: false
+            auto_help: false
+            defaults:
+                attr: { class: 'form-control' }
+                row_attr: { class: 'mb-3' }
+            field_types:
+                checkbox: { attr: { class: '' } }
+                hidden: { attr: { class: '' } }
+```
 
 Example — mount admin under `/cms`:
 
