@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -13,11 +15,14 @@ use Symfony\Component\Validator\Constraints as Assert;
 /**
  * @extends AbstractType<array{payload: string}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class TemplateImportType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->add('payload', TextareaType::class, [
+        $this->addWithDefaults($builder, 'payload', TextareaType::class, [
             'label'       => 'admin.templates.payload',
             'constraints' => [new Assert\NotBlank()],
             'attr'        => [

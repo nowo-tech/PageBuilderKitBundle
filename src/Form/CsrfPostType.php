@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -14,11 +16,14 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  * @extends AbstractType<array{_redirect?: string|null}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class CsrfPostType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->add('_redirect', HiddenType::class, [
+        $this->addWithDefaults($builder, '_redirect', HiddenType::class, [
             'required' => false,
         ]);
     }

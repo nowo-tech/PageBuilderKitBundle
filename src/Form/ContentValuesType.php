@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
@@ -29,8 +31,11 @@ use function is_string;
  *
  * @extends AbstractType<array{action: string, fieldLabels: array<string, string>, fieldValues: array<string, mixed>}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class ContentValuesType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         /** @var list<array<string, mixed>> $schema */
@@ -42,7 +47,7 @@ final class ContentValuesType extends AbstractType
         /** @var list<string> $referencePages */
         $referencePages = $options['reference_pages'];
 
-        $builder->add('action', HiddenType::class, [
+        $this->addWithDefaults($builder, 'action', HiddenType::class, [
             'data' => 'save_values',
         ]);
 
@@ -79,7 +84,7 @@ final class ContentValuesType extends AbstractType
                 $currentLabel = $field['label'];
             }
 
-            $localeLabels->add($key, TextType::class, [
+            $this->addWithDefaults($localeLabels, $key, TextType::class, [
                 'label'    => 'admin.content.field_label_locale',
                 'required' => false,
                 'data'     => $currentLabel,
@@ -115,7 +120,7 @@ final class ContentValuesType extends AbstractType
             : (is_string($field['label'] ?? null) ? $field['label'] : $key));
 
         if ($type === 'bool') {
-            $builder->add($key, CheckboxType::class, [
+            $this->addWithDefaults($builder, $key, CheckboxType::class, [
                 'label'    => $label,
                 'required' => false,
                 'data'     => (bool) $current,
@@ -130,7 +135,7 @@ final class ContentValuesType extends AbstractType
                 $field['options'],
                 is_string(...),
             )) : [];
-            $builder->add($key, ChoiceType::class, [
+            $this->addWithDefaults($builder, $key, ChoiceType::class, [
                 'label'                     => $label,
                 'choices'                   => array_combine($opts, $opts),
                 'choice_translation_domain' => false,
@@ -142,7 +147,7 @@ final class ContentValuesType extends AbstractType
 
         if ($type === 'reference') {
             $choices = array_combine($referencePages, $referencePages);
-            $builder->add($key, ChoiceType::class, [
+            $this->addWithDefaults($builder, $key, ChoiceType::class, [
                 'label'                     => $label,
                 'choices'                   => $choices,
                 'choice_translation_domain' => false,
@@ -215,7 +220,7 @@ final class ContentValuesType extends AbstractType
         }
 
         if (in_array($type, ['text', 'richtext', 'html', 'raw'], true)) {
-            $builder->add($key, TextareaType::class, [
+            $this->addWithDefaults($builder, $key, TextareaType::class, [
                 'label'    => $label,
                 'required' => false,
                 'data'     => is_string($current) ? $current : (string) $current,
@@ -226,7 +231,7 @@ final class ContentValuesType extends AbstractType
         }
 
         if ($type === 'url' || $type === 'image') {
-            $builder->add($key, UrlType::class, [
+            $this->addWithDefaults($builder, $key, UrlType::class, [
                 'label'    => $label,
                 'required' => false,
                 'data'     => is_string($current) ? $current : '',
@@ -241,7 +246,7 @@ final class ContentValuesType extends AbstractType
         }
 
         if ($type === 'number') {
-            $builder->add($key, NumberType::class, [
+            $this->addWithDefaults($builder, $key, NumberType::class, [
                 'label'    => $label,
                 'required' => false,
                 'data'     => is_numeric($current) ? $current + 0 : null,
@@ -250,7 +255,7 @@ final class ContentValuesType extends AbstractType
             return;
         }
 
-        $builder->add($key, TextType::class, [
+        $this->addWithDefaults($builder, $key, TextType::class, [
             'label'    => $label,
             'required' => false,
             'data'     => is_string($current) ? $current : (string) $current,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
 use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
@@ -21,8 +23,11 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * @extends AbstractType<array<string, mixed>>
  */
+#[FormKitConfig('page_builder_kit')]
 final class ContentSchemaAddType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $typeChoices = [];
@@ -30,53 +35,52 @@ final class ContentSchemaAddType extends AbstractType
             $typeChoices[$type] = $type;
         }
 
-        $builder
-            ->add('schema_action', HiddenType::class, [
-                'data' => 'add',
-            ])
-            ->add('key', TextType::class, [
-                'label'       => 'admin.content.field_key',
-                'constraints' => [
-                    new Assert\NotBlank(),
-                    new Assert\Regex(pattern: '/^[a-z][a-z0-9_]*$/'),
-                ],
-                'attr' => ['placeholder' => new TranslatableText('hero_title')],
-            ])
-            ->add('type', ChoiceType::class, [
-                'label'                     => 'admin.content.field_type',
-                'choices'                   => $typeChoices,
-                'choice_translation_domain' => false,
-            ])
-            ->add('label', TextType::class, [
-                'label'    => 'admin.content.field_label',
-                'required' => false,
-                'attr'     => ['placeholder' => new TranslatableText('Hero title')],
-            ])
-            ->add('options', TextType::class, [
-                'label'    => 'admin.content.field_options',
-                'required' => false,
-                'attr'     => ['placeholder' => new TranslatableText('a,b,c')],
-            ])
-            ->add('subfields', TextType::class, [
-                'label'    => 'admin.content.field_subfields',
-                'required' => false,
-                'attr'     => ['placeholder' => new TranslatableText('question:string,answer:text')],
-                'help'     => 'admin.content.field_subfields_hint',
-            ])
-            ->add('min', IntegerType::class, [
-                'label'    => 'admin.content.field_min',
-                'required' => false,
-                'attr'     => ['min' => 0, 'placeholder' => new TranslatableText('0')],
-            ])
-            ->add('max', IntegerType::class, [
-                'label'    => 'admin.content.field_max',
-                'required' => false,
-                'attr'     => ['min' => 0],
-            ])
-            ->add('required', CheckboxType::class, [
-                'label'    => 'admin.content.field_required',
-                'required' => false,
-            ]);
+        $this->addWithDefaults($builder, 'schema_action', HiddenType::class, [
+            'data' => 'add',
+        ]);
+        $this->addWithDefaults($builder, 'key', TextType::class, [
+            'label'       => 'admin.content.field_key',
+            'constraints' => [
+                new Assert\NotBlank(),
+                new Assert\Regex(pattern: '/^[a-z][a-z0-9_]*$/'),
+            ],
+            'attr' => ['placeholder' => new TranslatableText('hero_title')],
+        ]);
+        $this->addWithDefaults($builder, 'type', ChoiceType::class, [
+            'label'                     => 'admin.content.field_type',
+            'choices'                   => $typeChoices,
+            'choice_translation_domain' => false,
+        ]);
+        $this->addWithDefaults($builder, 'label', TextType::class, [
+            'label'    => 'admin.content.field_label',
+            'required' => false,
+            'attr'     => ['placeholder' => new TranslatableText('Hero title')],
+        ]);
+        $this->addWithDefaults($builder, 'options', TextType::class, [
+            'label'    => 'admin.content.field_options',
+            'required' => false,
+            'attr'     => ['placeholder' => new TranslatableText('a,b,c')],
+        ]);
+        $this->addWithDefaults($builder, 'subfields', TextType::class, [
+            'label'    => 'admin.content.field_subfields',
+            'required' => false,
+            'attr'     => ['placeholder' => new TranslatableText('question:string,answer:text')],
+            'help'     => 'admin.content.field_subfields_hint',
+        ]);
+        $this->addWithDefaults($builder, 'min', IntegerType::class, [
+            'label'    => 'admin.content.field_min',
+            'required' => false,
+            'attr'     => ['min' => 0, 'placeholder' => new TranslatableText('0')],
+        ]);
+        $this->addWithDefaults($builder, 'max', IntegerType::class, [
+            'label'    => 'admin.content.field_max',
+            'required' => false,
+            'attr'     => ['min' => 0],
+        ]);
+        $this->addWithDefaults($builder, 'required', CheckboxType::class, [
+            'label'    => 'admin.content.field_required',
+            'required' => false,
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

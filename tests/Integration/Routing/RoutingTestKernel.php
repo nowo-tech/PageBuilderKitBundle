@@ -72,6 +72,8 @@ final class RoutingTestKernel extends Kernel
             'csrf_protection'      => true,
             'form'                 => ['csrf_protection' => true],
             'session'              => ['storage_factory_id' => 'session.storage.factory.mock_file'],
+            'default_locale'       => 'en',
+            'translator'           => ['fallbacks' => ['en']],
         ]);
         $container->extension('security', [
             'firewalls' => ['main' => ['security' => false]],

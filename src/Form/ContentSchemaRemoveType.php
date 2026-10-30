@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -15,17 +17,19 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * @extends AbstractType<array{schema_action: string, key: string}>
  */
+#[FormKitConfig('page_builder_kit')]
 final class ContentSchemaRemoveType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('schema_action', HiddenType::class, [
-                'data' => 'remove',
-            ])
-            ->add('key', HiddenType::class, [
-                'constraints' => [new Assert\NotBlank()],
-            ]);
+        $this->addWithDefaults($builder, 'schema_action', HiddenType::class, [
+            'data' => 'remove',
+        ]);
+        $this->addWithDefaults($builder, 'key', HiddenType::class, [
+            'constraints' => [new Assert\NotBlank()],
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
