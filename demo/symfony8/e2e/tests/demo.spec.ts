@@ -66,7 +66,7 @@ test.describe('PageBuilderKit demo', () => {
     await loginAsAdmin(page);
     await page.goto('/admin/page-builder/pages/fields/content');
     await expect(page.getByText(/hero_title|faqs|content/i).first()).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('form, input[name*="fieldValues"], input[name="key"]').first()).toBeVisible();
+    await expect(page.locator('#nowo-ui-settings-values input[type="text"][name*="fieldValues"], #nowo-ui-settings-schema input[type="text"][name="key"]').first()).toBeVisible();
   });
 
   test('admin templates page is reachable', async ({ page }) => {
