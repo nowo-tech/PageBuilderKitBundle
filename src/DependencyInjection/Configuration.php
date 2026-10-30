@@ -216,7 +216,7 @@ final class Configuration implements ConfigurationInterface
                             ->defaultValue('https://esm.sh')
                             ->info('ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src.')
                             ->validate()
-                                ->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#^(https://[^/\s\\\\]+|/(?![/\\\\]))[^\s\\\\]*$#', $v) !== 1)
+                                ->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#^(https://[^/\s\\\\]+|/(?![/\\\\]))[^\s\\\\]*\z#', $v) !== 1)
                                 ->thenInvalid('grapesjs.module_base_url must be an https:// URL or a root-relative path (got %s).')
                             ->end()
                         ->end()

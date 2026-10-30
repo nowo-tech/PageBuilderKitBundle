@@ -86,7 +86,7 @@ final readonly class PublicBindHydrator implements PublicBindHydratorInterface
             if (preg_match('/^[a-zA-Z0-9_]+$/', $key) !== 1 || $element->parentElement?->closest('span[data-pbk-bind]') instanceof Element) {
                 continue;
             }
-            $marker         = sprintf('pbk-bind-%s-%d', $nonce, count($slots));
+            $marker         = sprintf('pbk-bind-%s-%d-end', $nonce, count($slots));
             $slots[$marker] = ['key' => $key, 'html' => $element->innerHTML, 'text' => $element->textContent ?? ''];
             $element->replaceWith($document->createTextNode($marker));
         }

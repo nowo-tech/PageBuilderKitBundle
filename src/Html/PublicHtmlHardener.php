@@ -54,9 +54,10 @@ final readonly class PublicHtmlHardener
     /**
      * Attribute prefixes of front-end frameworks that evaluate attribute values as code when they run over the
      * content (script gadgets): Alpine (`x-`, `:`, `@`), htmx (`hx-`), Vue (`v-`), AngularJS (`ng-`), Turbo
-     * (`data-turbo`), plus the `data-` spellings Alpine / htmx / AngularJS also accept.
+     * (`data-turbo`), plus the `data-` / `ng:` / `ng_` / `x-ng-` spellings AngularJS and the others also accept and the
+     * Vue slot shorthand (`#`).
      */
-    private const array DROP_ATTRIBUTE_PREFIXES = ['x-', 'hx-', 'v-', 'ng-', ':', '@', 'data-turbo', 'data-hx-', 'data-ng-', 'data-x-'];
+    private const array DROP_ATTRIBUTE_PREFIXES = ['x-', 'hx-', 'v-', 'ng-', 'ng:', 'ng_', 'x-ng-', ':', '@', '#', 'data-turbo', 'data-hx-', 'data-ng-', 'data-x-'];
 
     /** Attributes whose value is a URL (or URL list) and must not use a script scheme. */
     private const array URL_ATTRIBUTES = [

@@ -185,6 +185,26 @@ final class PublicBindHydratorTest extends TestCase
     }
 
     #[Test]
+    public function slotMarkersNeverMergeWithFollowingDigits(): void
+    {
+        $twig = $this->createStub(Environment::class);
+        $twig->method('render')->willReturnCallback(static fn (string $template, array $ctx): string => '[' . $ctx['field_key'] . '=' . $ctx['value'] . ']');
+        $form = $this->createStub(FormInterface::class);
+        $form->method('createView')->willReturn(new FormView());
+        $forms = $this->createStub(FormFactoryInterface::class);
+        $forms->method('create')->willReturn($form);
+
+        $html     = '';
+        $expected = '';
+        for ($i = 0; $i < 12; ++$i) {
+            $html .= '<span data-pbk-bind="f' . $i . '">v' . $i . '</span>' . $i;
+            $expected .= '[f' . $i . '=v' . $i . ']' . $i;
+        }
+
+        self::assertSame($expected, $this->hydrator($twig, true, $forms)->hydrate($html, 'home'));
+    }
+
+    #[Test]
     public function inputWithoutValidSlotsIsOnlyHardened(): void
     {
         $twig = $this->createMock(Environment::class);

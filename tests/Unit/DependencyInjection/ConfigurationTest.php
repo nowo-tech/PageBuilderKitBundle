@@ -148,7 +148,7 @@ final class ConfigurationTest extends TestCase
             self::assertSame($ok, $config['grapesjs']['module_base_url']);
         }
 
-        foreach (['http://cdn.example.com', '//evil.example', '/\\evil.example', 'javascript:alert(1)', 'https://a b'] as $bad) {
+        foreach (['http://cdn.example.com', '//evil.example', '/\\evil.example', 'javascript:alert(1)', 'https://a b', "https://cdn.example.com/esm\n", "/vendor/esm\n"] as $bad) {
             try {
                 new Processor()->processConfiguration(new Configuration(), [['grapesjs' => ['module_base_url' => $bad]]]);
                 self::fail('Accepted ' . $bad);

@@ -89,7 +89,7 @@ TypeScript test suite with a coverage gate (REQ-TEST-003). See
   always passes the final gate, so the function output is safe without `|raw`. SEC-004 re-audit 2026-10-30
   (Appendix BO); regression tests with the auditor's 130-payload corpus.
 - `PublicHtmlHardener` (final gate) drops comments, `form=`, `xml:base` and front-end framework gadget attributes
-  (`x-*`, `:*`, `@*`, `hx-*`, `v-*`, `ng-*`, `data-turbo*`).
+  (`x-*`, `:*`, `@*`, `#*`, `hx-*`, `v-*`, `ng-*` / `ng:*` / `ng_*`, `data-turbo*`).
 - The persist sanitizers (`allowlist` strategy, GrapesJS HTML pass) drop comments / processing instructions; the
   GrapesJS pass also blocks `style`, `math`, `template`, `portal`, `frame(set)`, `noscript`, SVG `animate*` / `set` /
   `foreignObject`, `srcdoc`, `xml:base`, `shadowrootmode` and uses the shared URL policy (`vbscript:`,

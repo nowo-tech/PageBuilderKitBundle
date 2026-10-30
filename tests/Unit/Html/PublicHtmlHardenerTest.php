@@ -141,7 +141,7 @@ final class PublicHtmlHardenerTest extends TestCase
     public function testDropsCommentsAndFrameworkGadgetAttributes(): void
     {
         $html = '<p>a<!-- </p><img src=x onerror=alert(1)> --></p>'
-            . '<div x-init="alert(1)" :class="x" @click="alert(1)" hx-get="/x" v-html="h" ng-click="x" data-turbo-method="delete" data-hx-post="/x" data-ok="1">d</div>'
+            . '<div x-init="alert(1)" :class="x" @click="alert(1)" hx-get="/x" v-html="h" ng-click="x" data-turbo-method="delete" data-hx-post="/x" ng:click="x" ng_bind="x" x-ng-init="x" #default="s" data-ok="1">d</div>'
             . '<input form="host-form" name="q"><svg xml:base="javascript:alert(1)//"><a href="#x">l</a></svg>';
 
         self::assertSame('<p>a</p><div data-ok="1">d</div><input name="q"><svg><a href="#x">l</a></svg>', $this->hardener->harden($html));

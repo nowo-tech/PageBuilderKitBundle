@@ -113,7 +113,7 @@ It parses with PHP 8.4 `Dom\HTMLDocument` (the HTML5 algorithm browsers use) and
 | --- | --- |
 | Elements (with content) | `script`, `style`, `iframe`, `frame(set)`, `object`, `embed`, `applet`, `base`, `meta`, `link`, `form`, `math`, `portal`, `noscript`, `template`, `xmp`, `noembed`, `noframes`, `plaintext`, SVG `animate*`, `set`, `foreignObject`, `handler`, `listener` |
 | Comments | every comment node |
-| Attributes | `on*`, `formaction`, `srcdoc`, `action`, `form`, `xml:base`, `xmlns:xlink`; front-end framework "script gadget" prefixes `x-`, `:`, `@` (Alpine), `hx-` / `data-hx-` (htmx), `v-` (Vue), `ng-` / `data-ng-` (AngularJS), `data-turbo*` (Turbo) |
+| Attributes | `on*`, `formaction`, `srcdoc`, `action`, `form`, `xml:base`, `xmlns:xlink`; front-end framework "script gadget" prefixes `x-`, `:`, `@` (Alpine), `hx-` / `data-hx-` (htmx), `v-` (Vue), `ng-` / `ng:` / `ng_` / `x-ng-` / `data-ng-` (AngularJS), `#` (Vue slot shorthand), `data-turbo*` (Turbo) |
 | URL values | `javascript:` / `vbscript:` / non-image `data:` in `href`, `src`, `xlink:href`, `srcset` (each candidate), `poster`, `data-src`, SVG `values`/`from`/`to`/`by`, … (ASCII whitespace/control chars ignored) |
 
 CSS: every `<` becomes the CSS escape `\3C `, so nested `</sty</stylele>` can never close the element. It runs regardless of `html.sanitize.strategy` (also `none`). `grapesjs.allow_scripts: true` keeps `<script>` elements only. The pass is idempotent. PHP 8.4 is the bundle minimum, so there is no non-HTML5 fallback.
