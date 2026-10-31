@@ -29,7 +29,7 @@
             </div>
         {% endif %}
     {% endset %}
-    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { link: collector.renderCount > 0 or collector.publicOutcomes|length > 0 or collector.adminActions|length > 0 }) }}
+    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: collector.renderCount > 0 or collector.publicOutcomes|length > 0 or collector.adminActions|length > 0}) }}
 {% endblock %}
 
 {% block menu %}
