@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.13.1](#to-1131)
 - [To 1.13.0](#to-1130)
 - [To 1.12.1](#to-1121)
 - [To 1.12.0](#to-1120)
@@ -42,6 +43,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.13.1
+
+From **1.13.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 ## To 1.13.0
 
