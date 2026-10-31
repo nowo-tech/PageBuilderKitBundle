@@ -229,6 +229,10 @@ jobs:
       - name: PHPStan (level and ignoreErrors from phpstan.neon.dist; fails the build on any error)
         run: composer phpstan --no-interaction
 
+      # Twig coding standard (twig-cs-fixer, .twig-cs-fixer.php): fails on any lint error.
+      - name: Twig lint
+        run: composer twig:lint
+
   frontend:
     name: Frontend (Vitest + Vite build)
     runs-on: ubuntu-latest

@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_tree.seo.title|default(page_tree.title|default(page_tree.pageKey)) }}</title>
-    {% include '@NowoPageBuilderKitBundle/public/_seo_meta.html.twig' with { seo: page_tree.seo|default({}) } %}
+    {{ include('@NowoPageBuilderKitBundle/public/_seo_meta.html.twig', {seo: page_tree.seo|default({})}) }}{# eats the newline, like the include tag did #}
     <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
     {% if page_tree.engine|default('classic') == 'grapesjs' and page_tree.css|default('') %}
         <style id="pbk-grapes-css"{% if _csp_nonce %} nonce="{{ _csp_nonce }}"{% endif %}>{{ page_tree.css|pbk_harden_css }}</style>
@@ -17,7 +17,7 @@
     {% if draft_preview|default(false) %}
         <div class="pbk-draft-banner" role="status">{{ 'public.draft_preview'|trans }}</div>
     {% endif %}
-    {% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
+    {{ include('@NowoPageBuilderKitBundle/public/_edit_button.html.twig', {page_tree: page_tree}) }}{# eats the newline, like the include tag did #}
     <a class="pbk-skip-link" href="#pbk-main-content">{{ 'public.skip_to_content'|trans }}</a>
     <article class="pbk-page" id="pbk-main-content" tabindex="-1">
         <header class="pbk-page__header">
@@ -29,7 +29,7 @@
             </div>
         {% else %}
             {% for section in page_tree.sections %}
-                {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+                {{ include('@NowoPageBuilderKitBundle/widgets/_section.html.twig', {section: section}) }}{# eats the newline, like the include tag did #}
             {% endfor %}
         {% endif %}
     </article>

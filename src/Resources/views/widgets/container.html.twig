@@ -2,7 +2,7 @@
 <{{ tag }} class="pbk-widget pbk-widget--container">
     {% if widget.children is defined and widget.children|length > 0 %}
         {% for child in widget.children %}
-            {% include '@NowoPageBuilderKitBundle/widgets/_widget.html.twig' with { widget: child } %}
+            {{ include('@NowoPageBuilderKitBundle/widgets/_widget.html.twig', {widget: child}) }}{# eats the newline, like the include tag did #}
         {% endfor %}
     {% endif %}
 </{{ tag }}>

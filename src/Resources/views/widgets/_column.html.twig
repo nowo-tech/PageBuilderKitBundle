@@ -2,6 +2,6 @@
 {% set width = appearance.width|default(12) %}
 <div {{ nowo_pbk_element_attrs(appearance, ['pbk-column', 'col-12', 'col-md-' ~ width]) }}>
     {% for widget in column.widgets %}
-        {% include '@NowoPageBuilderKitBundle/widgets/_widget.html.twig' with { widget: widget } %}
+        {{ include('@NowoPageBuilderKitBundle/widgets/_widget.html.twig', {widget: widget}) }}{# eats the newline, like the include tag did #}
     {% endfor %}
 </div>
