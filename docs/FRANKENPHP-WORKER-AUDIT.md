@@ -50,6 +50,8 @@ FrankenPHP worker mode boots the Symfony kernel once per worker and serves many 
 | `Security\PageBuilderProtection` | yes | none | ✅ |
 | `EventSubscriber\PageBuilderKitAdminAccessSubscriber` | yes | none | ✅ |
 | `EventSubscriber\WorkerStateResetSubscriber` | yes | none | ✅ |
+| `Persistence\PageBuilderTransaction` (1.14) | yes | request-scoped event outbox | ✅ dispatched or discarded at `kernel.terminate` / `kernel.exception` / console / Messenger boundaries, plus `ResetInterface` |
+| `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`) | yes | none | ✅ resets the bundle's own manager when closed (next request / message), clears it at the end of each request / message / command; never touches the host managers |
 | `Debug\PageBuilderKitTrace` | yes | request buffer | ✅ with reset |
 | `DataCollector\PageBuilderKitDataCollector` | profiler | request | ✅ |
 | `Locale\BuilderLocales` | yes | readonly config; static bind optional | ✅ with terminate reset |
@@ -68,6 +70,9 @@ FrankenPHP worker mode boots the Symfony kernel once per worker and serves many 
 - Keep `services_resetter` enabled (Symfony default).
 - Custom `PageBuilderKitAccessCheckerInterface` or HTML sanitizer services must be stateless or implement `ResetInterface`.
 - Optional: `EntityManager::clear()` or `FRANKENPHP_LOOP_MAX` for memory bounds on busy workers.
+- With `doctrine.entity_manager` (1.14) the bundle recovers and clears its own manager itself, without the services
+  resetter: `tests/Integration/Persistence/PageBuilderPersistenceKernelTest.php` drives `http_kernel`
+  handle/terminate directly (a failed write, then 300 requests with flat memory and an empty unit of work).
 - Do not put user/capability flags in Twig globals — use `nowo_page_builder_can()` / `nowo_page_builder_can_edit()` per render.
 
 ## Re-audit triggers

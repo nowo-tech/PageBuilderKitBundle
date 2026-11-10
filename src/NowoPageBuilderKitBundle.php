@@ -7,12 +7,14 @@ namespace Nowo\PageBuilderKitBundle;
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetTypePass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocalesLegacyBinding;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
@@ -27,13 +29,20 @@ final class NowoPageBuilderKitBundle extends Bundle
         $container->addCompilerPass(new GrapesBlockPackPass());
         $container->addCompilerPass(new CsrfProtectionPass());
 
+        // Before the mapping passes: a clear error for an unknown doctrine.entity_manager (1.14).
+        $container->addCompilerPass(new PageBuilderEntityManagerPass(checkOnly: true), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
+
         $entityDir = __DIR__ . '/Entity';
         if (is_dir($entityDir)) {
             $container->addCompilerPass(DoctrineOrmMappingsPass::createAttributeMappingDriver(
                 ['Nowo\\PageBuilderKitBundle\\Entity'],
                 [$entityDir],
+                [NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER],
             ));
         }
+
+        // After the mapping pass above (and DoctrineBundle's auto_mapping): keep the entities on one manager (1.14).
+        $container->addCompilerPass(new PageBuilderEntityManagerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, -10);
     }
 
     public function boot(): void

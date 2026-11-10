@@ -10,6 +10,9 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
+use Nowo\PageBuilderKitBundle\Event\PageMetadataSavedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageTemplateChangedEvent;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface;
 
 use function array_key_exists;
@@ -34,6 +37,7 @@ final readonly class PageTemplateService
         private DocumentService $documentService,
         private DocumentNormalizer $documentNormalizer,
         private ContentFieldsNormalizer $contentFieldsNormalizer = new ContentFieldsNormalizer(),
+        private ?PageBuilderTransaction $transaction = null,
     ) {
     }
 
@@ -86,7 +90,7 @@ final readonly class PageTemplateService
             ->setWidgetPropsByLocale($props);
 
         $this->entityManager->persist($template);
-        $this->entityManager->flush();
+        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_SAVED));
 
         return $template;
     }
@@ -154,7 +158,7 @@ final readonly class PageTemplateService
         }
 
         $this->entityManager->remove($template);
-        $this->entityManager->flush();
+        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_DELETED));
     }
 
     /**
@@ -338,7 +342,7 @@ final readonly class PageTemplateService
             ->setWidgetPropsByLocale($props);
 
         $this->entityManager->persist($template);
-        $this->entityManager->flush();
+        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_IMPORTED));
 
         return $templateKey;
     }
@@ -409,6 +413,20 @@ final readonly class PageTemplateService
                     $translation->{$setter}($value);
                 }
             }
+        }
+
+        $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+    }
+
+    /**
+     * Flushes the bundle entity manager (unless the host controls the transaction) and records the write events.
+     */
+    private function commit(object ...$events): void
+    {
+        if ($this->transaction instanceof PageBuilderTransaction) {
+            $this->transaction->commit(...$events);
+
+            return;
         }
 
         $this->entityManager->flush();

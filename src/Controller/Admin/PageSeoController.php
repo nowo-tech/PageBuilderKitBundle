@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Controller\Admin;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Form\BuilderPageSeoType;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
+use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,7 +26,7 @@ final class PageSeoController extends AbstractController
     public function __construct(
         private readonly BuilderPageRepository $pageRepository,
         private readonly BuilderLocales $builderLocales,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly DocumentService $documentService,
         private readonly PageBuilderKitPageFactory $pageFactory,
     ) {
     }
@@ -63,7 +63,8 @@ final class PageSeoController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->entityManager->flush();
+            // 1.14: the bundle entity manager (not the autowired default) + PageMetadataSavedEvent after commit.
+            $this->documentService->flushPage($page);
             $this->addFlash('success', 'admin.seo.saved');
 
             return $this->redirectToRoute('admin_page_builder_seo', [

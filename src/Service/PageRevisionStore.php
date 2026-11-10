@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface;
 
 use function array_slice;
@@ -30,6 +31,7 @@ final readonly class PageRevisionStore
         private int $maxPerPage = 50,
         private bool $onSave = true,
         private bool $onPublish = true,
+        private ?PageBuilderTransaction $transaction = null,
     ) {
     }
 
@@ -82,7 +84,7 @@ final readonly class PageRevisionStore
         $page->addRevision($revision);
 
         $this->entityManager->persist($revision);
-        $this->entityManager->flush();
+        $this->commit();
         $this->prune($page);
 
         return $revision;
@@ -116,7 +118,7 @@ final readonly class PageRevisionStore
             $page->removeRevision($stale);
             $this->entityManager->remove($stale);
         }
-        $this->entityManager->flush();
+        $this->commit();
     }
 
     /**
@@ -158,5 +160,19 @@ final readonly class PageRevisionStore
     private function fingerprint(array $structure, array $widgetPropsByLocale): string
     {
         return hash('xxh128', json_encode([$structure, $widgetPropsByLocale], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Flushes the bundle entity manager (unless the host controls the transaction) and records the write events.
+     */
+    private function commit(object ...$events): void
+    {
+        if ($this->transaction instanceof PageBuilderTransaction) {
+            $this->transaction->commit(...$events);
+
+            return;
+        }
+
+        $this->entityManager->flush();
     }
 }

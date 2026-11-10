@@ -7,6 +7,8 @@ namespace Nowo\PageBuilderKitBundle\Service;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
+use Nowo\PageBuilderKitBundle\Event\PageRevisionRestoredEvent;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 
 use function sprintf;
 
@@ -20,6 +22,7 @@ final readonly class PageRevisionService
         private DocumentService $documentService,
         private DocumentNormalizer $documentNormalizer = new DocumentNormalizer(),
         private DocumentDiff $documentDiff = new DocumentDiff(),
+        private ?PageBuilderTransaction $transaction = null,
     ) {
     }
 
@@ -64,6 +67,7 @@ final readonly class PageRevisionService
         /** @var array<string, array<string, mixed>> $props */
         $props = $revision->getWidgetPropsByLocale();
         $this->documentService->saveDocument($page, $revision->getStructure(), $props);
+        $this->transaction?->record(new PageRevisionRestoredEvent($page->getPageKey(), $page->getUuid(), $revisionId));
 
         return $revision;
     }

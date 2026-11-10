@@ -19,6 +19,7 @@ use function preg_match;
 use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
+use function trim;
 
 final class Configuration implements ConfigurationInterface
 {
@@ -149,6 +150,19 @@ final class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('table_prefix')->defaultValue('')->end()
+                        ->scalarNode('entity_manager')
+                            ->defaultNull()
+                            ->info('Doctrine entity manager that maps the bundle entities (1.14). Null (default): the manager returned by getManagerForClass() for the bundle entities, the default one in a standard host. When set, the bundle entities are mapped on that manager ONLY, every read and write uses it, and the bundle recovers (resets) it when a failed write closed it; the build fails when the manager does not exist.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => $v !== null && (!is_string($v) || trim($v) === ''))
+                                ->thenInvalid('doctrine.entity_manager must be a non-empty entity manager name or null.')
+                            ->end()
+                        ->end()
+                        ->enumNode('transaction')
+                            ->values(['bundle', 'host'])
+                            ->defaultValue('bundle')
+                            ->info('bundle (default): the bundle flushes its writes on its entity manager. host: the bundle never flushes; the host use case owns the transaction and the write events are dispatched after the host commit (1.14, DDD hosts).')
+                        ->end()
                         ->scalarNode('connection')
                             ->defaultValue('default')
                             ->info('Deprecated and ignored: the bundle entities use the default Doctrine entity manager mapping; route them to another connection through your doctrine.orm.entity_managers mappings.')

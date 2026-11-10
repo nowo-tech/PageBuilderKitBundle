@@ -1,0 +1,432 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
+
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\Persistence\ManagerRegistry;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageMetadataSavedEvent;
+use Nowo\PageBuilderKitBundle\Event\PagePublishedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageRevisionRestoredEvent;
+use Nowo\PageBuilderKitBundle\Event\PageTemplateChangedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageUnpublishedEvent;
+use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderPendingEventsInterface;
+use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
+use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
+use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
+use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
+use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\HttpKernel;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
+
+use function dirname;
+use function memory_get_usage;
+
+/**
+ * Rule 6/7 through a real kernel (1.14): which entity manager the bundle uses and flushes, the dedicated
+ * `doctrine.entity_manager`, the host-controlled transaction mode and a kept-alive kernel (FrankenPHP worker
+ * without kernel reset, no services resetter).
+ */
+final class PageBuilderPersistenceKernelTest extends TestCase
+{
+    private ?PersistenceTestKernel $kernel = null;
+
+    /** @var list<object> */
+    private array $events = [];
+
+    private string $pageKeyColumn = 'page_key';
+
+    /** @var list<bool> transaction state of the bundle connection when each event was dispatched */
+    private array $inTransaction = [];
+
+    protected function tearDown(): void
+    {
+        $this->kernel?->shutdown();
+        $this->kernel = null;
+    }
+
+    public function testStandardHostUsesTheDefaultManagerAndDispatchesIdEventsAfterCommit(): void
+    {
+        $container = $this->boot($this->singleManager(), []);
+        $default   = $this->manager($container, 'default');
+
+        self::assertSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
+        self::assertFalse($container->has(OwnEntityManagerSubscriber::class), 'the host manager is never reset by the bundle');
+
+        $publisher = $container->get(PagePublisherInterface::class);
+        self::assertInstanceOf(PagePublisherInterface::class, $publisher);
+        $uuid = $publisher->createPageByKey('home', 'Home', 'en');
+        $publisher->publishByKey('home');
+
+        self::assertSame(['home'], $this->pageKeys($default));
+        self::assertCount(2, $this->events);
+        self::assertInstanceOf(PageCreatedEvent::class, $this->events[0]);
+        self::assertSame(['home', $uuid], [$this->events[0]->pageKey, $this->events[0]->pageUuid]);
+        self::assertInstanceOf(PagePublishedEvent::class, $this->events[1]);
+        self::assertSame($uuid, $this->events[1]->pageUuid);
+        self::assertSame([false, false], $this->inTransaction, 'events are dispatched after the commit');
+    }
+
+    public function testDedicatedManagerWithAutoMappingOnDefaultKeepsTheHostUnitOfWorkUntouched(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $registry  = $container->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $registry);
+        $default = $this->manager($container, 'default');
+        $bundle  = $this->manager($container, 'page_builder');
+
+        self::assertTrue($default->getMetadataFactory()->isTransient(BuilderPage::class), 'not mapped on the auto-mapped default manager');
+        self::assertSame($bundle, $registry->getManagerForClass(BuilderPage::class));
+        self::assertSame($bundle, $container->get('nowo_page_builder_kit.entity_manager'));
+        self::assertSame('default', $registry->getDefaultManagerName());
+
+        $note = new HostNote('pending host change');
+        $default->persist($note);
+
+        $publisher = $container->get(PagePublisherInterface::class);
+        self::assertInstanceOf(PagePublisherInterface::class, $publisher);
+        $publisher->createPageByKey('about', 'About', 'en');
+        $publisher->publishByKey('about');
+
+        self::assertSame(['about'], $this->pageKeys($bundle));
+        self::assertSame([], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note'), 'the host change is not flushed by the bundle');
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($note));
+        self::assertNotContains('pb_page', $default->getConnection()->createSchemaManager()->listTableNames());
+
+        $repository = $container->get(BuilderPageRepositoryInterface::class);
+        self::assertInstanceOf(BuilderPageRepositoryInterface::class, $repository);
+        self::assertSame('about', $repository->findOneByPageKey('about')?->getPageKey());
+    }
+
+    public function testManagersWithoutDefaultEntityManagerKeepTheHostDefault(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: false, defaultName: false), ['entity_manager' => 'page_builder']);
+        $registry  = $container->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $registry);
+
+        self::assertSame('default', $registry->getDefaultManagerName());
+        self::assertTrue($this->manager($container, 'default')->getMetadataFactory()->isTransient(BuilderPage::class));
+        self::assertSame($this->manager($container, 'page_builder'), $registry->getManagerForClass(BuilderPage::class));
+    }
+
+    public function testEveryWriteRecordsAnIdEventOnTheDedicatedManager(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder'], revisions: true);
+        $default   = $this->manager($container, 'default');
+        $note      = new HostNote('pending');
+        $default->persist($note);
+
+        $documents = $container->get(DocumentService::class);
+        $templates = $container->get(PageTemplateService::class);
+        $fields    = $container->get(ContentFieldsService::class);
+        $revisions = $container->get(PageRevisionService::class);
+        self::assertInstanceOf(DocumentService::class, $documents);
+        self::assertInstanceOf(PageTemplateService::class, $templates);
+        self::assertInstanceOf(ContentFieldsService::class, $fields);
+        self::assertInstanceOf(PageRevisionService::class, $revisions);
+
+        $page = $documents->createPage('landing', 'Landing', 'en');
+        $documents->saveDocumentByKey('landing', ['version' => 1, 'sections' => []]);
+        $fields->saveSchema($page, [['key' => 'headline', 'type' => 'string', 'label' => 'Headline']]);
+        $revision = $revisions->create($page, 'manual');
+        self::assertNotNull($revision?->getId());
+        $revisions->restore($page, $revision->getId());
+        $documents->flushPage($page);
+        $templates->saveFromPage($page, 'tpl', 'Template');
+        $templates->import($templates->export('tpl'));
+        $templates->delete('tpl');
+        $documents->publishByKey('landing');
+        $documents->unpublishByKey('landing');
+
+        $summary = [];
+        foreach ($this->events as $event) {
+            $summary[] = match (true) {
+                $event instanceof PageDocumentSavedEvent    => 'saved:' . $event->change . ':' . $event->pageKey,
+                $event instanceof PageTemplateChangedEvent  => 'template:' . $event->action . ':' . $event->templateKey,
+                $event instanceof PageRevisionRestoredEvent => 'restored:' . $event->revisionId . ':' . $event->pageUuid,
+                $event instanceof PageCreatedEvent          => 'created:' . $event->pageKey,
+                $event instanceof PageMetadataSavedEvent    => 'metadata:' . $event->pageKey,
+                $event instanceof PagePublishedEvent        => 'published:' . $event->pageKey,
+                $event instanceof PageUnpublishedEvent      => 'unpublished:' . $event->pageKey,
+                default                                     => $event::class,
+            };
+        }
+
+        self::assertSame([
+            'created:landing',
+            'saved:document:landing',
+            'saved:content_fields:landing',
+            'saved:document:landing',
+            'restored:' . $revision->getId() . ':' . $page->getUuid(),
+            'metadata:landing',
+            'template:saved:tpl',
+            'template:imported:tpl',
+            'template:deleted:tpl',
+            'published:landing',
+            'unpublished:landing',
+        ], $summary);
+        self::assertNotContains(true, $this->inTransaction);
+        self::assertSame([], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note'));
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($note));
+    }
+
+    public function testUnknownEntityManagerFailsTheBuild(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('nowo_page_builder_kit.doctrine.entity_manager is "missing"');
+
+        $this->boot($this->singleManager(), ['entity_manager' => 'missing']);
+    }
+
+    public function testHostTransactionModeNeverFlushesAndDispatchesAfterTheHostCommit(): void
+    {
+        $container = $this->boot($this->singleManager(), ['transaction' => 'host']);
+        $default   = $this->manager($container, 'default');
+        $pending   = $container->get(PageBuilderPendingEventsInterface::class);
+        self::assertInstanceOf(PageBuilderPendingEventsInterface::class, $pending);
+        $publisher = $container->get(PagePublisherInterface::class);
+        self::assertInstanceOf(PagePublisherInterface::class, $publisher);
+
+        $publisher->createPageByKey('draft', 'Draft', 'en');
+        self::assertSame([], $this->pageKeys($default), 'the bundle does not flush');
+        self::assertSame([], $this->events);
+        self::assertSame(1, $pending->countPending());
+
+        // Host use case: its own transaction (Messenger doctrine_transaction middleware does the same).
+        $default->wrapInTransaction(static function (EntityManagerInterface $em): void {
+            $em->flush();
+        });
+        self::assertSame(['draft'], $this->pageKeys($default));
+        self::assertSame([], $this->events, 'postFlush inside the host transaction does not dispatch');
+        self::assertSame(1, $pending->dispatchPending());
+        self::assertCount(1, $this->events);
+        self::assertInstanceOf(PageCreatedEvent::class, $this->events[0]);
+
+        // Host flush outside a transaction: dispatched on postFlush, after the commit.
+        $publisher->publishByKey('draft');
+        self::assertCount(1, $this->events);
+        $default->flush();
+        self::assertCount(2, $this->events);
+        self::assertInstanceOf(PagePublishedEvent::class, $this->events[1]);
+        self::assertSame([false, false], $this->inTransaction);
+        self::assertSame(0, $pending->countPending());
+    }
+
+    public function testHostTransactionEventsAreDiscardedWhenTheHostRequestFails(): void
+    {
+        $container = $this->boot($this->singleManager(), ['transaction' => 'host']);
+        $pending   = $container->get(PageBuilderPendingEventsInterface::class);
+        self::assertInstanceOf(PageBuilderPendingEventsInterface::class, $pending);
+        $kernel = $this->httpKernel($container);
+
+        // The host never flushes: the request ends, the unwritten events must not leak into the next request.
+        $request  = Request::create('/t/create/never');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(1, $pending->countPending());
+
+        $kernel->terminate($request, $response);
+        self::assertSame(0, $pending->countPending());
+        self::assertSame([], $this->events);
+        self::assertSame([], $this->pageKeys($this->manager($container, 'default')));
+    }
+
+    public function testKeptAliveKernelRecoversTheOwnManagerAndKeepsMemoryFlat(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $kernel    = $this->httpKernel($container);
+        $default   = $this->manager($container, 'default');
+        $bundle    = $this->manager($container, 'page_builder');
+        $note      = new HostNote('host change survives');
+        $default->persist($note);
+
+        $request  = Request::create('/t/fail');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(500, $response->getStatusCode());
+        $kernel->terminate($request, $response);
+        self::assertFalse($bundle->isOpen(), 'the failed write closed the bundle manager');
+
+        $request  = Request::create('/t/create/after-failure');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $kernel->terminate($request, $response);
+        self::assertTrue($bundle->isOpen());
+        self::assertSame(['after-failure'], $this->pageKeys($bundle));
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), 'no managed page survives the request');
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($note), 'the host manager is never reset nor cleared');
+
+        $baseline = 0;
+        for ($i = 0; $i < 300; ++$i) {
+            $request  = Request::create('/t/create/page-' . $i);
+            $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+            self::assertSame(200, $response->getStatusCode());
+            $kernel->terminate($request, $response);
+            self::assertSame(0, $bundle->getUnitOfWork()->size());
+            if ($i === 50) {
+                $baseline = memory_get_usage();
+            }
+        }
+
+        self::assertCount(301, $this->events);
+        self::assertLessThan(4 * 1024 * 1024, memory_get_usage() - $baseline, 'memory stays flat over many requests');
+    }
+
+    public function testDefaultPathNeverResetsTheHostManager(): void
+    {
+        $container = $this->boot($this->singleManager(), []);
+        $kernel    = $this->httpKernel($container);
+        $default   = $this->manager($container, 'default');
+
+        $request  = Request::create('/t/fail');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        $kernel->terminate($request, $response);
+        self::assertFalse($default->isOpen());
+
+        $request  = Request::create('/t/create/next');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(500, $response->getStatusCode(), 'the host owns its manager: the bundle does not reset it');
+        self::assertFalse($default->isOpen());
+    }
+
+    /**
+     * @param array<string, mixed> $doctrine
+     * @param array<string, mixed> $bundleDoctrine
+     */
+    private function boot(array $doctrine, array $bundleDoctrine, bool $revisions = false): ContainerInterface
+    {
+        $this->kernel = new PersistenceTestKernel($doctrine, $bundleDoctrine, $revisions);
+        $this->kernel->boot();
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(ContainerInterface::class, $container);
+
+        $registry = $container->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $registry);
+        foreach ($registry->getManagers() as $manager) {
+            self::assertInstanceOf(EntityManagerInterface::class, $manager);
+            $tool     = new SchemaTool($manager);
+            $metadata = $manager->getMetadataFactory()->getAllMetadata();
+            $tool->dropDatabase();
+            $tool->createSchema($metadata);
+        }
+
+        $bundleManager = $container->get('nowo_page_builder_kit.entity_manager');
+        self::assertInstanceOf(EntityManagerInterface::class, $bundleManager);
+        $this->pageKeyColumn = $bundleManager->getClassMetadata(BuilderPage::class)->getColumnName('pageKey');
+        $dispatcher          = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        foreach ([
+            PageCreatedEvent::class,
+            PageDocumentSavedEvent::class,
+            PageMetadataSavedEvent::class,
+            PagePublishedEvent::class,
+            PageUnpublishedEvent::class,
+            PageRevisionRestoredEvent::class,
+            PageTemplateChangedEvent::class,
+        ] as $eventClass) {
+            $dispatcher->addListener($eventClass, function (object $event) use ($bundleManager): void {
+                $this->events[]        = $event;
+                $this->inTransaction[] = $bundleManager->getConnection()->isTransactionActive();
+            });
+        }
+
+        return $container;
+    }
+
+    /**
+     * The `http_kernel` service itself: FrankenPHP worker mode without kernel reset (Kernel::handle() would run the
+     * services resetter between two requests).
+     */
+    private function httpKernel(ContainerInterface $container): HttpKernel
+    {
+        $kernel = $container->get('http_kernel');
+        self::assertInstanceOf(HttpKernel::class, $kernel);
+
+        return $kernel;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function pageKeys(EntityManagerInterface $manager): array
+    {
+        return $manager->getConnection()->fetchFirstColumn('SELECT ' . $this->pageKeyColumn . ' FROM pb_page ORDER BY id');
+    }
+
+    private function manager(ContainerInterface $container, string $name): EntityManagerInterface
+    {
+        $registry = $container->get('doctrine');
+        self::assertInstanceOf(ManagerRegistry::class, $registry);
+        $manager = $registry->getManager($name);
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+
+        return $manager;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function hostMapping(): array
+    {
+        return [
+            'Host' => [
+                'type'      => 'attribute',
+                'dir'       => dirname(__DIR__, 2) . '/Fixtures/Host',
+                'prefix'    => 'Nowo\\PageBuilderKitBundle\\Tests\\Fixtures\\Host',
+                'is_bundle' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Flex shorthand: one (default) entity manager.
+     *
+     * @return array<string, mixed>
+     */
+    private function singleManager(): array
+    {
+        return [
+            'dbal' => ['url' => 'sqlite:///%kernel.cache_dir%/default.sqlite'],
+            'orm'  => ['mappings' => $this->hostMapping()],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function twoManagers(bool $autoMapping, bool $defaultName = true): array
+    {
+        $orm = [
+            'entity_managers' => [
+                'default'      => ['connection' => 'default', 'auto_mapping' => $autoMapping, 'mappings' => $this->hostMapping()],
+                'page_builder' => ['connection' => 'page_builder'],
+            ],
+        ];
+        if ($defaultName) {
+            $orm = ['default_entity_manager' => 'default'] + $orm;
+        }
+
+        return [
+            'dbal' => [
+                'default_connection' => 'default',
+                'connections'        => [
+                    'default'      => ['url' => 'sqlite:///%kernel.cache_dir%/default.sqlite'],
+                    'page_builder' => ['url' => 'sqlite:///%kernel.cache_dir%/page_builder.sqlite'],
+                ],
+            ],
+            'orm' => $orm,
+        ];
+    }
+}

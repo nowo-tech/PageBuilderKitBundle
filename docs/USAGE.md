@@ -18,6 +18,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Screenshots](#screenshots)
 - [Admin routes](#admin-routes)
 - [DocumentService](#documentservice)
+- [Standard Symfony and DDD / hexagonal hosts](#standard-symfony-and-ddd--hexagonal-hosts)
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
 - [Public HTML cleanup](#public-html-cleanup)
@@ -108,7 +109,77 @@ $documentService->publish($page);
 $documentService->unpublish($page); // back to draft — public /p/{pageKey} returns 404
 ```
 
+Key-based alternative (1.14, no entity in the signature): autowire `PagePublisherInterface` and call
+`createPageByKey()`, `saveDocumentByKey()`, `publishByKey()`, `unpublishByKey()`.
+
 `saveDocument()` normalizes structure through `DocumentNormalizer`. For GrapesJS documents it sanitizes HTML/CSS via `GrapesDocumentSanitizer`. Classic v1 documents still validate widget types and sanitize props per locale.
+
+## Standard Symfony and DDD / hexagonal hosts
+
+Both paths are supported (1.14); the standard one is the zero-config default.
+
+**Standard Symfony host.** Nothing to configure. The admin UI and `DocumentService` write the bundle entities on the
+entity manager that maps them (your default one) and flush right away. Listen to the write events when you need to
+react (cache purge, search index, audit):
+
+```php
+use Nowo\PageBuilderKitBundle\Event\PagePublishedEvent;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+#[AsEventListener]
+final class PurgePageCache
+{
+    public function __invoke(PagePublishedEvent $event): void
+    {
+        // $event->pageKey, $event->pageUuid, $event->publishedAt — IDs and scalars only
+    }
+}
+```
+
+Events (`Nowo\PageBuilderKitBundle\Event`): `PageCreatedEvent`, `PageDocumentSavedEvent` (`change`: `document` |
+`content_fields`), `PageMetadataSavedEvent`, `PagePublishedEvent`, `PageUnpublishedEvent`, `PageRevisionRestoredEvent`,
+`PageTemplateChangedEvent`. They are dispatched after the commit: never inside a flush, never while a transaction is
+open.
+
+**DDD / hexagonal host.** Keep your domain free of the bundle entities: address pages by key through
+`PagePublisherInterface`, read them through `PageRenderProviderInterface`, and react to the ID-only events.
+
+```yaml
+nowo_page_builder_kit:
+    doctrine:
+        entity_manager: page_builder   # optional: a manager that maps ONLY the bundle entities
+        transaction: host              # optional: the bundle never flushes, your use case commits
+```
+
+```php
+use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
+
+final readonly class PublishLandingPage
+{
+    public function __construct(private PagePublisherInterface $pages)
+    {
+    }
+
+    public function __invoke(string $pageKey): void
+    {
+        $this->pages->publishByKey($pageKey); // no flush in `host` mode: your bus / unit of work commits
+    }
+}
+```
+
+- `entity_manager`: the bundle entities are mapped on that manager only (the bundle removes them from the others,
+  including an `auto_mapping: true` default) and the bundle never touches your managers. It also owns that manager in
+  a kept-alive kernel: a manager closed by a failed write is reset at the next request or message, and it is cleared
+  at the end of every request, message and command. Your default manager is never reset or cleared by the bundle.
+- `transaction: host`: commit through your own unit of work (for example the Messenger `doctrine_transaction`
+  middleware, or `wrapInTransaction()`). With `entity_manager` set, flush THAT manager. The events wait for the flush
+  and are dispatched when no transaction is open any more: on the next `postFlush` outside a transaction, at the end of
+  the request / message / command, or when you call `PageBuilderPendingEventsInterface::dispatchPending()` right after
+  your commit. Events of writes never flushed, or of a failed request / message / command, are discarded.
+- Without `entity_manager`, the bundle uses the manager returned by `getManagerForClass()` for its entities; with
+  `transaction: bundle` (the default) it flushes that manager, which in a standard host is the default one.
+- XML-mapped hosts: the bundle entities keep their own attribute mapping; register it with `auto_mapping` or an
+  explicit `NowoPageBuilderKitBundle` mapping when `auto_mapping` is off. There is no host entity to extend.
 
 ## Document JSON API and CSRF
 

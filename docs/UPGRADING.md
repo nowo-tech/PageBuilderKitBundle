@@ -44,6 +44,27 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
+### To 1.14.0
+
+Standard hosts: **no configuration change**. The bundle keeps flushing its own admin writes on the entity manager
+that maps its entities, which is your default manager when you use `auto_mapping` or the bundle mapping on it.
+
+New and optional:
+
+- `doctrine.entity_manager: <name>` maps the bundle entities on that manager only and makes every bundle read/write use
+  it. Declare the manager under `doctrine.orm.entity_managers` (it needs no `mappings`: the bundle adds its own) and
+  keep `default_entity_manager` pointing at your own default. Create or migrate the `pb_*` tables on that manager's
+  connection. An unknown name now fails the container build.
+- `doctrine.transaction: host` (DDD hosts): the bundle no longer flushes; commit through your own use case / unit of
+  work (e.g. the Messenger `doctrine_transaction` middleware). Events are dispatched after your commit.
+- Write events (`Nowo\PageBuilderKitBundle\Event\*`) carry page keys / UUIDs and scalars only. They are new:
+  nothing to migrate.
+- `PagePublisherInterface` is the key-based alternative to the entity-based `DocumentService` methods, which stay.
+
+If you construct the bundle services yourself (outside the container), they accept a new optional last constructor
+argument `?PageBuilderTransaction $transaction`; without it they flush as before and dispatch no events.
+`PageSeoController` now receives `DocumentService` instead of `EntityManagerInterface` (internal controller).
+
 ## To 1.13.1
 
 From **1.13.0**:
