@@ -171,11 +171,12 @@ final readonly class PublishLandingPage
   including an `auto_mapping: true` default) and the bundle never touches your managers. It also owns that manager in
   a kept-alive kernel: a manager closed by a failed write is reset at the next request or message, and it is cleared
   at the end of every request, message and command. Your default manager is never reset or cleared by the bundle.
-- `transaction: host`: commit through your own unit of work (for example the Messenger `doctrine_transaction`
+- `transaction: host`: when your code calls the bundle services, commit through your own unit of work (for example the Messenger `doctrine_transaction`
   middleware, or `wrapInTransaction()`). With `entity_manager` set, flush THAT manager. The events wait for the flush
   and are dispatched when no transaction is open any more: on the next `postFlush` outside a transaction, at the end of
   the request / message / command, or when you call `PageBuilderPendingEventsInterface::dispatchPending()` right after
-  your commit. Events of writes never flushed, or of a failed request / message / command, are discarded.
+  your commit. Events of writes never flushed, or of a failed request / message / command, are discarded. The bundle's
+  own admin UI is a use case of its own: while one of its controllers serves the request it still flushes its writes.
 - Without `entity_manager`, the bundle uses the manager returned by `getManagerForClass()` for its entities; with
   `transaction: bundle` (the default) it flushes that manager, which in a standard host is the default one.
 - XML-mapped hosts: the bundle entities keep their own attribute mapping; register it with `auto_mapping` or an

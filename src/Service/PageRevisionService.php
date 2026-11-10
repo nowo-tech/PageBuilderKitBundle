@@ -67,7 +67,7 @@ final readonly class PageRevisionService
         /** @var array<string, array<string, mixed>> $props */
         $props = $revision->getWidgetPropsByLocale();
         $this->documentService->saveDocument($page, $revision->getStructure(), $props);
-        $this->transaction?->record(new PageRevisionRestoredEvent($page->getPageKey(), $page->getUuid(), $revisionId));
+        $this->transaction?->record(null, new PageRevisionRestoredEvent($page->getPageKey(), $page->getUuid(), $revisionId));
 
         return $revision;
     }

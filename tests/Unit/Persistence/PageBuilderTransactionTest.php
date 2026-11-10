@@ -15,6 +15,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 #[CoversClass(PageBuilderTransaction::class)]
@@ -77,6 +79,30 @@ final class PageBuilderTransactionTest extends TestCase
 
         $transaction->postFlush(new PostFlushEventArgs($em));
         self::assertCount(1, $this->dispatched);
+    }
+
+    #[Test]
+    public function hostModeStillFlushesDuringTheBundleOwnAdminRequests(): void
+    {
+        $stack = new RequestStack();
+        $em    = $this->manager(flushes: true);
+
+        $transaction = new PageBuilderTransaction($em, $this->dispatcher(), true, requestStack: $stack);
+        self::assertFalse($transaction->flushesItself(), 'no request (CLI / host use case)');
+
+        $hostRequest = Request::create('/host');
+        $hostRequest->attributes->set('_controller', 'App\\Controller\\PublishController::__invoke');
+        $stack->push($hostRequest);
+        self::assertFalse($transaction->flushesItself(), 'host controller: the host commits');
+        $stack->pop();
+
+        $adminRequest = Request::create('/admin/page-builder');
+        $adminRequest->attributes->set('_controller', 'Nowo\\PageBuilderKitBundle\\Controller\\Admin\\PageDocumentApiController::publish');
+        $stack->push($adminRequest);
+        self::assertTrue($transaction->flushesItself());
+
+        $transaction->commit(new PageCreatedEvent('k', 'u'));
+        self::assertCount(1, $this->dispatched, 'flushed by the bundle UI: dispatched after its commit');
     }
 
     #[Test]

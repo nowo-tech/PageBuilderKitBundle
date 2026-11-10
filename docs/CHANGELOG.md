@@ -49,8 +49,9 @@ Target 1.14.0 (architecture bar W1: standard Symfony and DDD hosts, rules 1, 4, 
   message when the manager does not exist or does not map the entities. The bundle then also owns that manager: it
   recovers it (reset) at the next request or message when a failed write closed it, and clears it at the end of each
   request, message and command (FrankenPHP worker mode without kernel reset).
-- `doctrine.transaction: bundle|host` (default `bundle`). `host` is the opt-in mode for DDD hosts: the bundle never
-  flushes, the host's use case owns the transaction, and the write events are dispatched after the host commit.
+- `doctrine.transaction: bundle|host` (default `bundle`). `host` is the opt-in mode for DDD hosts: when the host calls
+  the bundle services the bundle never flushes, the host's use case owns the transaction, and the write events are
+  dispatched after the host commit. The bundle's own admin UI keeps flushing its writes (it is a use case of its own).
 - ID-only write events in `Nowo\PageBuilderKitBundle\Event` (scalars only, no Doctrine/Symfony types), dispatched
   after the commit, never inside a flush or an open transaction: `PageCreatedEvent`, `PageDocumentSavedEvent`
   (`change`: `document` | `content_fields`), `PageMetadataSavedEvent` (translations / SEO), `PagePublishedEvent`,

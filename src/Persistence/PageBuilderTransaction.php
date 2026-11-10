@@ -13,11 +13,14 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 
 use function array_values;
 use function count;
+use function is_string;
+use function str_starts_with;
 
 /**
  * Unit of work boundary of the bundle's writes (1.14, architecture bar rules 6 and 7).
@@ -25,9 +28,10 @@ use function count;
  * - `doctrine.transaction: bundle` (default, standard hosts): {@see commit()} flushes the entity manager that maps
  *   the bundle entities (`doctrine.entity_manager`, else the manager returned by `getManagerForClass()`), never the
  *   autowired default one by accident, then dispatches the write events.
- * - `doctrine.transaction: host` (DDD hosts): {@see commit()} never flushes; the host's use case owns the
- *   transaction. The events wait for the host's flush of that manager and are dispatched once no transaction is
- *   open any more (the host committed).
+ * - `doctrine.transaction: host` (DDD hosts): {@see commit()} never flushes when the host calls the bundle; the
+ *   host's use case owns the transaction. The events wait for the host's flush of that manager and are dispatched
+ *   once no transaction is open any more (the host committed). The bundle's own admin controllers are a use case of
+ *   their own: during a main request served by them the bundle still flushes its writes.
  *
  * Events are never dispatched inside a flush nor while a transaction that may still roll back is open. The recorded
  * events are request state: dispatched or discarded at every request / message / command boundary and on
@@ -38,6 +42,8 @@ use function count;
 #[AsDoctrineListener(event: Events::postFlush)]
 final class PageBuilderTransaction implements PageBuilderPendingEventsInterface, EventSubscriberInterface, ResetInterface
 {
+    private const string BUNDLE_CONTROLLER_NAMESPACE = 'Nowo\\PageBuilderKitBundle\\Controller\\';
+
     /**
      * Events of writes not flushed yet (host-controlled transaction only).
      *
@@ -59,6 +65,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
         private readonly bool $hostControlsTransaction = false,
         private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly ?RequestStack $requestStack = null,
     ) {
     }
 
@@ -86,23 +93,24 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      */
     public function commit(object ...$events): void
     {
-        if (!$this->hostControlsTransaction) {
+        $flush = $this->flushesItself();
+        if ($flush) {
             $this->entityManager->flush();
         }
 
-        $this->record(...$events);
+        $this->record($flush, ...$events);
     }
 
     /**
      * Records the events of writes already handed to {@see commit()} (e.g. a revision restore on top of a save).
      */
-    public function record(object ...$events): void
+    public function record(?bool $flushed = null, object ...$events): void
     {
         if ($events === []) {
             return;
         }
 
-        if ($this->hostControlsTransaction) {
+        if (!($flushed ?? $this->flushesItself())) {
             $this->unflushed = [...$this->unflushed, ...array_values($events)];
 
             return;
@@ -110,6 +118,21 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
 
         $this->flushed = [...$this->flushed, ...array_values($events)];
         $this->dispatchPending();
+    }
+
+    /**
+     * Whether the bundle flushes its own writes: always in `bundle` mode, and in `host` mode only while one of the
+     * bundle's admin controllers serves the main request (the bundle UI owns that unit of work).
+     */
+    public function flushesItself(): bool
+    {
+        if (!$this->hostControlsTransaction) {
+            return true;
+        }
+
+        $controller = $this->requestStack?->getMainRequest()?->attributes->get('_controller');
+
+        return is_string($controller) && str_starts_with($controller, self::BUNDLE_CONTROLLER_NAMESPACE);
     }
 
     public function dispatchPending(): int
