@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.14.0] - 2026-11-11](#1140---2026-11-11)
 - [[1.13.1] - 2026-10-31](#1131---2026-10-31)
 - [[1.13.0] - 2026-10-30](#1130---2026-10-30)
 - [[1.12.1] - 2026-10-30](#1121---2026-10-30)
@@ -39,7 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Target 1.14.0 (architecture bar W1: standard Symfony and DDD hosts, rules 1, 4, 6 and 7).
+## [1.14.0] - 2026-11-11
+
+Services use the manager that maps the bundle entities (or a dedicated doctrine.entity_manager); seven write events with IDs dispatched only after the outermost commit and dropped on rollback; opt-in host transaction mode. See [UPGRADING](https://github.com/nowo-tech/PageBuilderKitBundle/blob/v1.14.0/docs/UPGRADING.md#to-1140).
+
 
 ### Added
 

@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.14.0](#to-1140)
 - [To 1.13.1](#to-1131)
 - [To 1.13.0](#to-1130)
 - [To 1.12.1](#to-1121)
@@ -44,7 +45,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 ## Unreleased
 
-### To 1.14.0
+## To 1.14.0
 
 Standard hosts: **no configuration change**. The bundle keeps flushing its own admin writes on the entity manager
 that maps its entities, which is your default manager when you use `auto_mapping` or the bundle mapping on it.
