@@ -39,6 +39,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target 1.14.0 (architecture bar W1: standard Symfony and DDD hosts, rules 1, 4, 6 and 7).
+
+### Added
+
+- `doctrine.entity_manager` (default `null`): the Doctrine entity manager that maps the bundle entities. When set, the
+  entities are mapped on that manager ONLY (`PageBuilderEntityManagerPass` removes them from every other manager,
+  including an `auto_mapping: true` default), every bundle read and write uses it, and the build fails with a clear
+  message when the manager does not exist or does not map the entities. The bundle then also owns that manager: it
+  recovers it (reset) at the next request or message when a failed write closed it, and clears it at the end of each
+  request, message and command (FrankenPHP worker mode without kernel reset).
+- `doctrine.transaction: bundle|host` (default `bundle`). `host` is the opt-in mode for DDD hosts: when the host calls
+  the bundle services the bundle never flushes, the host's use case owns the transaction, and the write events are
+  dispatched after the host commit. The bundle's own admin UI keeps flushing its writes (it is a use case of its own).
+- ID-only write events in `Nowo\PageBuilderKitBundle\Event` (scalars only, no Doctrine/Symfony types), dispatched
+  after the commit, never inside a flush or an open transaction: `PageCreatedEvent`, `PageDocumentSavedEvent`
+  (`change`: `document` | `content_fields`), `PageMetadataSavedEvent` (translations / SEO), `PagePublishedEvent`,
+  `PageUnpublishedEvent`, `PageRevisionRestoredEvent`, `PageTemplateChangedEvent` (`saved` | `imported` | `deleted`).
+- `PagePublisherInterface` (implemented by `DocumentService`, autowirable): key-based write port
+  (`createPageByKey()`, `saveDocumentByKey()`, `publishByKey()`, `unpublishByKey()`), no entity in the signature.
+- `PageBuilderPendingEventsInterface` (`dispatchPending()`, `countPending()`) for hosts that commit in the middle of a
+  long process.
+- The events follow the **real** transaction of the bundle's connection (`AfterCommitMiddleware` + a per-transaction
+  outbox, the InstanceSettings 1.11 / LegalKit 1.10 design): held while a transaction is open, dropped when it (or the
+  savepoint that held them) rolls back, dispatched after the outermost commit at the next point where DBAL reports no
+  open transaction. A rolled-back write never produces an event, in `bundle` mode inside a host transaction and in
+  `host` mode; a committed write keeps its event when the request, message or command fails later.
+- CI runs `composer igor` (worker-state audit, REQ-CS-008).
+
+### Fixed
+
+- Rule 6: `DocumentService`, `ContentFieldsService`, `PageRevisionStore`, `PageTemplateService`, the SEO admin form and
+  `BuilderPageStatusQuery` used the autowired *default* entity manager. They now use the manager that maps the bundle
+  entities (`doctrine.entity_manager`, else `getManagerForClass()`); in a standard host this is still the default
+  manager, so nothing changes there.
+
 ## [1.13.1] - 2026-10-31
 
 Twig templates pass twig-cs-fixer (formatting only, rendered HTML unchanged); twig lint in CI and release-check. See [UPGRADING](UPGRADING.md#to-1131).

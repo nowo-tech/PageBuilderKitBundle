@@ -19,6 +19,18 @@ use Symfony\Component\Config\Definition\Processor;
 final class ConfigurationTest extends TestCase
 {
     #[Test]
+    public function doctrineEntityManagerAndTransactionMode(): void
+    {
+        $config = new Processor()->processConfiguration(new Configuration(), [['doctrine' => ['entity_manager' => 'page_builder', 'transaction' => 'host']]]);
+        self::assertSame('page_builder', $config['doctrine']['entity_manager']);
+        self::assertSame('host', $config['doctrine']['transaction']);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('non-empty entity manager name');
+        new Processor()->processConfiguration(new Configuration(), [['doctrine' => ['entity_manager' => ' ']]]);
+    }
+
+    #[Test]
     public function processConfigurationAppliesDefaults(): void
     {
         $processor = new Processor();
@@ -35,6 +47,8 @@ final class ConfigurationTest extends TestCase
         self::assertSame('/admin/page-builder', $config['web_ui']['path_prefix']);
         self::assertSame('', $config['doctrine']['table_prefix']);
         self::assertSame('default', $config['doctrine']['connection']);
+        self::assertNull($config['doctrine']['entity_manager']);
+        self::assertSame('bundle', $config['doctrine']['transaction']);
         self::assertSame(
             HtmlSanitizeStrategy::Allowlist->value,
             $config['html']['sanitize']['strategy'],

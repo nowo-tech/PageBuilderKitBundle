@@ -2,6 +2,10 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            # 1.14 (rule 6): every bundle read/write uses the manager that maps the bundle entities, never the
+            # autowired default one by accident (doctrine.entity_manager, else resolved by entity class).
+            Doctrine\ORM\EntityManagerInterface: '@nowo_page_builder_kit.entity_manager'
 
     Nowo\PageBuilderKitBundle\:
         resource: '../../*'
@@ -13,6 +17,12 @@ services:
             - '../../Media/LocalFilesystemAssetStorage.php'
             - '../../Media/AwsS3AssetStorage.php'
             - '../../NowoPageBuilderKitBundle.php'
+            - '../../Persistence/AfterCommitConnection.php'
+            - '../../Persistence/AfterCommitDriver.php'
+            - '../../Persistence/AfterCommitMiddleware.php'
+            - '../../Persistence/OwnEntityManagerSubscriber.php'
+            - '../../Persistence/PageBuilderEntityManagerFactory.php'
+            - '../../Event/'
             - '../../Resources/'
             - '../../Security/PageBuilderProtection.php'
             - '../../Security/PageBuilderProtectionConfig.php'
@@ -68,6 +78,21 @@ services:
 
     Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepositoryInterface:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepository
+
+    Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction:
+        arguments:
+            $hostControlsTransaction: false
+
+    # LG-PBK-M1: the real transactions of the bundle's connection (AfterCommitMiddlewarePass sets the connection).
+    Nowo\PageBuilderKitBundle\Persistence\AfterCommitMiddleware:
+        arguments: ['@Nowo\PageBuilderKitBundle\Persistence\PageBuilderOutbox']
+        tags: ['doctrine.middleware']
+
+    Nowo\PageBuilderKitBundle\Persistence\PageBuilderPendingEventsInterface:
+        alias: Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction
+
+    Nowo\PageBuilderKitBundle\Service\PagePublisherInterface:
+        alias: Nowo\PageBuilderKitBundle\Service\DocumentService
 
     Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface:
         alias: Nowo\PageBuilderKitBundle\Service\PageRenderProvider

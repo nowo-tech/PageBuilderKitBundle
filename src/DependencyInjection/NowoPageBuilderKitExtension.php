@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\DependencyInjection;
 
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Events;
 use LogicException;
 use Nowo\PageBuilderKitBundle\DataCollector\PageBuilderKitDataCollector;
@@ -18,6 +19,9 @@ use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
+use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderEntityManagerFactory;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
@@ -45,9 +49,16 @@ use Symfony\Component\DependencyInjection\Reference;
 use function array_key_exists;
 use function is_array;
 use function is_string;
+use function sprintf;
 
 final class NowoPageBuilderKitExtension extends Extension implements PrependExtensionInterface
 {
+    /** Container parameter holding `doctrine.entity_manager` (null: the manager that maps the bundle entities). */
+    public const string ENTITY_MANAGER_PARAMETER = 'nowo_page_builder_kit.doctrine.entity_manager';
+
+    /** Entity manager used by every bundle read and write (alias of the configured one, or resolved by entity class). */
+    public const string ENTITY_MANAGER_SERVICE = 'nowo_page_builder_kit.entity_manager';
+
     /** FormKit profile (`nowo_form_kit.profiles.page_builder_kit`) of every page form type (REQ-TWIG-005 rule 11). */
     public const string FORM_KIT_PROFILE = 'page_builder_kit';
 
@@ -117,6 +128,9 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.locales', $config['locales']);
         $container->setParameter('nowo_page_builder_kit.doctrine.table_prefix', $config['doctrine']['table_prefix']);
         $container->setParameter('nowo_page_builder_kit.doctrine.connection', $config['doctrine']['connection']);
+        $container->setParameter(self::ENTITY_MANAGER_PARAMETER, $config['doctrine']['entity_manager']);
+        $container->setParameter('nowo_page_builder_kit.doctrine.transaction', $config['doctrine']['transaction']);
+        $this->registerEntityManager($container, $config['doctrine']['entity_manager'], $config['doctrine']['transaction'] === 'host');
         $container->setParameter('nowo_page_builder_kit.security.access_roles', $config['security']['access_roles']);
         $container->setParameter('nowo_page_builder_kit.security.layout_roles', $config['security']['layout_roles']);
         $container->setParameter('nowo_page_builder_kit.security.content_roles', $config['security']['content_roles']);
@@ -230,6 +244,26 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             $definition->addTag('doctrine.event_listener', ['event' => Events::loadClassMetadata]);
             $container->setDefinition(TablePrefixListener::class, $definition);
         }
+    }
+
+    /**
+     * Wires the entity manager of the bundle entities (rule 6, 1.14): never the autowired default by accident.
+     */
+    private function registerEntityManager(ContainerBuilder $container, ?string $entityManagerName, bool $hostControlsTransaction): void
+    {
+        if ($entityManagerName === null) {
+            $container->register(self::ENTITY_MANAGER_SERVICE, EntityManagerInterface::class)
+                ->setFactory([PageBuilderEntityManagerFactory::class, 'create'])
+                ->setArguments([new Reference('doctrine')]);
+        } else {
+            $container->setAlias(self::ENTITY_MANAGER_SERVICE, sprintf('doctrine.orm.%s_entity_manager', $entityManagerName));
+            $container->register(OwnEntityManagerSubscriber::class, OwnEntityManagerSubscriber::class)
+                ->setArguments([new Reference('doctrine'), $entityManagerName])
+                ->addTag('kernel.event_subscriber');
+        }
+
+        $container->getDefinition(PageBuilderTransaction::class)
+            ->setArgument('$hostControlsTransaction', $hostControlsTransaction);
     }
 
     /**

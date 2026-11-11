@@ -46,6 +46,8 @@ nowo_page_builder_kit:
         default_robots: 'index,follow'
     doctrine:
         table_prefix: ''
+        entity_manager: null    # 1.14: manager that maps the bundle entities (null: resolved by entity class)
+        transaction: bundle     # 1.14: bundle | host (host: the bundle never flushes, DDD hosts)
         # connection: default   # deprecated since 1.8, ignored (see below)
     html:
         sanitize:
@@ -272,7 +274,9 @@ Then list is `/cms/pages`, canvas `/cms/pages/{pageKey}/canvas`, upload `/cms/as
 | Key | Default | Description |
 | --- | --- | --- |
 | `table_prefix` | `''` | Prefix applied to bundle entity tables (`pb_page`, `pb_document`, …) through `TablePrefixListener`. Use when several apps/tenants share one database. |
-| `connection` | `default` | **Deprecated since 1.8, ignored.** It was only stored as the `nowo_page_builder_kit.doctrine.connection` parameter and never wired to Doctrine. The bundle entities are mapped like any other mapping: to use another connection, add the bundle mapping to the matching entity manager in `doctrine.orm.entity_managers`. Setting the key triggers a deprecation notice; it will be removed in the next major. |
+| `entity_manager` | `null` | **1.14.** Doctrine entity manager that maps the bundle entities. `null`: the manager returned by `getManagerForClass()` for the bundle entities (your default one in a standard host). When set, the entities are mapped on that manager **only** (also removed from an `auto_mapping: true` default), every bundle read and write uses it, the bundle recovers it when a failed write closed it and clears it at the end of each request / message / command. The build fails when the manager does not exist or does not map the entities. |
+| `transaction` | `bundle` | **1.14.** `bundle`: the bundle flushes its writes on its entity manager. `host`: the bundle never flushes when the host calls its services (its own admin UI still does); the host's use case owns the transaction and the write events are dispatched after the host commit (see USAGE "Standard Symfony and DDD / hexagonal hosts"). |
+| `connection` | `default` | **Deprecated since 1.8, ignored.** Use `entity_manager` (1.14). It was only stored as the `nowo_page_builder_kit.doctrine.connection` parameter and never wired to Doctrine. The bundle entities are mapped like any other mapping: to use another connection, add the bundle mapping to the matching entity manager in `doctrine.orm.entity_managers`. Setting the key triggers a deprecation notice; it will be removed in the next major. |
 
 Example — tables become `tenant_a_pb_page`, etc.:
 

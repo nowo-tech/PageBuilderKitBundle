@@ -9,6 +9,8 @@ use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\ContentFieldType;
+use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 
 use function array_key_exists;
@@ -27,6 +29,7 @@ final readonly class ContentFieldsService
         private ContentFieldsNormalizer $contentFieldsNormalizer,
         private PageBuilderProtection $protection,
         private ?PageRevisionStore $pageRevisionStore = null,
+        private ?PageBuilderTransaction $transaction = null,
     ) {
     }
 
@@ -47,7 +50,7 @@ final readonly class ContentFieldsService
         // @igor-ignore - Doctrine entity mutation via EM; request-scoped, flushed immediately.
         $document->setStructure($structure);
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid(), PageDocumentSavedEvent::CHANGE_CONTENT_FIELDS));
     }
 
     /**
@@ -77,7 +80,7 @@ final readonly class ContentFieldsService
         // @igor-ignore - Doctrine entity mutation via EM; request-scoped, flushed immediately.
         $document->setStructure($structure);
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid(), PageDocumentSavedEvent::CHANGE_CONTENT_FIELDS));
     }
 
     /**
@@ -144,7 +147,7 @@ final readonly class ContentFieldsService
         // @igor-ignore - Doctrine entity mutation via EM; request-scoped, flushed immediately.
         $document->setStructure($structure);
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid(), PageDocumentSavedEvent::CHANGE_CONTENT_FIELDS));
     }
 
     /**
@@ -230,5 +233,19 @@ final readonly class ContentFieldsService
         }
 
         return $document;
+    }
+
+    /**
+     * Flushes the bundle entity manager (unless the host controls the transaction) and records the write events.
+     */
+    private function commit(object ...$events): void
+    {
+        if ($this->transaction instanceof PageBuilderTransaction) {
+            $this->transaction->commit(...$events);
+
+            return;
+        }
+
+        $this->entityManager->flush();
     }
 }

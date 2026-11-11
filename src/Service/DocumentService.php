@@ -11,7 +11,13 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
+use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageMetadataSavedEvent;
+use Nowo\PageBuilderKitBundle\Event\PagePublishedEvent;
+use Nowo\PageBuilderKitBundle\Event\PageUnpublishedEvent;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
@@ -27,7 +33,10 @@ use function sprintf;
 use function strtolower;
 use function trim;
 
-final readonly class DocumentService
+/**
+ * Page write service of the admin UI (entity-based) and the key-based {@see PagePublisherInterface} port (1.14).
+ */
+final readonly class DocumentService implements PagePublisherInterface
 {
     private DocumentStructureValidator $structureValidator;
 
@@ -45,6 +54,7 @@ final readonly class DocumentService
         ?DocumentStructureValidator $structureValidator = null,
         private ?ClockInterface $clock = null,
         private LoggerInterface $logger = new NullLogger(),
+        private ?PageBuilderTransaction $transaction = null,
     ) {
         $this->structureValidator = $structureValidator ?? new DocumentStructureValidator($widgetTypeRegistry);
     }
@@ -94,7 +104,7 @@ final readonly class DocumentService
         }
 
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid()));
     }
 
     public function createPage(string $pageKey, string $title, string $locale): BuilderPage
@@ -134,7 +144,7 @@ final readonly class DocumentService
         $page->setDocument($document);
 
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageCreatedEvent($page->getPageKey(), $page->getUuid()));
 
         return $page;
     }
@@ -216,9 +226,10 @@ final readonly class DocumentService
             );
         }
 
+        $publishedAt = $this->clock?->now() ?? new DateTimeImmutable();
         $page->setStatus(PageStatus::Published);
-        $page->setPublishedAt($this->clock?->now() ?? new DateTimeImmutable());
-        $this->entityManager->flush();
+        $page->setPublishedAt($publishedAt);
+        $this->commit(new PagePublishedEvent($page->getPageKey(), $page->getUuid(), $publishedAt));
         $this->logger->info('Page builder page published.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'publish', 'page_key' => $page->getPageKey()]);
     }
 
@@ -226,13 +237,36 @@ final readonly class DocumentService
     {
         $page->setStatus(PageStatus::Draft);
         $page->setPublishedAt(null);
-        $this->entityManager->flush();
+        $this->commit(new PageUnpublishedEvent($page->getPageKey(), $page->getUuid()));
     }
 
+    /**
+     * Saves page changes outside the document (translations, SEO / Open Graph).
+     */
     public function flushPage(BuilderPage $page): void
     {
         $this->entityManager->persist($page);
-        $this->entityManager->flush();
+        $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+    }
+
+    public function createPageByKey(string $pageKey, string $title, string $locale): string
+    {
+        return $this->createPage($pageKey, $title, $locale)->getUuid();
+    }
+
+    public function saveDocumentByKey(string $pageKey, array $structure, array $widgetPropsByLocale = []): void
+    {
+        $this->saveDocument($this->requirePage($pageKey), $structure, $widgetPropsByLocale);
+    }
+
+    public function publishByKey(string $pageKey): void
+    {
+        $this->publish($this->requirePage($pageKey));
+    }
+
+    public function unpublishByKey(string $pageKey): void
+    {
+        $this->unpublish($this->requirePage($pageKey));
     }
 
     /**
@@ -392,5 +426,29 @@ final readonly class DocumentService
         }
 
         return null;
+    }
+
+    private function requirePage(string $pageKey): BuilderPage
+    {
+        $page = $this->pageRepository->findOneByPageKey($pageKey);
+        if (!$page instanceof BuilderPage) {
+            throw new InvalidArgumentException(sprintf('Unknown page "%s".', $pageKey));
+        }
+
+        return $page;
+    }
+
+    /**
+     * Flushes the bundle entity manager (unless the host controls the transaction) and records the write events.
+     */
+    private function commit(object ...$events): void
+    {
+        if ($this->transaction instanceof PageBuilderTransaction) {
+            $this->transaction->commit(...$events);
+
+            return;
+        }
+
+        $this->entityManager->flush();
     }
 }
