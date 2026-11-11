@@ -10,6 +10,7 @@ use LogicException;
 use Nowo\PageBuilderKitBundle\DataCollector\PageBuilderKitDataCollector;
 use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceBoundarySubscriber;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
@@ -38,8 +39,10 @@ use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
 use Nowo\PageBuilderKitBundle\Widget\WidgetPackInterface;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
@@ -463,6 +466,15 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             ->setAutoconfigured(true);
 
         $container->setAlias(PageBuilderKitTraceInterface::class, PageBuilderKitTrace::class);
+
+        // REQ-RUNTIME-002: clear the trace at the main request / Messenger / console boundaries, not only on
+        // kernel.reset. Lazy iterator of an IGNORE_ON_UNINITIALIZED reference: a boundary never builds the trace.
+        $container->register(PageBuilderKitTraceBoundarySubscriber::class)
+            ->setAutowired(false)
+            ->setAutoconfigured(true)
+            ->setArguments([
+                new IteratorArgument([new Reference(PageBuilderKitTrace::class, ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE)]),
+            ]);
 
         $container->register(PageBuilderKitDataCollector::class)
             ->setAutowired(false)

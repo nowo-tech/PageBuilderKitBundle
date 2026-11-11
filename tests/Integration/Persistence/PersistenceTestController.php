@@ -6,20 +6,36 @@ namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
+use function array_column;
+use function implode;
+
 /**
- * Host controllers of the worker test: a failing bundle write (closes the manager) and a normal one.
+ * Host controllers of the worker tests: a failing bundle write (closes the manager), a normal one and a debug trace
+ * probe.
  */
 final readonly class PersistenceTestController
 {
     public function __construct(
         private PagePublisherInterface $publisher,
         private ManagerRegistry $registry,
+        private PageBuilderKitTraceInterface $trace,
     ) {
+    }
+
+    /**
+     * Records one public outcome for `$user` and returns every page key the trace holds for this request.
+     */
+    public function trace(string $user): Response
+    {
+        $this->trace->addPublicOutcome($user, 'published', 'en');
+
+        return new Response(implode(',', array_column($this->trace->getPublicOutcomes(), 'pageKey')));
     }
 
     public function create(string $key): Response

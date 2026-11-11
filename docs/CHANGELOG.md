@@ -40,6 +40,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Next patch: 1.14.1.
+
+### Fixed
+
+- **Debug trace survived across units of work when the services resetter does not run (REQ-RUNTIME-002).**
+  `PageBuilderKitTrace` (the Web Profiler buffer, only built with `kernel.debug` and `debug.collector: true`) was
+  cleared only by `kernel.reset`. With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs
+  `services_resetter` before every request, so a standard host was not affected. The trace kept growing and showed
+  the entries of earlier units of work only where the resetter does not run: a host that removes, replaces or bypasses
+  `services_resetter` (or drives `http_kernel` directly), Messenger consumers started with `--no-reset`, and
+  long-running console commands. The new `PageBuilderKitTraceBoundarySubscriber` clears it at the main
+  `kernel.request`, at Messenger `WorkerMessageReceivedEvent` / `WorkerMessageHandledEvent` /
+  `WorkerMessageFailedEvent` and at `console.terminate`. It holds the trace through a lazy iterator of an
+  `IGNORE_ON_UNINITIALIZED_REFERENCE` reference, so a boundary never builds the trace. `ResetInterface` stays.
+  Affected: 1.1.0 to 1.14.0, debug mode with the collector enabled only; no production data is exposed.
+
+### Changed
+
+- `docs/FRANKENPHP-WORKER-AUDIT.md`: the bundle no longer asks hosts to keep `services_resetter`; it lists the boundary
+  events and the worker test `PageBuilderKitTraceWorkerTest` (one kernel, 1,000 requests and 1,000 messages, two
+  users, 4 MiB memory margin).
+
 ## [1.14.0] - 2026-11-11
 
 Services use the manager that maps the bundle entities (or a dedicated doctrine.entity_manager); seven write events with IDs dispatched only after the outermost commit and dropped on rollback; opt-in host transaction mode. See [UPGRADING](https://github.com/nowo-tech/PageBuilderKitBundle/blob/v1.14.0/docs/UPGRADING.md#to-1140).

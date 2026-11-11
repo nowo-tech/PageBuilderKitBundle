@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\DependencyInjection;
 use LogicException;
 use Nowo\PageBuilderKitBundle\DataCollector\PageBuilderKitDataCollector;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
+use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceBoundarySubscriber;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration;
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
@@ -22,8 +23,11 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
+use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Reference;
 
 #[CoversClass(NowoPageBuilderKitExtension::class)]
 final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
@@ -286,6 +290,15 @@ final class NowoPageBuilderKitExtensionCoverageTest extends TestCase
         self::assertTrue($container->hasDefinition(PageBuilderKitTrace::class));
         self::assertTrue($container->hasDefinition(PageBuilderKitDataCollector::class));
         self::assertSame(PageBuilderKitTrace::class, (string) $container->getAlias(PageBuilderKitTraceInterface::class));
+
+        // REQ-RUNTIME-002: boundary clear through a lazy IGNORE_ON_UNINITIALIZED reference (never builds the trace).
+        self::assertTrue($container->hasDefinition(PageBuilderKitTraceBoundarySubscriber::class));
+        $traces = $container->getDefinition(PageBuilderKitTraceBoundarySubscriber::class)->getArgument(0);
+        self::assertInstanceOf(IteratorArgument::class, $traces);
+        $reference = $traces->getValues()[0] ?? null;
+        self::assertInstanceOf(Reference::class, $reference);
+        self::assertSame(PageBuilderKitTrace::class, (string) $reference);
+        self::assertSame(ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE, $reference->getInvalidBehavior());
     }
 
     #[Test]
