@@ -24,7 +24,8 @@ use function sys_get_temp_dir;
 
 /**
  * Host kernel for the rule 6 tests (1.14): real DoctrineBundle on SQLite files, configurable managers and bundle
- * `doctrine` options. Routes: `/t/create/{key}` (key-based write port) and `/t/fail` (failing bundle write).
+ * `doctrine` options. Routes: `/t/create/{key}` (key-based write port), `/t/trace/{user}` (debug
+ * trace of the request) and `/t/fail` (failing bundle write). `$debugCollector` boots in debug with the trace on.
  */
 final class PersistenceTestKernel extends Kernel
 {
@@ -38,8 +39,9 @@ final class PersistenceTestKernel extends Kernel
         private readonly array $doctrine,
         private readonly array $bundleDoctrine = [],
         private readonly bool $revisions = false,
+        private readonly bool $debugCollector = false,
     ) {
-        parent::__construct('test', false);
+        parent::__construct('test', $debugCollector);
     }
 
     public function registerBundles(): iterable
@@ -61,7 +63,7 @@ final class PersistenceTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->getProjectDir() . '/' . md5(serialize([$this->doctrine, $this->bundleDoctrine, $this->revisions])) . '/cache';
+        return $this->getProjectDir() . '/' . md5(serialize([$this->doctrine, $this->bundleDoctrine, $this->revisions, $this->debugCollector])) . '/cache';
     }
 
     public function getLogDir(): string
@@ -95,6 +97,7 @@ final class PersistenceTestKernel extends Kernel
             'web_ui'    => ['path_prefix' => '/admin/page-builder'],
             'doctrine'  => $this->bundleDoctrine,
             'revisions' => ['enabled' => $this->revisions],
+            'debug'     => ['collector' => $this->debugCollector],
         ]);
     }
 
@@ -102,6 +105,7 @@ final class PersistenceTestKernel extends Kernel
     {
         $routes->add('t_create', '/t/create/{key}')->controller([PersistenceTestController::class, 'create']);
         $routes->add('t_commit_fail', '/t/commit-then-fail/{key}')->controller([PersistenceTestController::class, 'commitThenFail']);
+        $routes->add('t_trace', '/t/trace/{user}')->controller([PersistenceTestController::class, 'trace']);
         $routes->add('t_fail', '/t/fail')->controller([PersistenceTestController::class, 'fail']);
     }
 }

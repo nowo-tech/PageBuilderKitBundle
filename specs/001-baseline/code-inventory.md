@@ -39,6 +39,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Debug/PageBuilderKitTraceInterface.php` | Request-scoped trace contract | REQ-DEBUG-001 |
 | `Debug/PageBuilderKitTrace.php` | Trace implementation + ResetInterface | REQ-DEBUG-001, FR-WRK-001 |
 | `Debug/NullPageBuilderKitTrace.php` | No-op when collector disabled | REQ-DEBUG-001 |
+| `Debug/PageBuilderKitTraceBoundarySubscriber.php` | Clears the trace at main request / Messenger / console boundaries (1.14.1) | REQ-DEBUG-001, FR-WRK-001 |
 
 ## Dependency injection and compiler
 

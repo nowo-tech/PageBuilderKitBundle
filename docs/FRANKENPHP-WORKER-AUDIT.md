@@ -3,23 +3,26 @@
 | Field | Value |
 |-------|-------|
 | Package | `nowo-tech/page-builder-kit-bundle` (`symfony-bundle`) |
-| Audited revision | **v1.3.0 + Phase 5 MVP (unreleased)** |
-| Audit date | 2026-10-02 |
+| Audited revision | **1.14.1 (unreleased): debug trace boundaries (REQ-RUNTIME-002)**; earlier full review v1.3.0 + Phase 5 MVP |
+| Audit date | 2026-11-11 (trace boundaries); 2026-10-02 (full review) |
 | Method | Manual review of `src/` services, controllers, subscribers, Twig extension, DI extension, DataCollector/trace, content fields, capabilities |
-| **Verdict** | ✅ **Compatible with long-lived workers** for bundle-owned correctness: shared services are readonly or assign-once; request-scoped debug state implements `ResetInterface`; per-request access/capability checks ask AuthorizationChecker without storing the user. |
+| **Verdict** | ✅ **Compatible with long-lived workers** for bundle-owned correctness: shared services are readonly or assign-once; request-scoped debug state is cleared at the main request / Messenger / console boundaries by the bundle itself and also implements `ResetInterface`; per-request access/capability checks ask AuthorizationChecker without storing the user. |
 
 ## Table of contents
 
 - [Execution model assumed](#execution-model-assumed)
 - [Summary](#summary)
 - [Services reviewed (post–Phase 3–5)](#services-reviewed-postphase-35)
+- [Debug trace boundaries](#debug-trace-boundaries)
 - [BuilderLocales static bind](#builderlocales-static-bind)
 - [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
 - [Re-audit triggers](#re-audit-triggers)
 
 ## Execution model assumed
 
-FrankenPHP worker mode boots the Symfony kernel once per worker and serves many requests with the same container. This audit assumes the strict variant: the kernel is **not** rebooted between requests unless the host configures otherwise.
+FrankenPHP worker mode boots the Symfony kernel once per worker and serves many requests with the same container. This audit assumes the strict variant: the kernel is **not** rebooted between requests (`FRANKENPHP_RESET_KERNEL=false`).
+
+With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `services_resetter` (`kernel.reset`) before every request after the first. The bundle does **not** rely on it: it must also be correct where the resetter does not run, i.e. a host that removes, replaces or bypasses `services_resetter` (or drives `http_kernel` directly), Messenger consumers started with `--no-reset`, and long-running console commands (REQ-RUNTIME-002).
 
 ## Summary
 
@@ -29,7 +32,7 @@ FrankenPHP worker mode boots the Symfony kernel once per worker and serves many 
 | Static properties | ⚠️ Documented | `BuilderLocales::$boundInstance` bound in `boot()`, cleared on `kernel.terminate` |
 | Request / user captured in services | ✅ | Access checker + capabilities evaluate per call |
 | Twig extension | ✅ | Functions only (`can_edit`, `can`, render); no per-user globals |
-| Debug / DataCollector | ✅ | `PageBuilderKitTrace` + `ResetInterface` / `kernel.reset` between requests |
+| Debug / DataCollector | ✅ | `PageBuilderKitTrace` cleared by `PageBuilderKitTraceBoundarySubscriber` (main `kernel.request`, Messenger received / handled / failed, `console.terminate`); `ResetInterface` kept |
 | Revisions / templates | ✅ | Stateless stores; Doctrine EM request-scoped |
 | Content fields | ✅ | Values live in document JSON; normalizer/service readonly |
 | CSRF / document API | ✅ | Validated per request in `PageDocumentApiController` / content forms |
@@ -52,10 +55,30 @@ FrankenPHP worker mode boots the Symfony kernel once per worker and serves many 
 | `EventSubscriber\WorkerStateResetSubscriber` | yes | none | ✅ |
 | `Persistence\PageBuilderTransaction` (1.14) | yes | request-scoped event outbox | ✅ dispatched or discarded at `kernel.terminate` / `kernel.exception` / console / Messenger boundaries, plus `ResetInterface` |
 | `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`) | yes | none | ✅ resets the bundle's own manager when closed (next request / message), clears it at the end of each request / message / command; never touches the host managers |
-| `Debug\PageBuilderKitTrace` | yes | request buffer | ✅ with reset |
+| `Debug\PageBuilderKitTrace` | yes (debug + collector only) | request buffer | ✅ cleared at every boundary by `PageBuilderKitTraceBoundarySubscriber`, plus `ResetInterface` |
+| `Debug\PageBuilderKitTraceBoundarySubscriber` (1.14.1, debug + collector only) | yes | none (lazy iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` to the trace) | ✅ |
 | `DataCollector\PageBuilderKitDataCollector` | profiler | request | ✅ |
 | `Locale\BuilderLocales` | yes | readonly config; static bind optional | ✅ with terminate reset |
 | Admin / public controllers | yes | none | ✅ |
+
+## Debug trace boundaries
+
+- **State:** `PageBuilderKitTrace` buffers the renders, public outcomes and admin actions of the current unit of work for
+  the Web Profiler panel. It exists only with `kernel.debug: true` and `debug.collector: true`.
+- **Cleared by the bundle (1.14.1):** `PageBuilderKitTraceBoundarySubscriber` at the main `kernel.request` (priority
+  4096, start of the request, so the profiler still collects the finished request; sub-requests keep the trace),
+  Messenger `WorkerMessageReceivedEvent` (before the message) and `WorkerMessageHandledEvent` /
+  `WorkerMessageFailedEvent` (after it), and `console.terminate`. `ResetInterface` / `kernel.reset` stays as a second
+  path. The subscriber receives the trace as a lazy iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` reference, so a
+  boundary never builds the trace.
+- **Before 1.14.1 (1.1.0 – 1.14.0):** only `kernel.reset` cleared it; where the resetter does not run (see the
+  execution model above) the trace grew and the profiler panel showed earlier units of work. Debug mode only.
+- **Worker test:** `tests/Integration/Persistence/PageBuilderKitTraceWorkerTest.php` boots **one** kernel in debug
+  with the collector on and never calls `services_resetter`: 1,000 requests through `http_kernel` handle / terminate
+  alternating two users (each response lists only its own entry), 1,000 Messenger received / handled / failed cycles
+  alternating two users, and one `console.terminate`; memory margin 4 MiB after a 50-iteration warm-up.
+  `tests/Unit/Debug/PageBuilderKitTraceBoundarySubscriberTest.php` covers sub-requests and the uninitialized reference;
+  `tests/Unit/Debug/PageBuilderKitTraceTest.php` calls `reset()` directly.
 
 ## BuilderLocales static bind
 
@@ -67,7 +90,9 @@ FrankenPHP worker mode boots the Symfony kernel once per worker and serves many 
 ## Usage recommendations in worker mode
 
 - Prefer injected `BuilderLocales` over static accessors.
-- Keep `services_resetter` enabled (Symfony default).
+- The bundle does not need `services_resetter`: it clears its own request state at the boundaries above. A host that
+  disables or bypasses the resetter must still clear **its own** entity managers at every boundary (main request,
+  Messenger message, console command; REQ-RUNTIME-002 rule 7), or the identity map serves stale rows across requests.
 - Custom `PageBuilderKitAccessCheckerInterface` or HTML sanitizer services must be stateless or implement `ResetInterface`.
 - Optional: `EntityManager::clear()` or `FRANKENPHP_LOOP_MAX` for memory bounds on busy workers.
 - With `doctrine.entity_manager` (1.14) the bundle recovers and clears its own manager itself, without the services
