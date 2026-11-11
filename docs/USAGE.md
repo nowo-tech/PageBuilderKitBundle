@@ -139,7 +139,8 @@ final class PurgePageCache
 Events (`Nowo\PageBuilderKitBundle\Event`): `PageCreatedEvent`, `PageDocumentSavedEvent` (`change`: `document` |
 `content_fields`), `PageMetadataSavedEvent`, `PagePublishedEvent`, `PageUnpublishedEvent`, `PageRevisionRestoredEvent`,
 `PageTemplateChangedEvent`. They are dispatched after the commit: never inside a flush, never while a transaction is
-open.
+open, and never for a write that was rolled back (also when your code wraps a bundle call in its own transaction, or
+rolls back a savepoint). A DBAL middleware on the bundle's connection tracks the real commits and rollbacks.
 
 **DDD / hexagonal host.** Keep your domain free of the bundle entities: address pages by key through
 `PagePublisherInterface`, read them through `PageRenderProviderInterface`, and react to the ID-only events.
@@ -173,9 +174,10 @@ final readonly class PublishLandingPage
   at the end of every request, message and command. Your default manager is never reset or cleared by the bundle.
 - `transaction: host`: when your code calls the bundle services, commit through your own unit of work (for example the Messenger `doctrine_transaction`
   middleware, or `wrapInTransaction()`). With `entity_manager` set, flush THAT manager. The events wait for the flush
-  and are dispatched when no transaction is open any more: on the next `postFlush` outside a transaction, at the end of
-  the request / message / command, or when you call `PageBuilderPendingEventsInterface::dispatchPending()` right after
-  your commit. Events of writes never flushed, or of a failed request / message / command, are discarded. The bundle's
+  and follow the transaction that flush ran in: dropped if it rolls back, dispatched after its outermost commit, on
+  the next `postFlush` outside a transaction, at the end of the request / message / command (also a failed one), or
+  when you call `PageBuilderPendingEventsInterface::dispatchPending()` right after your commit. Events of writes never
+  flushed are discarded at the end of the request / message / command. The bundle's
   own admin UI is a use case of its own: while one of its controllers serves the request it still flushes its writes.
 - Without `entity_manager`, the bundle uses the manager returned by `getManagerForClass()` for its entities; with
   `transaction: bundle` (the default) it flushes that manager, which in a standard host is the default one.

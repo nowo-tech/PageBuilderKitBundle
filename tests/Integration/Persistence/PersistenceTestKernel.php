@@ -101,6 +101,7 @@ final class PersistenceTestKernel extends Kernel
     private function configureRoutes(RoutingConfigurator $routes): void
     {
         $routes->add('t_create', '/t/create/{key}')->controller([PersistenceTestController::class, 'create']);
+        $routes->add('t_commit_fail', '/t/commit-then-fail/{key}')->controller([PersistenceTestController::class, 'commitThenFail']);
         $routes->add('t_fail', '/t/fail')->controller([PersistenceTestController::class, 'fail']);
     }
 }

@@ -8,13 +8,15 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderOutbox;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
+use stdClass;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -26,8 +28,6 @@ final class PageBuilderTransactionTest extends TestCase
     private array $dispatched = [];
 
     private bool $transactionActive = false;
-
-    private bool $open = true;
 
     #[Test]
     public function bundleModeFlushesThenDispatchesAfterCommit(): void
@@ -43,20 +43,79 @@ final class PageBuilderTransactionTest extends TestCase
     }
 
     #[Test]
-    public function bundleModeWaitsForAnOpenHostTransaction(): void
+    public function bundleModeInsideAHostTransactionFollowsItsCommitOrRollback(): void
     {
-        $this->transactionActive = true;
-        $transaction             = new PageBuilderTransaction($this->manager(), $this->dispatcher());
-        $transaction->commit(new PageCreatedEvent('k', 'u'));
-        $transaction->commit();
+        $outbox      = new PageBuilderOutbox();
+        $driver      = new stdClass();
+        $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), outbox: $outbox);
 
-        self::assertSame([], $this->dispatched);
+        // Host transaction rolled back: the event is dropped, also at the next boundary (LG-PBK-M1).
+        $outbox->transactionStarted($driver);
+        $this->transactionActive = true;
+        $transaction->record(true, new PageCreatedEvent('rolled', 'back'));
+        $transaction->commit();
         self::assertSame(1, $transaction->countPending());
         self::assertSame(0, $transaction->dispatchPending());
+        $outbox->transactionEnded($driver, false);
+        $this->transactionActive = false;
+        $transaction->onBoundary();
+        self::assertSame([], $this->dispatched);
+        self::assertSame(0, $transaction->countPending());
 
+        // Host transaction committed: dispatched once DBAL reports no open transaction.
+        $outbox->transactionStarted($driver);
+        $this->transactionActive = true;
+        $transaction->record(true, $event = new PageCreatedEvent('k', 'u'));
+        $outbox->transactionEnded($driver, true);
+        self::assertSame(0, $transaction->dispatchPending(), 'DBAL still inside its commit');
         $this->transactionActive = false;
         self::assertSame(1, $transaction->dispatchPending());
-        self::assertCount(1, $this->dispatched);
+        self::assertSame([$event], $this->dispatched);
+    }
+
+    #[Test]
+    public function aFailedRequestKeepsTheEventsOfCommittedWritesAndDropsTheUnflushedOnes(): void
+    {
+        $outbox      = new PageBuilderOutbox();
+        $driver      = new stdClass();
+        $em          = $this->manager();
+        $transaction = new PageBuilderTransaction($em, $this->dispatcher(), true, outbox: $outbox);
+
+        // Host use case: write, flush inside its transaction, commit.
+        $transaction->commit($committed = new PageCreatedEvent('committed', 'u'));
+        $outbox->transactionStarted($driver);
+        $this->transactionActive = true;
+        $transaction->postFlush(new PostFlushEventArgs($this->createStub(EntityManagerInterface::class)));
+        self::assertSame(1, $transaction->countPending(), 'another manager flushed: still unflushed');
+        $transaction->postFlush(new PostFlushEventArgs($em));
+        $outbox->transactionEnded($driver, true);
+        $this->transactionActive = false;
+
+        // A later write never flushed, then the request fails (kernel.exception, LG-PBK-L1).
+        $transaction->commit(new PageCreatedEvent('never', 'flushed'));
+        $transaction->onBoundary();
+        self::assertSame([$committed], $this->dispatched);
+        self::assertSame(0, $transaction->countPending());
+    }
+
+    #[Test]
+    public function aThrowingListenerIsLoggedAndTheOtherEventsAreStillDispatched(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error');
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(function (object $event): object {
+            if ($event instanceof PageCreatedEvent && $event->pageKey === 'boom') {
+                throw new RuntimeException('listener');
+            }
+            $this->dispatched[] = $event;
+
+            return $event;
+        });
+        $transaction = new PageBuilderTransaction($this->manager(), $dispatcher, logger: $logger);
+
+        $transaction->record(true, new PageCreatedEvent('boom', 'u'), $ok = new PageCreatedEvent('ok', 'u'));
+        self::assertSame([$ok], $this->dispatched);
     }
 
     #[Test]
@@ -64,7 +123,6 @@ final class PageBuilderTransactionTest extends TestCase
     {
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('flush');
-        $em->method('isOpen')->willReturn(true);
         $connection = $this->createStub(Connection::class);
         $connection->method('isTransactionActive')->willReturn(false);
         $em->method('getConnection')->willReturn($connection);
@@ -113,7 +171,7 @@ final class PageBuilderTransactionTest extends TestCase
         $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), true, $logger);
 
         $transaction->onBoundary();
-        $transaction->discardPending();
+        $transaction->discardUnflushed();
         $transaction->commit(new PageCreatedEvent('never', 'flushed'));
         $transaction->onBoundary();
 
@@ -122,18 +180,17 @@ final class PageBuilderTransactionTest extends TestCase
     }
 
     #[Test]
-    public function closedManagerAndResetKeepNothing(): void
+    public function resetKeepsNothing(): void
     {
-        $this->open  = false;
-        $transaction = new PageBuilderTransaction($this->manager());
+        $this->transactionActive = true;
+        $transaction             = new PageBuilderTransaction($this->manager());
         $transaction->commit(new PageCreatedEvent('k', 'u'));
-        self::assertSame(0, $transaction->dispatchPending());
         self::assertSame(1, $transaction->countPending());
 
         $transaction->reset();
         self::assertSame(0, $transaction->countPending());
 
-        $this->open = true;
+        $this->transactionActive = false;
         $transaction->commit(new PageCreatedEvent('k', 'u'));
         self::assertSame(0, $transaction->countPending(), 'no dispatcher: dispatched to nobody');
     }
@@ -143,7 +200,7 @@ final class PageBuilderTransactionTest extends TestCase
     {
         $events = PageBuilderTransaction::getSubscribedEvents();
         self::assertSame(['onBoundary', 1024], $events[KernelEvents::TERMINATE]);
-        self::assertSame(['discardPending', -1024], $events[KernelEvents::EXCEPTION]);
+        self::assertSame(['onBoundary', -1024], $events[KernelEvents::EXCEPTION]);
         self::assertCount(6, $events);
     }
 
@@ -151,12 +208,13 @@ final class PageBuilderTransactionTest extends TestCase
     {
         $connection = $this->createStub(Connection::class);
         $connection->method('isTransactionActive')->willReturnCallback(fn (): bool => $this->transactionActive);
-        $em = $flushes ? $this->createMock(EntityManagerInterface::class) : $this->createStub(EntityManagerInterface::class);
-        $em->method('getConnection')->willReturn($connection);
-        $em->method('isOpen')->willReturnCallback(fn (): bool => $this->open);
-        if ($em instanceof MockObject) {
+        if ($flushes) {
+            $em = $this->createMock(EntityManagerInterface::class);
             $em->expects(self::once())->method('flush');
+        } else {
+            $em = $this->createStub(EntityManagerInterface::class);
         }
+        $em->method('getConnection')->willReturn($connection);
 
         return $em;
     }

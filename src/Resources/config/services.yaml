@@ -17,6 +17,9 @@ services:
             - '../../Media/LocalFilesystemAssetStorage.php'
             - '../../Media/AwsS3AssetStorage.php'
             - '../../NowoPageBuilderKitBundle.php'
+            - '../../Persistence/AfterCommitConnection.php'
+            - '../../Persistence/AfterCommitDriver.php'
+            - '../../Persistence/AfterCommitMiddleware.php'
             - '../../Persistence/OwnEntityManagerSubscriber.php'
             - '../../Persistence/PageBuilderEntityManagerFactory.php'
             - '../../Event/'
@@ -79,6 +82,11 @@ services:
     Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction:
         arguments:
             $hostControlsTransaction: false
+
+    # LG-PBK-M1: the real transactions of the bundle's connection (AfterCommitMiddlewarePass sets the connection).
+    Nowo\PageBuilderKitBundle\Persistence\AfterCommitMiddleware:
+        arguments: ['@Nowo\PageBuilderKitBundle\Persistence\PageBuilderOutbox']
+        tags: ['doctrine.middleware']
 
     Nowo\PageBuilderKitBundle\Persistence\PageBuilderPendingEventsInterface:
         alias: Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction

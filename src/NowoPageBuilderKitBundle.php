@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
@@ -28,6 +29,9 @@ final class NowoPageBuilderKitBundle extends Bundle
         $container->addCompilerPass(new WidgetPackPass());
         $container->addCompilerPass(new GrapesBlockPackPass());
         $container->addCompilerPass(new CsrfProtectionPass());
+
+        // Before DoctrineBundle's MiddlewaresPass: the after-commit middleware on the bundle connection only (1.14).
+        $container->addCompilerPass(new AfterCommitMiddlewarePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
 
         // Before the mapping passes: a clear error for an unknown doctrine.entity_manager (1.14).
         $container->addCompilerPass(new PageBuilderEntityManagerPass(checkOnly: true), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);

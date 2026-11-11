@@ -29,9 +29,11 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
+use function array_map;
 use function dirname;
 use function memory_get_usage;
 
@@ -225,6 +227,88 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         self::assertSame(0, $pending->countPending());
     }
 
+    public function testBundleModeInsideAHostTransactionThatRollsBackDispatchesNothing(): void
+    {
+        $container = $this->boot($this->singleManager(), []);
+        $default   = $this->manager($container, 'default');
+        $publisher = $this->publisher($container);
+
+        $default->beginTransaction();
+        $publisher->createPageByKey('rolledback', 'Rolled back', 'en');
+        self::assertSame([], $this->events, 'not inside the host transaction');
+        $default->rollback();
+        $default->clear();
+
+        $this->terminate($container);
+        $publisher->createPageByKey('next', 'Next', 'en');
+        $this->terminate($container);
+
+        self::assertSame(['next'], $this->pageKeys($default));
+        self::assertSame(['next'], $this->eventKeys(), 'LG-PBK-M1: no event for the rolled-back page');
+        self::assertSame([false], $this->inTransaction);
+    }
+
+    public function testBundleModeSavepointRollbackDropsOnlyItsEvents(): void
+    {
+        $container = $this->boot($this->singleManager(), []);
+        $default   = $this->manager($container, 'default');
+        $publisher = $this->publisher($container);
+        $pending   = $this->pending($container);
+
+        $default->beginTransaction();
+        $publisher->createPageByKey('kept', 'Kept', 'en');
+        $default->beginTransaction(); // savepoint
+        $publisher->createPageByKey('dropped', 'Dropped', 'en');
+        $default->rollback(); // rollback to the savepoint
+        self::assertSame(1, $pending->countPending());
+        $default->commit();
+        self::assertSame([], $this->events, 'dispatched at the next safe point, not inside the DBAL commit');
+        self::assertSame(1, $pending->dispatchPending());
+
+        self::assertSame(['kept'], $this->eventKeys());
+        self::assertSame(['kept'], $this->pageKeys($default));
+        self::assertSame([false], $this->inTransaction);
+    }
+
+    public function testHostModeFlushThenConnectionRollbackDispatchesNothing(): void
+    {
+        $container  = $this->boot($this->singleManager(), ['transaction' => 'host']);
+        $default    = $this->manager($container, 'default');
+        $publisher  = $this->publisher($container);
+        $pending    = $this->pending($container);
+        $connection = $default->getConnection();
+
+        $publisher->createPageByKey('conn-rb', 'Rolled back', 'en');
+        $connection->beginTransaction();
+        $default->flush();
+        $connection->rollBack();
+        $default->clear();
+        self::assertSame(0, $pending->countPending());
+
+        $this->terminate($container);
+        $publisher->createPageByKey('next', 'Next', 'en');
+        $default->flush();
+        $this->terminate($container);
+
+        self::assertSame(['next'], $this->eventKeys(), 'LG-PBK-M1: no event for the rolled-back page');
+        self::assertSame(['next'], $this->pageKeys($default));
+    }
+
+    public function testCommittedHostWriteKeepsItsEventWhenTheRequestFailsLater(): void
+    {
+        $container = $this->boot($this->singleManager(), ['transaction' => 'host']);
+        $kernel    = $this->httpKernel($container);
+
+        $request  = Request::create('/t/commit-then-fail/committed');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(500, $response->getStatusCode());
+        $kernel->terminate($request, $response);
+
+        self::assertSame(['committed'], $this->pageKeys($this->manager($container, 'default')));
+        self::assertSame(['committed'], $this->eventKeys(), 'LG-PBK-L1');
+        self::assertSame(0, $this->pending($container)->countPending());
+    }
+
     public function testHostTransactionEventsAreDiscardedWhenTheHostRequestFails(): void
     {
         $container = $this->boot($this->singleManager(), ['transaction' => 'host']);
@@ -349,6 +433,38 @@ final class PageBuilderPersistenceKernelTest extends TestCase
      * The `http_kernel` service itself: FrankenPHP worker mode without kernel reset (Kernel::handle() would run the
      * services resetter between two requests).
      */
+    private function publisher(ContainerInterface $container): PagePublisherInterface
+    {
+        $publisher = $container->get(PagePublisherInterface::class);
+        self::assertInstanceOf(PagePublisherInterface::class, $publisher);
+
+        return $publisher;
+    }
+
+    private function pending(ContainerInterface $container): PageBuilderPendingEventsInterface
+    {
+        $pending = $container->get(PageBuilderPendingEventsInterface::class);
+        self::assertInstanceOf(PageBuilderPendingEventsInterface::class, $pending);
+
+        return $pending;
+    }
+
+    /**
+     * End of a request without a new request: `kernel.terminate` through the real dispatcher.
+     */
+    private function terminate(ContainerInterface $container): void
+    {
+        $this->httpKernel($container)->terminate(Request::create('/'), new Response());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function eventKeys(): array
+    {
+        return array_map(static fn (object $event): string => $event instanceof PageCreatedEvent ? $event->pageKey : $event::class, $this->events);
+    }
+
     private function httpKernel(ContainerInterface $container): HttpKernel
     {
         $kernel = $container->get('http_kernel');

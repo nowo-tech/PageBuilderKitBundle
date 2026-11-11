@@ -8,6 +8,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,6 +25,20 @@ final readonly class PersistenceTestController
     public function create(string $key): Response
     {
         return new Response($this->publisher->createPageByKey($key, 'Title ' . $key, 'en'));
+    }
+
+    /**
+     * Host use case that commits a page, then fails later in the same request (LG-PBK-L1).
+     */
+    public function commitThenFail(string $key): Response
+    {
+        $this->publisher->createPageByKey($key, 'Title ' . $key, 'en');
+        $manager = $this->registry->getManagerForClass(BuilderPage::class);
+        if ($manager instanceof ObjectManager) {
+            $manager->flush();
+        }
+
+        throw new RuntimeException('Failure after the commit.');
     }
 
     /**

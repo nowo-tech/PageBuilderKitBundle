@@ -60,6 +60,11 @@ Target 1.14.0 (architecture bar W1: standard Symfony and DDD hosts, rules 1, 4, 
   (`createPageByKey()`, `saveDocumentByKey()`, `publishByKey()`, `unpublishByKey()`), no entity in the signature.
 - `PageBuilderPendingEventsInterface` (`dispatchPending()`, `countPending()`) for hosts that commit in the middle of a
   long process.
+- The events follow the **real** transaction of the bundle's connection (`AfterCommitMiddleware` + a per-transaction
+  outbox, the InstanceSettings 1.11 / LegalKit 1.10 design): held while a transaction is open, dropped when it (or the
+  savepoint that held them) rolls back, dispatched after the outermost commit at the next point where DBAL reports no
+  open transaction. A rolled-back write never produces an event, in `bundle` mode inside a host transaction and in
+  `host` mode; a committed write keeps its event when the request, message or command fails later.
 - CI runs `composer igor` (worker-state audit, REQ-CS-008).
 
 ### Fixed

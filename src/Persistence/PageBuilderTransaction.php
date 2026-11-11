@@ -16,6 +16,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
+use Throwable;
 
 use function array_values;
 use function count;
@@ -27,15 +28,20 @@ use function str_starts_with;
  *
  * - `doctrine.transaction: bundle` (default, standard hosts): {@see commit()} flushes the entity manager that maps
  *   the bundle entities (`doctrine.entity_manager`, else the manager returned by `getManagerForClass()`), never the
- *   autowired default one by accident, then dispatches the write events.
+ *   autowired default one by accident.
  * - `doctrine.transaction: host` (DDD hosts): {@see commit()} never flushes when the host calls the bundle; the
- *   host's use case owns the transaction. The events wait for the host's flush of that manager and are dispatched
- *   once no transaction is open any more (the host committed). The bundle's own admin controllers are a use case of
- *   their own: during a main request served by them the bundle still flushes its writes.
+ *   host's use case owns the transaction and the events wait for its flush of that manager. The bundle's own admin
+ *   controllers are a use case of their own: during a main request served by them the bundle still flushes.
  *
- * Events are never dispatched inside a flush nor while a transaction that may still roll back is open. The recorded
- * events are request state: dispatched or discarded at every request / message / command boundary and on
- * `kernel.reset` (FrankenPHP worker mode without kernel reset).
+ * Events follow the **real** commit (LG-PBK-M1): once flushed they go to the {@see PageBuilderOutbox}, which
+ * {@see AfterCommitMiddleware} tells about the transactions of the bundle's connection. A rollback (also a savepoint
+ * rollback, or a host transaction around a bundle-mode write) drops them; the outermost commit makes them committed.
+ * Committed events are dispatched at the next safe point where DBAL reports no open transaction: right after a
+ * bundle flush or a host flush, {@see dispatchPending()}, and the end of the request / message / command (also a
+ * failed one: a committed write keeps its event, LG-PBK-L1). Never inside a flush nor inside a transaction.
+ *
+ * Events of writes never flushed are discarded at every boundary; everything is dropped on `kernel.reset`
+ * (FrankenPHP worker mode without kernel reset).
  *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
@@ -49,16 +55,8 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      *
      * @var list<object>
      */
-    // @igor-ignore - Request-scoped outbox: dispatched or discarded at every request/message/command boundary and reset().
+    // @igor-ignore - Request-scoped outbox: handed to the transaction outbox on flush, discarded at every boundary and reset().
     private array $unflushed = [];
-
-    /**
-     * Events of flushed writes, dispatched once the connection has no open transaction.
-     *
-     * @var list<object>
-     */
-    // @igor-ignore - Request-scoped outbox: dispatched or discarded at every request/message/command boundary and reset().
-    private array $flushed = [];
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -66,19 +64,20 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly bool $hostControlsTransaction = false,
         private readonly LoggerInterface $logger = new NullLogger(),
         private readonly ?RequestStack $requestStack = null,
+        private readonly PageBuilderOutbox $outbox = new PageBuilderOutbox(),
     ) {
     }
 
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::EXCEPTION  => ['discardPending', -1024],
+            KernelEvents::EXCEPTION  => ['onBoundary', -1024],
             KernelEvents::TERMINATE  => ['onBoundary', 1024],
-            ConsoleEvents::ERROR     => ['discardPending', -1024],
+            ConsoleEvents::ERROR     => ['onBoundary', -1024],
             ConsoleEvents::TERMINATE => ['onBoundary', 1024],
             // symfony/messenger is optional: event names as strings.
             'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent' => ['onBoundary', 1024],
-            'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent'  => ['discardPending', -1024],
+            'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent'  => ['onBoundary', -1024],
         ];
     }
 
@@ -89,7 +88,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
 
     /**
      * Ends one bundle write: flushes the bundle entity manager (unless the host controls the transaction) and records
-     * the write events, dispatched as soon as the write is committed.
+     * the write events, dispatched once the write is committed.
      */
     public function commit(object ...$events): void
     {
@@ -116,7 +115,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
             return;
         }
 
-        $this->flushed = [...$this->flushed, ...array_values($events)];
+        $this->outbox->hold(...$events);
         $this->dispatchPending();
     }
 
@@ -135,20 +134,27 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         return is_string($controller) && str_starts_with($controller, self::BUNDLE_CONTROLLER_NAMESPACE);
     }
 
+    /**
+     * Dispatches the events of committed writes when DBAL reports no open transaction on the bundle's connection.
+     * A listener that throws cannot undo the commit: it is logged and the other events are still dispatched.
+     */
     public function dispatchPending(): int
     {
-        if ($this->flushed === [] || !$this->entityManager->isOpen()) {
+        if ($this->outbox->countCommitted() === 0 || $this->entityManager->getConnection()->isTransactionActive()) {
             return 0;
         }
 
-        if ($this->entityManager->getConnection()->isTransactionActive()) {
-            return 0;
-        }
-
-        $events        = $this->flushed;
-        $this->flushed = [];
+        $events = $this->outbox->takeCommitted();
         foreach ($events as $event) {
-            $this->eventDispatcher?->dispatch($event);
+            try {
+                $this->eventDispatcher?->dispatch($event);
+            } catch (Throwable $e) {
+                $this->logger->error('Page builder: a listener failed after the commit.', [
+                    'bundle'    => 'NowoPageBuilderKitBundle',
+                    'event'     => $event::class,
+                    'exception' => $e::class,
+                ]);
+            }
         }
 
         return count($events);
@@ -156,59 +162,57 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
 
     public function countPending(): int
     {
-        return count($this->unflushed) + count($this->flushed);
+        return count($this->unflushed) + $this->outbox->countHeld() + $this->outbox->countCommitted();
     }
 
     /**
-     * Doctrine `postFlush`: a host flush of the bundle manager writes the recorded changes; they are dispatched now
-     * when that flush committed, else after the host's commit ({@see dispatchPending()} or the boundary).
+     * Doctrine `postFlush`: a flush of the bundle manager wrote the recorded changes; their events now follow the
+     * transaction (if any) that flush ran in.
      */
     public function postFlush(PostFlushEventArgs $args): void
     {
         if ($this->unflushed !== [] && $args->getObjectManager() === $this->entityManager) {
-            $this->flushed   = [...$this->flushed, ...$this->unflushed];
+            $events          = $this->unflushed;
             $this->unflushed = [];
+            $this->outbox->hold(...$events);
         }
 
         $this->dispatchPending();
     }
 
     /**
-     * End of a request, message or command: dispatches what the host committed, discards the rest.
+     * End of a request, message or command (also a failed one): dispatches what was committed, discards the events of
+     * writes never flushed.
      */
     public function onBoundary(): void
     {
-        if ($this->countPending() === 0) {
-            return;
-        }
-
         try {
             $this->dispatchPending();
         } finally {
-            $this->discardPending();
+            $this->discardUnflushed();
         }
     }
 
     /**
-     * Failed request, message or command: the recorded writes may have been rolled back.
+     * Drops the events of writes never flushed.
      */
-    public function discardPending(): void
+    public function discardUnflushed(): void
     {
-        $count = $this->countPending();
+        $count = count($this->unflushed);
         if ($count === 0) {
             return;
         }
 
-        $this->logger->warning('Page builder write events discarded: the write was not committed before the end of the request, message or command.', [
+        $this->logger->warning('Page builder write events discarded: the write was never flushed before the end of the request, message or command.', [
             'bundle' => 'NowoPageBuilderKitBundle',
             'events' => $count,
         ]);
-        $this->reset();
+        $this->unflushed = [];
     }
 
     public function reset(): void
     {
         $this->unflushed = [];
-        $this->flushed   = [];
+        $this->outbox->reset();
     }
 }
