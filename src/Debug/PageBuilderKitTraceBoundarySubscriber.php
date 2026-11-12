@@ -6,6 +6,9 @@ namespace Nowo\PageBuilderKitBundle\Debug;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Contracts\Service\ResetInterface;
 
 /**
@@ -32,10 +35,10 @@ final readonly class PageBuilderKitTraceBoundarySubscriber implements EventSubsc
     public static function getSubscribedEvents(): array
     {
         return [
-            'kernel.request'                                                   => ['onMainRequest', 4096],
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent' => ['clear', 4096],
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent'  => ['clear', -4096],
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent'   => ['clear', -4096],
+            'kernel.request'                  => ['onMainRequest', 4096],
+            WorkerMessageReceivedEvent::class => ['clear', 4096],
+            WorkerMessageHandledEvent::class  => ['clear', -4096],
+            WorkerMessageFailedEvent::class   => ['clear', -4096],
             // String names: symfony/console and symfony/messenger are optional for this bundle.
             'console.terminate' => ['clear', -4096],
         ];

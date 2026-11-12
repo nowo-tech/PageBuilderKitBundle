@@ -43,6 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Unit boundary tracker: per-worker message depth, request stack (audit NX CR1–CR3).**
+  `Persistence\UnitOfWorkBoundaries` kept one process-wide "message in flight" flag and judged a main request
+  outermost without looking at other main requests. A Messenger worker run in-process inside a message handler ended
+  the outer message (its handled / stopped events reset the flag), so the inner worker's messages and a main request
+  handled later in the outer handler cleared the bundle's own manager and discarded the outer unit's unflushed write
+  events (CR1); a main request handled in-process inside another main request cleared the outer one (CR2); a message
+  skipped by a `WorkerMessageReceivedEvent` listener (`shouldHandle(false)`) stayed in flight until the worker
+  stopped (CR3). The tracker now keeps a stack of the running workers (`WorkerStartedEvent` / `WorkerRunningEvent` /
+  `WorkerStoppedEvent`), each with its own message in flight, and a stack of the main requests in flight (popped by
+  their own `kernel.finish_request` / `kernel.terminate`, so unbalanced events heal); a skipped message ends at the end
+  of its received event or at its worker's next `WorkerRunningEvent`. Message boundaries clear only outside another
+  message. No configuration change. `symfony/messenger` is a new dev dependency (worker tests).
+
 ## [1.15.1] - 2026-11-12
 
 ### Fixed

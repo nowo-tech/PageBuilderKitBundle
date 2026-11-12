@@ -42,9 +42,16 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Event\WorkerRunningEvent;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
+use Symfony\Component\Messenger\Worker;
 use WeakMap;
 
 use function array_map;
@@ -699,6 +706,86 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $dispatcher->removeListener(ConsoleEvents::ERROR, $listener);
 
         $this->assertRequestClears($container, $bundle, 'after an error listener ran a command');
+    }
+
+    /**
+     * Audit NX CR2, through the `http_kernel` service: a main request handled in-process while another main request
+     * runs (here from a `kernel.response` listener) does not clear the outer request's own manager.
+     */
+    public function testNestedMainRequestKeepsTheOuterRequestUnit(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $kernel                            = $this->httpKernel($container);
+        $kept                              = null;
+        $nested                            = static function (ResponseEvent $event) use ($bundle, $kernel, &$kept, &$nested, $dispatcher): void {
+            $dispatcher->removeListener(KernelEvents::RESPONSE, $nested);
+            $page = $bundle->getRepository(BuilderPage::class)->findOneBy(['pageKey' => 'tenant-a']);
+            self::assertInstanceOf(BuilderPage::class, $page);
+            $kernel->handle(Request::create('/t/show/tenant-a'), HttpKernelInterface::MAIN_REQUEST, true);
+            $kept = $bundle->contains($page);
+        };
+        $dispatcher->addListener(KernelEvents::RESPONSE, $nested);
+
+        $request  = Request::create('/t/show/tenant-a');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertTrue($kept, 'the nested main request did not clear the outer request');
+        $kernel->terminate($request, $response);
+        self::assertSame(0, $bundle->getUnitOfWork()->size());
+        $this->assertRequestClears($container, $bundle, 'after a nested main request');
+    }
+
+    /**
+     * Audit NX CR1/CR3, through a real Messenger worker on the kernel's dispatcher: a worker run inside a handler and
+     * a main request handled by that handler do not clear the outer message's unit; a skipped message ends.
+     */
+    public function testWorkerInsideAHandlerKeepsTheOuterMessageUnit(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $kernel                            = $this->httpKernel($container);
+        $kept                              = null;
+        $this->runWorker($dispatcher, function () use ($bundle, $kernel, $dispatcher, &$kept): void {
+            $page = $bundle->getRepository(BuilderPage::class)->findOneBy(['pageKey' => 'tenant-a']);
+            self::assertInstanceOf(BuilderPage::class, $page);
+            $this->runWorker($dispatcher, static function (): void {
+            });
+            $kernel->handle(Request::create('/t/show/tenant-a'), HttpKernelInterface::MAIN_REQUEST, true);
+            $kept = $bundle->contains($page);
+        });
+        self::assertTrue($kept, 'the inner worker and the in-process request kept the outer message unit');
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), 'the outer message clears when handled');
+
+        $skip = static function (WorkerMessageReceivedEvent $event): void {
+            $event->shouldHandle(false);
+        };
+        $dispatcher->addListener(WorkerMessageReceivedEvent::class, $skip);
+        $this->runWorker($dispatcher, static function (): void {
+        }, stopAfterFirst: true);
+        $dispatcher->removeListener(WorkerMessageReceivedEvent::class, $skip);
+        $this->assertRequestClears($container, $bundle, 'after a skipped message');
+    }
+
+    private function runWorker(EventDispatcherInterface $dispatcher, Closure $handler, bool $stopAfterFirst = false): void
+    {
+        $transport = new InMemoryTransport();
+        $transport->send(new Envelope(new stdClass()));
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use ($handler): Envelope {
+            $handler();
+
+            return $message instanceof Envelope ? $message : new Envelope($message);
+        });
+        $worker = new Worker(['memory' => $transport], $bus, $dispatcher);
+        $stop   = static function (WorkerRunningEvent $event) use ($worker, $stopAfterFirst): void {
+            if ($event->getWorker() === $worker && ($stopAfterFirst || $event->isWorkerIdle())) {
+                $worker->stop();
+            }
+        };
+        $dispatcher->addListener(WorkerRunningEvent::class, $stop, -1);
+        try {
+            $worker->run(['sleep' => 0]);
+        } finally {
+            $dispatcher->removeListener(WorkerRunningEvent::class, $stop);
+        }
     }
 
     private static function throwingListener(): Closure

@@ -20,6 +20,9 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Contracts\Service\ResetInterface;
 
 use function dirname;
@@ -39,11 +42,11 @@ final class PageBuilderKitTraceWorkerTest extends TestCase
 
     private const int MEMORY_MARGIN = 4 * 1024 * 1024;
 
-    private const string RECEIVED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent';
+    private const string RECEIVED = WorkerMessageReceivedEvent::class;
 
-    private const string HANDLED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
+    private const string HANDLED = WorkerMessageHandledEvent::class;
 
-    private const string FAILED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
+    private const string FAILED = WorkerMessageFailedEvent::class;
 
     private ?PersistenceTestKernel $kernel = null;
 
