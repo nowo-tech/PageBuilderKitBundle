@@ -72,7 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   process "inside a command"; a command whose `console.error` listener throws (Symfony then never dispatches its
   terminate) stays marked and is dropped at the next request, message, command or worker stop; a message or request
   left open inside a command (a throwing `WorkerMessageReceivedEvent` or `kernel.exception` listener) does not outlive
-  it; a terminate without a matching frame never ends another command. Without this a long-lived process could stop
+  it; a terminate without a matching frame never ends another command. Every handler drops failed frames first and
+  then applies its own change, so a restored flag never overrides the event being handled.
+- Safety net: the start of an outermost main request dispatches committed events and discards unflushed ones left by
+  a previous request whose runtime never called `kernel.terminate`. Without this a long-lived process could stop
   clearing the bundle's manager for good (stale identity map across requests).
 
 ### Tests
@@ -83,8 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-process `Application::run()` kernel tests: a throwing `console.terminate` listener and a throwing `console.error`
   listener, after which HTTP requests still clear the bundle's manager; an unknown nested command keeps the outer
   command's write events; a self-recursive command and a nested command whose error listener throws, throwing
-  listeners at `PHP_INT_MIN` / `PHP_INT_MAX`, and a message or request left open inside a command. They fail on
-  1.15.0.
+  listeners at `PHP_INT_MIN` / `PHP_INT_MAX`, a message or request left open inside a command, and a failed command
+  inside a failed message with and without a worker stop. They fail on 1.15.0.
 - Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
   per-tenant data, empty unit of work after each request, memory margin 4 MiB.
 

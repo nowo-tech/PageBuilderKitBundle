@@ -208,7 +208,8 @@ final class PageBuilderTransactionTest extends TestCase
         self::assertSame(['onConsoleBoundary', 1024], $events[UnitOfWorkBoundaries::CONSOLE_TERMINATE]);
         self::assertSame(['onMessageFinished', 1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED]);
         self::assertSame(['onMessageFinished', -1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED]);
-        self::assertCount(5, $events);
+        self::assertSame(['onHttpRequest', 4096], $events[KernelEvents::REQUEST]);
+        self::assertCount(6, $events);
     }
 
     /**
@@ -266,6 +267,35 @@ final class PageBuilderTransactionTest extends TestCase
         $events->error(null);
         self::assertSame(0, $transaction->countPending());
         self::assertSame([], $this->dispatched, 'never flushed: nothing dispatched');
+    }
+
+    /**
+     * Safety net (1.15.1): a runtime that never called kernel.terminate; the next outermost main request discards the
+     * leftover unflushed events, a request inside a command or a sub-request does not.
+     */
+    #[Test]
+    public function anOutermostMainRequestDiscardsLeftoversOfAnUnterminatedRequest(): void
+    {
+        $boundaries  = new UnitOfWorkBoundaries();
+        $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), true, boundaries: $boundaries);
+        $events      = new BoundaryEvents($boundaries, $transaction);
+        $command     = new Command('app:crawl');
+
+        $events->request();
+        $transaction->commit(new PageCreatedEvent('left', 'over'));
+        $events->finishRequest();
+        $events->request(HttpKernelInterface::SUB_REQUEST);
+        $events->command($command);
+        $events->request();
+        self::assertSame(1, $transaction->countPending(), 'a sub-request or a request inside a command keeps them');
+        $events->finishRequest();
+        $events->terminate($command);
+        self::assertSame(0, $transaction->countPending(), 'the outermost command ended');
+
+        $transaction->commit(new PageCreatedEvent('left', 'over'));
+        $events->request();
+        self::assertSame(0, $transaction->countPending(), 'the next outermost main request discards them');
+        self::assertSame([], $this->dispatched);
     }
 
     private function manager(bool $flushes = false): EntityManagerInterface

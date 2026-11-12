@@ -74,7 +74,8 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
   `kernel.terminate`) and a Messenger message in flight. It changes at priority `PHP_INT_MAX` (before any other
   listener can throw); a terminate removes only its own frame (and nested frames that never terminated); a command
   whose `console.error` listener threw (no terminate follows) stays marked and is dropped at the next request,
-  message, command or worker stop. No request, user or tenant data.
+  message, command or worker stop. Every handler drops failed frames first, then applies its own change. No
+  request, user or tenant data.
 - **Resetter:** the services resetter (`kernel.reset`) empties `PageBuilderTransaction` (its pending events), but
   `UnitOfWorkBoundaries` keeps its own state on purpose: it is process-lifetime nesting state, correct with or
   without the resetter, and `OwnEntityManagerSubscriber` is stateless.
@@ -86,7 +87,8 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
   iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` reference, so a boundary never builds it.
 - **Write events:** `PageBuilderTransaction` follows the same policy (1.15.1): committed events are dispatched at
   every boundary, events of unflushed writes are discarded only at the outermost one. `kernel.exception` is not a
-  boundary (FrameworkBundle's ErrorListener at -128 stops its propagation); `kernel.terminate` is.
+  boundary (FrameworkBundle's ErrorListener at -128 stops its propagation); `kernel.terminate` is, and the start of
+  an outermost main request is a safety net for a runtime that never called `kernel.terminate`.
 - **Before 1.15.1 (1.14.0 – 1.15.0):** every `console.terminate` and `kernel.terminate` cleared the manager (and
   discarded the unflushed write events). A command
   run in-process from another command or from a Messenger handler, or a `kernel.terminate` inside a command, cleared

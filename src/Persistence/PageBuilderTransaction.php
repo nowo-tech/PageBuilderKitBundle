@@ -13,6 +13,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
@@ -42,7 +43,8 @@ use function str_starts_with;
  * Events of writes never flushed are discarded at the OUTERMOST boundary only (1.15.1, judged by
  * {@see UnitOfWorkBoundaries}, the same policy as `OwnEntityManagerSubscriber`), so a nested command or a request
  * handled inside a command never drops the outer unit's events; everything is dropped on `kernel.reset` (the nesting
- * state lives in `UnitOfWorkBoundaries`, which the services resetter does not touch).
+ * state lives in `UnitOfWorkBoundaries`, which the services resetter does not touch). The start of an outermost main
+ * request is a safety net for a runtime that never called `kernel.terminate`.
  *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
@@ -73,12 +75,25 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     public static function getSubscribedEvents(): array
     {
         return [
+            KernelEvents::REQUEST                                  => ['onHttpRequest', 4096],
             KernelEvents::TERMINATE                                => ['onHttpTerminate', 1024],
             UnitOfWorkBoundaries::CONSOLE_ERROR                    => ['onConsoleBoundary', -1024],
             UnitOfWorkBoundaries::CONSOLE_TERMINATE                => ['onConsoleBoundary', 1024],
             UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED => ['onMessageFinished', 1024],
             UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED  => ['onMessageFinished', -1024],
         ];
+    }
+
+    /**
+     * Start of an outermost main request: safety net for a runtime that never called `kernel.terminate` after the
+     * previous request. Committed events are dispatched and events of writes never flushed are discarded, so they
+     * never reach the new request's unit of work (1.15.1). Nothing happens inside a command or a message.
+     */
+    public function onHttpRequest(RequestEvent $event): void
+    {
+        if ($event->isMainRequest() && $this->boundaries->isHttpOutermost()) {
+            $this->onBoundary();
+        }
     }
 
     /**

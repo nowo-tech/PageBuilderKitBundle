@@ -70,7 +70,7 @@ composer require nowo-tech/page-builder-kit-bundle:^1.15.1
   methods changed. Do not construct or call them yourself.
 - `kernel.exception` no longer discards unflushed write events: the end of the main request (`kernel.terminate`, also
   after a failure) does. A host that never calls `$kernel->terminate()` (FrankenPHP and the Symfony runtime do) keeps
-  them until the next boundary.
+  them until the next outermost main request, which discards them before it starts.
 
 ## To 1.15.0
 

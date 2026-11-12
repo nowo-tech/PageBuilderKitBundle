@@ -42,6 +42,9 @@ use const PHP_INT_MAX;
  * - a Messenger message in flight: received → handled / failed / worker stopped. `WorkerMessageSkipEvent` (dispatched
  *   only by `messenger:failed:retry` when a message is skipped) also ends it.
  *
+ * Rule for every handler: failed frames are dropped FIRST (which restores the state saved with them), THEN the
+ * handler applies its own change, so a restored flag never overrides the event being handled.
+ *
  * The verdict for each console event ("was this the outermost unit?") is kept per event object (`WeakMap`), so the
  * late listeners that act on it read the value computed when the event started, whatever ran in between.
  *
@@ -113,6 +116,7 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
     public function onFinishRequest(FinishRequestEvent $event): void
     {
         if ($event->isMainRequest()) {
+            $this->dropFailedFrames();
             // @igor-ignore - Count of the main requests in flight (no request data).
             $this->requests = max(0, $this->requests - 1);
         }
@@ -123,6 +127,7 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
      */
     public function onKernelTerminate(): void
     {
+        $this->dropFailedFrames();
         if ($this->isHttpOutermost()) {
             // @igor-ignore - Count of the main requests in flight (no request data).
             $this->requests = 0;
@@ -192,15 +197,16 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
 
     public function onMessageFinished(): void
     {
+        $this->dropFailedFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = false;
     }
 
     public function onWorkerStopped(): void
     {
+        $this->dropFailedFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = false;
-        $this->dropFailedFrames();
     }
 
     /**

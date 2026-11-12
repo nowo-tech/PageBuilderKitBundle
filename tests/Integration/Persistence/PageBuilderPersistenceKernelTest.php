@@ -650,6 +650,34 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     }
 
     /**
+     * NL2-v R1: a worker running in-process outside a command; its handler runs a command whose error listener throws
+     * (the frame stays marked, no terminate), the message fails, then the worker stops (or not): the next main request
+     * is the outermost unit again and clears the bundle's own manager.
+     */
+    public function testFailedCommandInsideAFailedMessageDoesNotLeaveTheMessageInFlight(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+
+        foreach ([true, false] as $workerStops) {
+            $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+            $throw = self::throwingListener();
+            $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+            self::assertNotSame(0, $application->run($this->input('app:fail'), new NullOutput()));
+            $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+            $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED);
+            if ($workerStops) {
+                $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED);
+            }
+
+            $this->assertRequestClears($container, $bundle, 'failed command in a failed message, worker stops: ' . ($workerStops ? 'yes' : 'no'));
+        }
+    }
+
+    /**
      * An error listener that runs another command in-process: the state stays sane afterwards.
      */
     public function testErrorListenerRunningACommandLeavesASaneState(): void

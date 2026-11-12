@@ -195,6 +195,43 @@ final class UnitOfWorkBoundariesTest extends TestCase
         self::assertFalse($boundaries->isOutermost($start));
     }
 
+    /**
+     * NL2-v R1: every handler drops failed frames FIRST, so a restored flag never overrides the event being handled.
+     */
+    #[Test]
+    public function droppedFramesNeverOverrideTheEventBeingHandled(): void
+    {
+        $boundaries = new UnitOfWorkBoundaries();
+        $events     = new BoundaryEvents($boundaries);
+        $failing    = new Command('app:failing');
+        $events->dispatcher->addListener(UnitOfWorkBoundaries::CONSOLE_ERROR, static function (): never {
+            throw new RuntimeException('error listener failed');
+        });
+        $failInside = static function (callable $open) use ($events, $failing): void {
+            $open();
+            $events->command($failing);
+            try {
+                $events->error($failing);
+            } catch (RuntimeException) {
+            }
+        };
+
+        foreach ([UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED, UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED] as $end) {
+            $failInside(static fn () => $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED));
+            $events->message($end);
+            self::assertTrue($boundaries->isHttpOutermost(), $end . ' ends the message');
+            self::assertSame(0, $boundaries->runningCommands());
+        }
+
+        $failInside(static fn () => $events->request());
+        $events->finishRequest();
+        self::assertTrue($boundaries->isOutermost(new stdClass()), 'finish_request ends the request');
+
+        $failInside(static fn () => $events->request());
+        $events->kernelTerminate();
+        self::assertTrue($boundaries->isOutermost(new stdClass()), 'a top-level terminate ends the request');
+    }
+
     #[Test]
     public function verdictsAreKeptPerEventAndUnseenEventsUseTheCurrentState(): void
     {
