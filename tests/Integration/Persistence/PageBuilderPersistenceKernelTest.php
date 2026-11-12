@@ -423,7 +423,7 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     /**
      * REQ-RUNTIME-002 rule 4 (1.15.1), through the real dispatcher: with `transaction: host` on a dedicated manager, a
      * nested command, a command run from a message handler and a `kernel.terminate` inside a command never clear the
-     * host's pending bundle writes; only the outermost boundary does.
+     * host's pending bundle writes nor discard their write events; only the outermost boundary does.
      */
     public function testNestedBoundariesNeverDiscardTheHostUnitOfWork(): void
     {
@@ -455,6 +455,9 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         self::assertSame(0, $bundle->getUnitOfWork()->size());
 
         self::assertSame(['in-command', 'in-message'], $this->pageKeys($bundle));
+        self::assertSame(['in-command', 'in-message'], $this->eventKeys(), 'the nested boundaries keep the outer unit\'s write events');
+        self::assertSame([false, false], $this->inTransaction);
+        self::assertSame(0, $this->pending($container)->countPending());
     }
 
     public function testDedicatedManagerThatIsTheHostDefaultIsNeverClearedByTheBundle(): void

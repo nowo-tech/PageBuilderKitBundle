@@ -59,10 +59,15 @@ composer require nowo-tech/page-builder-kit-bundle:^1.15.1
 - Only with `doctrine.entity_manager`: the bundle clears its own manager at the outermost request / message /
   command boundary only. A command you run in-process from another command, a message handler or a controller no
   longer clears it, so with `transaction: host` your pending bundle writes survive until your use case flushes.
+- With `transaction: host`, write events of a use case that a nested command, a command run from a handler or a
+  controller, or a request handled inside a command did not flush yet are no longer discarded by that nested
+  boundary: they are dispatched after your flush. Only the outermost boundary of the request, message or command
+  discards events of writes that were never flushed (with the same warning as before).
 - If `doctrine.entity_manager` names your default manager, the bundle no longer clears it: clear your own managers at
   every boundary when you run without the services resetter (REQ-RUNTIME-002 rule 7).
-- `Persistence\OwnEntityManagerSubscriber` is `@internal`; its constructor changed (iterators instead of the
-  registry). Do not construct it yourself.
+- `Persistence\OwnEntityManagerSubscriber` and `Persistence\PageBuilderTransaction` are `@internal`: the subscriber's
+  constructor changed (iterators instead of the registry) and the transaction's boundary methods changed. Do not
+  construct or call them yourself.
 
 ## To 1.15.0
 

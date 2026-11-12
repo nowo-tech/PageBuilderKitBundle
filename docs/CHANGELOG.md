@@ -54,11 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the registry are injected as `IGNORE_ON_UNINITIALIZED_REFERENCE` iterators, so a boundary never builds the manager.
 - When `doctrine.entity_manager` names the host's default manager, the bundle no longer registers the subscriber: the
   host's manager is the host's to clear (rule 7).
+- **Write events discarded mid-unit (same bug class).** `Persistence\PageBuilderTransaction` discarded the events of
+  unflushed writes at every `kernel.terminate`, `kernel.exception`, `console.error` and `console.terminate`. With
+  `transaction: host`, a nested command, a command run from a handler or a controller, or a request handled inside a
+  command or a message dropped the outer unit's write events: the host's later flush wrote the pages but no
+  `Page*Event` was dispatched. Unflushed events are now discarded at the OUTERMOST boundary only (same console depth
+  counter and Messenger / main-request in-flight flags); nested boundaries still dispatch what was committed.
 
 ### Tests
 
 - Unit cases for a nested command, a command inside a handler, a handler inside a command, a request inside a command
-  or a message and a command inside a request; a real-dispatcher kernel test with `transaction: host`.
+  or a message and a command inside a request, for both the manager subscriber and the write-event boundary; a
+  real-dispatcher kernel test with `transaction: host` asserting the outer unit's pages and events survive.
 - Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
   per-tenant data, empty unit of work after each request, memory margin 4 MiB.
 

@@ -17,8 +17,12 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use stdClass;
+use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 #[CoversClass(PageBuilderTransaction::class)]
@@ -190,6 +194,16 @@ final class PageBuilderTransactionTest extends TestCase
         $transaction->reset();
         self::assertSame(0, $transaction->countPending());
 
+        // The nesting state ends with the reset (between units).
+        $host = new PageBuilderTransaction($this->manager(), null, true);
+        $host->onConsoleCommand();
+        $host->onMessageReceived();
+        $host->onRequest(new RequestEvent($this->createStub(HttpKernelInterface::class), new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $host->reset();
+        $host->commit(new PageCreatedEvent('after', 'reset'));
+        $host->onHttpBoundary();
+        self::assertSame(0, $host->countPending(), 'no command, message or request left in flight after reset()');
+
         $this->transactionActive = false;
         $transaction->commit(new PageCreatedEvent('k', 'u'));
         self::assertSame(0, $transaction->countPending(), 'no dispatcher: dispatched to nobody');
@@ -199,9 +213,80 @@ final class PageBuilderTransactionTest extends TestCase
     public function subscribesToEveryBoundary(): void
     {
         $events = PageBuilderTransaction::getSubscribedEvents();
-        self::assertSame(['onBoundary', 1024], $events[KernelEvents::TERMINATE]);
-        self::assertSame(['onBoundary', -1024], $events[KernelEvents::EXCEPTION]);
-        self::assertCount(6, $events);
+        self::assertSame(['onRequest', 4096], $events[KernelEvents::REQUEST]);
+        self::assertSame(['onFinishRequest', -1024], $events[KernelEvents::FINISH_REQUEST]);
+        self::assertSame(['onHttpBoundary', 1024], $events[KernelEvents::TERMINATE]);
+        self::assertSame(['onHttpBoundary', -1024], $events[KernelEvents::EXCEPTION]);
+        self::assertSame(['onConsoleCommand', 4096], $events[ConsoleEvents::COMMAND]);
+        self::assertSame(['onConsoleError', -1024], $events[ConsoleEvents::ERROR]);
+        self::assertSame(['onConsoleTerminate', 1024], $events[ConsoleEvents::TERMINATE]);
+        self::assertSame(['onMessageReceived', 4096], $events[PageBuilderTransaction::MESSENGER_WORKER_MESSAGE_RECEIVED]);
+        self::assertSame(['onMessageFinished', 1024], $events[PageBuilderTransaction::MESSENGER_WORKER_MESSAGE_HANDLED]);
+        self::assertSame(['onMessageFinished', -1024], $events[PageBuilderTransaction::MESSENGER_WORKER_MESSAGE_FAILED]);
+        self::assertSame(['onWorkerStopped', -1024], $events[PageBuilderTransaction::MESSENGER_WORKER_STOPPED]);
+        self::assertCount(11, $events);
+    }
+
+    /**
+     * 1.15.1: nested boundaries dispatch what was committed but never discard the outer unit's unflushed events.
+     */
+    #[Test]
+    public function nestedBoundariesKeepTheOuterUnflushedEvents(): void
+    {
+        $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), true);
+        $kernel      = $this->createStub(HttpKernelInterface::class);
+        $main        = static fn (): RequestEvent => new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST);
+        $sub         = static fn (): RequestEvent => new RequestEvent($kernel, new Request(), HttpKernelInterface::SUB_REQUEST);
+        $finish      = static fn (int $type): FinishRequestEvent => new FinishRequestEvent($kernel, new Request(), $type);
+
+        // Nested command (terminate and error), and a request handled inside the command.
+        $transaction->onConsoleCommand();
+        $transaction->commit(new PageCreatedEvent('outer', 'command'));
+        $transaction->onConsoleCommand();
+        $transaction->onConsoleError();
+        $transaction->onConsoleTerminate();
+        $transaction->onRequest($main());
+        $transaction->onHttpBoundary();
+        $transaction->onFinishRequest($finish(HttpKernelInterface::MAIN_REQUEST));
+        $transaction->onHttpBoundary();
+        self::assertSame(1, $transaction->countPending(), 'nested boundaries keep the outer command\'s events');
+        $transaction->onConsoleError();
+        self::assertSame(0, $transaction->countPending(), 'the outermost command\'s failure discards them');
+        $transaction->onConsoleTerminate();
+
+        // A command run from a handler, and a request handled inside a message.
+        $transaction->onMessageReceived();
+        $transaction->commit(new PageCreatedEvent('outer', 'message'));
+        $transaction->onConsoleCommand();
+        $transaction->onConsoleTerminate();
+        $transaction->onHttpBoundary();
+        self::assertSame(1, $transaction->countPending(), 'a command or request inside the message keeps its events');
+        $transaction->onMessageFinished();
+        self::assertSame(0, $transaction->countPending());
+
+        // A command run from a controller; a sub-request does not end the main request.
+        $transaction->onRequest($sub());
+        $transaction->onRequest($main());
+        $transaction->commit(new PageCreatedEvent('outer', 'request'));
+        $transaction->onConsoleCommand();
+        $transaction->onConsoleTerminate();
+        $transaction->onFinishRequest($finish(HttpKernelInterface::SUB_REQUEST));
+        $transaction->onConsoleCommand();
+        $transaction->onConsoleTerminate();
+        self::assertSame(1, $transaction->countPending(), 'a command run from a controller keeps the request\'s events');
+        $transaction->onFinishRequest($finish(HttpKernelInterface::MAIN_REQUEST));
+        $transaction->onHttpBoundary();
+        self::assertSame(0, $transaction->countPending());
+
+        // A skipped message: the stopped worker ends the in-flight state; a stray terminate stays at depth 0.
+        $transaction->onMessageReceived();
+        $transaction->onWorkerStopped();
+        $transaction->onConsoleTerminate();
+        $transaction->commit(new PageCreatedEvent('top', 'level'));
+        $transaction->onConsoleCommand();
+        $transaction->onConsoleTerminate();
+        self::assertSame(0, $transaction->countPending());
+        self::assertSame([], $this->dispatched, 'never flushed: nothing dispatched');
     }
 
     private function manager(bool $flushes = false): EntityManagerInterface

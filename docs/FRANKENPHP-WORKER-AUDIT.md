@@ -55,7 +55,7 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 | `Security\PageBuilderProtection` | yes | none | ✅ |
 | `EventSubscriber\PageBuilderKitAdminAccessSubscriber` | yes | none | ✅ |
 | `EventSubscriber\WorkerStateResetSubscriber` | yes | none | ✅ |
-| `Persistence\PageBuilderTransaction` (1.14) | yes | request-scoped event outbox | ✅ dispatched or discarded at `kernel.terminate` / `kernel.exception` / console / Messenger boundaries, plus `ResetInterface` |
+| `Persistence\PageBuilderTransaction` (1.14; outermost boundaries since 1.15.1) | yes | request-scoped event outbox + unit-of-work nesting state | ✅ committed events dispatched at every `kernel.terminate` / `kernel.exception` / console / Messenger boundary; unflushed events discarded at the OUTERMOST boundary only (console depth, message / request in flight), plus `ResetInterface` |
 | `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`; outermost boundaries since 1.15.1) | yes | unit-of-work nesting state (console depth, message / request in flight) | ✅ recreates the bundle's own manager when closed and clears it at the OUTERMOST request / message / command boundary only; never touches the host managers (not registered when `doctrine.entity_manager` is the host's default manager) |
 | `Debug\PageBuilderKitTrace` | yes (debug + collector only) | request buffer | ✅ cleared at every boundary by `PageBuilderKitTraceBoundarySubscriber`, plus `ResetInterface` |
 | `Debug\PageBuilderKitTraceBoundarySubscriber` (1.14.1, debug + collector only) | yes | none (lazy iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` to the trace) | ✅ |
@@ -73,7 +73,10 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
   received / handled / failed; the outermost `console.command` / `console.terminate` outside a message and a main
   request. `WorkerStoppedEvent` ends the in-flight message (a skipped message). The manager and the registry are
   injected as iterators of `IGNORE_ON_UNINITIALIZED_REFERENCE` references, so a boundary never builds the manager.
-- **Before 1.15.1 (1.14.0 – 1.15.0):** every `console.terminate` and `kernel.terminate` cleared the manager. A command
+- **Write events:** `PageBuilderTransaction` follows the same policy (1.15.1): committed events are dispatched at
+  every boundary, events of unflushed writes are discarded only at the outermost one.
+- **Before 1.15.1 (1.14.0 – 1.15.0):** every `console.terminate` and `kernel.terminate` cleared the manager (and
+  discarded the unflushed write events). A command
   run in-process from another command or from a Messenger handler, or a `kernel.terminate` inside a command, cleared
   it in the middle of the outer unit; with `transaction: host` the host's pending (unflushed) bundle writes were
   discarded.

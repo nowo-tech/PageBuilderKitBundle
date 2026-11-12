@@ -14,6 +14,8 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
@@ -21,6 +23,7 @@ use Throwable;
 use function array_values;
 use function count;
 use function is_string;
+use function max;
 use function str_starts_with;
 
 /**
@@ -40,8 +43,9 @@ use function str_starts_with;
  * bundle flush or a host flush, {@see dispatchPending()}, and the end of the request / message / command (also a
  * failed one: a committed write keeps its event, LG-PBK-L1). Never inside a flush nor inside a transaction.
  *
- * Events of writes never flushed are discarded at every boundary; everything is dropped on `kernel.reset`
- * (FrankenPHP worker mode without kernel reset).
+ * Events of writes never flushed are discarded at the OUTERMOST boundary only (1.15.1: a console depth counter and
+ * Messenger / main-request in-flight flags, the same policy as `OwnEntityManagerSubscriber`), so a nested command or a
+ * request handled inside a command never drops the outer unit's events; everything is dropped on `kernel.reset`.
  *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
@@ -50,6 +54,12 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
 {
     private const string BUNDLE_CONTROLLER_NAMESPACE = 'Nowo\\PageBuilderKitBundle\\Controller\\';
 
+    /** Messenger event names (class names), subscribed without requiring symfony/messenger. */
+    public const string MESSENGER_WORKER_MESSAGE_RECEIVED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent';
+    public const string MESSENGER_WORKER_MESSAGE_HANDLED  = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
+    public const string MESSENGER_WORKER_MESSAGE_FAILED   = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
+    public const string MESSENGER_WORKER_STOPPED          = 'Symfony\\Component\\Messenger\\Event\\WorkerStoppedEvent';
+
     /**
      * Events of writes not flushed yet (host-controlled transaction only).
      *
@@ -57,6 +67,19 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      */
     // @igor-ignore - Request-scoped outbox: handed to the transaction outbox on flush, discarded at every boundary and reset().
     private array $unflushed = [];
+
+    /**
+     * Console commands currently running in this process (nested in-process runs count), bounded by the nesting depth
+     * (1.15.1). `reset()` also zeroes it, like the flags: the services resetter already drops every pending event, so
+     * a reset in the middle of a command cannot lose more than it does today.
+     */
+    private int $consoleDepth = 0;
+
+    /** A Messenger message is being handled (between received and handled / failed / worker stopped). */
+    private bool $messageInFlight = false;
+
+    /** A main request is being handled (between its `kernel.request` and its `kernel.finish_request`). */
+    private bool $requestInFlight = false;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -71,14 +94,96 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::EXCEPTION  => ['onBoundary', -1024],
-            KernelEvents::TERMINATE  => ['onBoundary', 1024],
-            ConsoleEvents::ERROR     => ['onBoundary', -1024],
-            ConsoleEvents::TERMINATE => ['onBoundary', 1024],
+            KernelEvents::REQUEST        => ['onRequest', 4096],
+            KernelEvents::FINISH_REQUEST => ['onFinishRequest', -1024],
+            KernelEvents::EXCEPTION      => ['onHttpBoundary', -1024],
+            KernelEvents::TERMINATE      => ['onHttpBoundary', 1024],
+            ConsoleEvents::COMMAND       => ['onConsoleCommand', 4096],
+            ConsoleEvents::ERROR         => ['onConsoleError', -1024],
+            ConsoleEvents::TERMINATE     => ['onConsoleTerminate', 1024],
             // symfony/messenger is optional: event names as strings.
-            'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent' => ['onBoundary', 1024],
-            'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent'  => ['onBoundary', -1024],
+            self::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onMessageReceived', 4096],
+            self::MESSENGER_WORKER_MESSAGE_HANDLED  => ['onMessageFinished', 1024],
+            self::MESSENGER_WORKER_MESSAGE_FAILED   => ['onMessageFinished', -1024],
+            self::MESSENGER_WORKER_STOPPED          => ['onWorkerStopped', -1024],
         ];
+    }
+
+    /**
+     * Start of a main request: from now on a command run in-process from it is nested in its unit of work (1.15.1).
+     */
+    public function onRequest(RequestEvent $event): void
+    {
+        if ($event->isMainRequest()) {
+            // @igor-ignore - Unit-of-work flag, set and unset at the main request boundaries.
+            $this->requestInFlight = true;
+        }
+    }
+
+    public function onFinishRequest(FinishRequestEvent $event): void
+    {
+        if ($event->isMainRequest()) {
+            // @igor-ignore - Unit-of-work flag, set and unset at the main request boundaries.
+            $this->requestInFlight = false;
+        }
+    }
+
+    /**
+     * End (or failure) of a request: a full boundary only outside a command and a Messenger message; an in-process
+     * `HttpKernel::handle()` from a command or a handler only dispatches what was committed (1.15.1).
+     */
+    public function onHttpBoundary(): void
+    {
+        $this->onBoundary($this->consoleDepth === 0 && !$this->messageInFlight);
+    }
+
+    public function onConsoleCommand(): void
+    {
+        // @igor-ignore - Nesting counter of the running commands (no request data).
+        ++$this->consoleDepth;
+    }
+
+    /**
+     * Failure of a command: a full boundary only for the outermost command outside a message and a main request.
+     */
+    public function onConsoleError(): void
+    {
+        $this->onBoundary($this->consoleDepth <= 1 && !$this->messageInFlight && !$this->requestInFlight);
+    }
+
+    /**
+     * End of a command: a full boundary only for the outermost command outside a message and a main request.
+     */
+    public function onConsoleTerminate(): void
+    {
+        // @igor-ignore - Nesting counter of the running commands (no request data).
+        $this->consoleDepth = max(0, $this->consoleDepth - 1);
+        $this->onBoundary($this->consoleDepth === 0 && !$this->messageInFlight && !$this->requestInFlight);
+    }
+
+    public function onMessageReceived(): void
+    {
+        // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
+        $this->messageInFlight = true;
+    }
+
+    /**
+     * End of a Messenger message (handled or failed): each message is its own unit of work.
+     */
+    public function onMessageFinished(): void
+    {
+        // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
+        $this->messageInFlight = false;
+        $this->onBoundary();
+    }
+
+    /**
+     * The worker stopped (possibly after a skipped message): no message is in flight any more.
+     */
+    public function onWorkerStopped(): void
+    {
+        // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
+        $this->messageInFlight = false;
     }
 
     public function isHostControlled(): bool
@@ -181,15 +286,19 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     }
 
     /**
-     * End of a request, message or command (also a failed one): dispatches what was committed, discards the events of
-     * writes never flushed.
+     * End of a request, message or command (also a failed one): dispatches what was committed and, at the OUTERMOST
+     * boundary only, discards the events of writes never flushed. A nested boundary (a command run from another
+     * command, a handler or a controller; a request handled inside a command or a message) keeps them for the outer
+     * unit of work, whose use case may still flush (1.15.1).
      */
-    public function onBoundary(): void
+    public function onBoundary(bool $outermost = true): void
     {
         try {
             $this->dispatchPending();
         } finally {
-            $this->discardUnflushed();
+            if ($outermost) {
+                $this->discardUnflushed();
+            }
         }
     }
 
@@ -212,7 +321,10 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
 
     public function reset(): void
     {
-        $this->unflushed = [];
+        $this->unflushed       = [];
+        $this->consoleDepth    = 0;
+        $this->messageInFlight = false;
+        $this->requestInFlight = false;
         $this->outbox->reset();
     }
 }
