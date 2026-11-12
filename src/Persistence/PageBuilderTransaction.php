@@ -13,7 +13,6 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
@@ -74,7 +73,6 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::EXCEPTION                                => ['onHttpException', -1024],
             KernelEvents::TERMINATE                                => ['onHttpTerminate', 1024],
             UnitOfWorkBoundaries::CONSOLE_ERROR                    => ['onConsoleBoundary', -1024],
             UnitOfWorkBoundaries::CONSOLE_TERMINATE                => ['onConsoleBoundary', 1024],
@@ -84,19 +82,12 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     }
 
     /**
-     * Failure of a main request (sub-requests share their main request's unit of work): a full boundary only outside
-     * a command and a Messenger message (1.15.1).
-     */
-    public function onHttpException(ExceptionEvent $event): void
-    {
-        if ($event->isMainRequest()) {
-            $this->onBoundary($this->boundaries->isHttpOutermost());
-        }
-    }
-
-    /**
-     * End of a request: a full boundary only outside a command and a Messenger message; an in-process
-     * `HttpKernel::handle()` from a command or a handler only dispatches what was committed (1.15.1).
+     * End of a request (also a failed one): a full boundary only outside a command and a Messenger message; an
+     * in-process `HttpKernel::handle()` from a command or a handler only dispatches what was committed (1.15.1).
+     *
+     * `kernel.exception` is not a boundary since 1.15.1: FrameworkBundle's ErrorListener (priority -128) stops its
+     * propagation, sub-requests share the main request's unit of work, and `kernel.terminate` follows every main
+     * request, failed or not (LG-PBK-L1: a committed write keeps its event).
      */
     public function onHttpTerminate(): void
     {

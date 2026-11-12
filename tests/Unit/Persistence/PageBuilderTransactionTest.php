@@ -94,7 +94,7 @@ final class PageBuilderTransactionTest extends TestCase
         $outbox->transactionEnded($driver, true);
         $this->transactionActive = false;
 
-        // A later write never flushed, then the request fails (kernel.exception, LG-PBK-L1).
+        // A later write never flushed, then the request fails and ends (kernel.terminate, LG-PBK-L1).
         $transaction->commit(new PageCreatedEvent('never', 'flushed'));
         $transaction->onBoundary();
         self::assertSame([$committed], $this->dispatched);
@@ -203,12 +203,12 @@ final class PageBuilderTransactionTest extends TestCase
     {
         $events = PageBuilderTransaction::getSubscribedEvents();
         self::assertSame(['onHttpTerminate', 1024], $events[KernelEvents::TERMINATE]);
-        self::assertSame(['onHttpException', -1024], $events[KernelEvents::EXCEPTION]);
+        self::assertArrayNotHasKey(KernelEvents::EXCEPTION, $events, 'kernel.terminate is the HTTP boundary');
         self::assertSame(['onConsoleBoundary', -1024], $events[UnitOfWorkBoundaries::CONSOLE_ERROR]);
         self::assertSame(['onConsoleBoundary', 1024], $events[UnitOfWorkBoundaries::CONSOLE_TERMINATE]);
         self::assertSame(['onMessageFinished', 1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED]);
         self::assertSame(['onMessageFinished', -1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED]);
-        self::assertCount(6, $events);
+        self::assertCount(5, $events);
     }
 
     /**
@@ -249,17 +249,17 @@ final class PageBuilderTransactionTest extends TestCase
         $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
         self::assertSame(0, $transaction->countPending());
 
-        // A command run from a controller; a failing sub-request does not end the main request (NL2-3).
+        // A command run from a controller; an exception (sub-request or main) is not a boundary (NL2-3, NL2-v N4).
         $events->request();
         $transaction->commit(new PageCreatedEvent('outer', 'request'));
         $events->command($nested);
         $events->terminate($nested);
         $events->exception(HttpKernelInterface::SUB_REQUEST);
-        self::assertSame(1, $transaction->countPending(), 'a command or a failing sub-request keeps the request\'s events');
         $events->exception();
-        self::assertSame(0, $transaction->countPending(), 'the failing main request discards them');
+        self::assertSame(1, $transaction->countPending(), 'a command or a failing (sub-)request keeps the request\'s events');
         $events->finishRequest();
         $events->kernelTerminate();
+        self::assertSame(0, $transaction->countPending(), 'the end of the main request discards them');
 
         // An unknown command with nothing else running is the outermost unit (NL2-2).
         $transaction->commit(new PageCreatedEvent('top', 'level'));

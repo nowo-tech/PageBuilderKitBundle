@@ -55,8 +55,8 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 | `Security\PageBuilderProtection` | yes | none | ✅ |
 | `EventSubscriber\PageBuilderKitAdminAccessSubscriber` | yes | none | ✅ |
 | `EventSubscriber\WorkerStateResetSubscriber` | yes | none | ✅ |
-| `Persistence\PageBuilderTransaction` (1.14; outermost boundaries since 1.15.1) | yes | request-scoped event outbox | ✅ committed events dispatched at every `kernel.terminate` / `kernel.exception` / console / Messenger boundary; unflushed events discarded at the OUTERMOST boundary only (judged by `UnitOfWorkBoundaries`), plus `ResetInterface` |
-| `Persistence\UnitOfWorkBoundaries` (1.15.1) | yes | running commands stack, message / request in flight, per-event verdicts (`WeakMap`) | ✅ changed at the boundary events themselves (priority `PHP_INT_MAX`), self-healing after a failed error listener; no request, user or tenant data; deliberately not reset by `kernel.reset` (it describes units still running) |
+| `Persistence\PageBuilderTransaction` (1.14; outermost boundaries since 1.15.1) | yes | request-scoped event outbox | ✅ committed events dispatched at every `kernel.terminate` / console / Messenger boundary; unflushed events discarded at the OUTERMOST boundary only (judged by `UnitOfWorkBoundaries`), plus `ResetInterface` |
+| `Persistence\UnitOfWorkBoundaries` (1.15.1) | yes | command frames (Command + input), message in flight, main-request count, per-event verdicts (`WeakMap`) | ✅ changed at the boundary events themselves (priority `PHP_INT_MAX`), frames restore the message / request state, self-healing after a failed error listener; no request, user or tenant data; deliberately not reset by `kernel.reset` (it describes units still running) |
 | `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`; outermost boundaries since 1.15.1) | yes | none (`readonly`) | ✅ recreates the bundle's own manager when closed and clears it at the OUTERMOST request / message / command boundary only; never touches the host managers (not registered when `doctrine.entity_manager` is the host's default manager) |
 | `Debug\PageBuilderKitTrace` | yes (debug + collector only) | request buffer | ✅ cleared at every boundary by `PageBuilderKitTraceBoundarySubscriber`, plus `ResetInterface` |
 | `Debug\PageBuilderKitTraceBoundarySubscriber` (1.14.1, debug + collector only) | yes | none (lazy iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` to the trace) | ✅ |
@@ -67,22 +67,26 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 ## Own entity manager boundaries
 
 - **State:** with `doctrine.entity_manager` the bundle owns that manager (it maps the bundle entities only) and keeps
-  it usable in a kept-alive kernel. `UnitOfWorkBoundaries` tracks which unit runs: a stack of the running commands
-  (each remembers whether it started as the outermost unit), a Messenger message in flight and a main request in
-  flight. It changes at priority `PHP_INT_MAX` (before any other listener can throw); a terminate removes only its
-  own command's entry (and nested entries that never terminated); a command whose `console.error` listener threw
-  (no terminate follows) is dropped at the next request, message, command or worker stop. No request, user or tenant
-  data.
+  it usable in a kept-alive kernel. `UnitOfWorkBoundaries` tracks which unit runs: a stack of frames, one per
+  running command, keyed by the Command and its input (one frame per run of a self-recursive command), each
+  remembering whether its command started as the outermost unit and saving the message / request state of that
+  moment (restored when the frame is removed); a count of the main requests in flight (reset at a top-level
+  `kernel.terminate`) and a Messenger message in flight. It changes at priority `PHP_INT_MAX` (before any other
+  listener can throw); a terminate removes only its own frame (and nested frames that never terminated); a command
+  whose `console.error` listener threw (no terminate follows) stays marked and is dropped at the next request,
+  message, command or worker stop. No request, user or tenant data.
 - **Resetter:** the services resetter (`kernel.reset`) empties `PageBuilderTransaction` (its pending events), but
   `UnitOfWorkBoundaries` keeps its own state on purpose: it is process-lifetime nesting state, correct with or
   without the resetter, and `OwnEntityManagerSubscriber` is stateless.
 - **Cleared by the bundle (1.15.1):** the manager is cleared (or recreated when a failed flush closed it) at the
   OUTERMOST boundary only: the main `kernel.request` / `kernel.terminate` outside a command and a message; Messenger
   received / handled / failed; the outermost `console.command` / `console.terminate` outside a message and a main
-  request. `WorkerMessageSkipEvent` and `WorkerStoppedEvent` end the in-flight message. The manager is injected as an
+  request. `WorkerStoppedEvent` and `WorkerMessageSkipEvent` (only dispatched by `messenger:failed:retry`) end the
+  in-flight message. The manager is injected as an
   iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` reference, so a boundary never builds it.
 - **Write events:** `PageBuilderTransaction` follows the same policy (1.15.1): committed events are dispatched at
-  every boundary, events of unflushed writes are discarded only at the outermost one.
+  every boundary, events of unflushed writes are discarded only at the outermost one. `kernel.exception` is not a
+  boundary (FrameworkBundle's ErrorListener at -128 stops its propagation); `kernel.terminate` is.
 - **Before 1.15.1 (1.14.0 – 1.15.0):** every `console.terminate` and `kernel.terminate` cleared the manager (and
   discarded the unflushed write events). A command
   run in-process from another command or from a Messenger handler, or a `kernel.terminate` inside a command, cleared

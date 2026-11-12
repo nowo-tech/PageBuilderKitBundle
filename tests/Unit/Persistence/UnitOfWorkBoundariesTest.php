@@ -18,7 +18,6 @@ use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 use const PHP_INT_MAX;
-use const PHP_INT_MIN;
 
 /**
  * 1.15.1 (NL2): the unit-of-work tracker changes state before any other listener can throw, remembers each command's
@@ -34,12 +33,13 @@ final class UnitOfWorkBoundariesTest extends TestCase
 
         self::assertSame(['onRequest', PHP_INT_MAX], $events[KernelEvents::REQUEST]);
         self::assertSame(['onFinishRequest', PHP_INT_MAX], $events[KernelEvents::FINISH_REQUEST]);
+        self::assertSame(['onKernelTerminate', PHP_INT_MAX], $events[KernelEvents::TERMINATE]);
         self::assertSame(['onCommand', PHP_INT_MAX], $events[UnitOfWorkBoundaries::CONSOLE_COMMAND]);
-        self::assertSame([['onErrorStarted', PHP_INT_MAX], ['onErrorHandled', PHP_INT_MIN]], $events[UnitOfWorkBoundaries::CONSOLE_ERROR]);
+        self::assertSame(['onError', PHP_INT_MAX], $events[UnitOfWorkBoundaries::CONSOLE_ERROR]);
         self::assertSame(['onTerminate', PHP_INT_MAX], $events[UnitOfWorkBoundaries::CONSOLE_TERMINATE]);
         self::assertSame(['onMessageFinished', PHP_INT_MAX], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_SKIPPED]);
         self::assertSame(['onWorkerStopped', PHP_INT_MAX], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED]);
-        self::assertCount(10, $events);
+        self::assertCount(11, $events);
     }
 
     #[Test]
@@ -67,13 +67,14 @@ final class UnitOfWorkBoundariesTest extends TestCase
     {
         $events = new BoundaryEvents(new UnitOfWorkBoundaries());
         $outer  = new Command('app:outer');
+        $input  = new ArrayInput([]);
 
-        $events->command($outer);
+        $events->command($outer, $input);
         $events->command(new Command('app:lost-1'));
         $events->command(new Command('app:lost-2'));
         self::assertSame(3, $events->boundaries->runningCommands());
 
-        $terminate = new ConsoleTerminateEvent($outer, new ArrayInput([]), new NullOutput(), 0);
+        $terminate = new ConsoleTerminateEvent($outer, $input, new NullOutput(), 0);
         $events->dispatcher->dispatch($terminate, UnitOfWorkBoundaries::CONSOLE_TERMINATE);
         self::assertSame(0, $events->boundaries->runningCommands());
         self::assertTrue($events->boundaries->isOutermost($terminate));
@@ -87,18 +88,19 @@ final class UnitOfWorkBoundariesTest extends TestCase
         $outer      = new Command('app:outer');
         $failing    = new Command('app:failing');
 
-        // A handled error (the listeners finish) keeps the command until its terminate.
+        // A handled error: the frame stays marked until its own terminate, which removes it.
         $events->command($outer);
         $events->error($outer);
         $events->error(new Command('app:unknown-to-the-tracker'));
-        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
         self::assertSame(1, $boundaries->runningCommands());
-        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
+        $events->terminate($outer);
+        self::assertSame(0, $boundaries->runningCommands());
 
-        // The nested command's error listener throws: no terminate; the next command heals, the outer one stays.
+        // The nested command's error listener throws: no terminate; the next unit heals, the outer frame stays.
         $events->dispatcher->addListener(UnitOfWorkBoundaries::CONSOLE_ERROR, static function (): never {
             throw new RuntimeException('error listener failed');
         });
+        $events->command($outer);
         $events->command($failing);
         try {
             $events->error($failing);
@@ -106,23 +108,91 @@ final class UnitOfWorkBoundariesTest extends TestCase
         }
         self::assertSame(2, $boundaries->runningCommands());
         $events->command(new Command('app:next'));
-        self::assertSame(2, $boundaries->runningCommands(), 'failing entry dropped, the new one pushed');
+        self::assertSame(2, $boundaries->runningCommands(), 'failing frame dropped, the new one pushed');
 
-        // The same at a stray terminate and when the worker stops.
-        $events->command($failing);
+        // The same at a stray terminate, a message and when the worker stops.
+        foreach ([
+            static fn () => $events->terminate(new Command('app:stray')),
+            static fn () => $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED),
+            static fn () => $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED),
+        ] as $nextUnit) {
+            $events->command($failing);
+            try {
+                $events->error($failing);
+            } catch (RuntimeException) {
+            }
+            self::assertSame(3, $boundaries->runningCommands());
+            $nextUnit();
+            self::assertSame(2, $boundaries->runningCommands());
+            $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
+        }
+    }
+
+    /**
+     * NL2-v N1: a command that runs itself in-process has one frame per run (Command + input).
+     */
+    #[Test]
+    public function aSelfRecursiveCommandWithAThrowingErrorListenerEndsWithItsOuterRun(): void
+    {
+        $boundaries = new UnitOfWorkBoundaries();
+        $events     = new BoundaryEvents($boundaries);
+        $command    = new Command('app:recursive');
+        $outerRun   = new ArrayInput([]);
+        $innerRun   = new ArrayInput([]);
+        $events->dispatcher->addListener(UnitOfWorkBoundaries::CONSOLE_ERROR, static function (): never {
+            throw new RuntimeException('error listener failed');
+        });
+
+        $events->command($command, $outerRun);
+        $events->command($command, $innerRun);
         try {
-            $events->error($failing);
+            $events->error($command, $innerRun);
         } catch (RuntimeException) {
         }
-        $events->terminate(new Command('app:stray'));
-        self::assertSame(2, $boundaries->runningCommands());
-        $events->command($failing);
-        try {
-            $events->error($failing);
-        } catch (RuntimeException) {
-        }
-        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED);
-        self::assertSame(2, $boundaries->runningCommands());
+        $terminate = new ConsoleTerminateEvent($command, $outerRun, new NullOutput(), 0);
+        $events->dispatcher->dispatch($terminate, UnitOfWorkBoundaries::CONSOLE_TERMINATE);
+
+        self::assertSame(0, $boundaries->runningCommands());
+        self::assertTrue($boundaries->isOutermost($terminate));
+    }
+
+    /**
+     * NL2-v N3: a frame restores the message / request state of its start, so a message or request whose closing
+     * event never came inside the command does not outlive it; nested main requests are counted.
+     */
+    #[Test]
+    public function aCommandFrameRestoresTheMessageAndRequestStateOfItsStart(): void
+    {
+        $boundaries = new UnitOfWorkBoundaries();
+        $events     = new BoundaryEvents($boundaries);
+        $consume    = new Command('app:consume');
+
+        $events->command($consume);
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $events->request();
+        $events->terminate($consume);
+        self::assertTrue($boundaries->isHttpOutermost(), 'no message left in flight');
+        self::assertTrue($boundaries->isOutermost(new stdClass()), 'no request left in flight');
+
+        // Nested main requests: the inner finish does not end the outer request.
+        $events->request();
+        $events->request();
+        $events->finishRequest();
+        self::assertFalse($boundaries->isOutermost(new stdClass()));
+        $events->finishRequest();
+        $events->finishRequest();
+        self::assertTrue($boundaries->isOutermost(new stdClass()), 'never below zero');
+
+        // A top-level request whose finish never came is over at its terminate; inside a command it is not.
+        $events->request();
+        $events->kernelTerminate();
+        self::assertTrue($boundaries->isOutermost(new stdClass()));
+        $events->command($consume);
+        $events->request();
+        $events->kernelTerminate();
+        $start = new ConsoleCommandEvent(new Command('app:nested'), new ArrayInput([]), new NullOutput());
+        $events->dispatcher->dispatch($start, UnitOfWorkBoundaries::CONSOLE_COMMAND);
+        self::assertFalse($boundaries->isOutermost($start));
     }
 
     #[Test]

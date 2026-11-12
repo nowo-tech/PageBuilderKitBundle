@@ -23,6 +23,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
+use WeakMap;
 
 /**
  * Dispatches real boundary events through a real dispatcher holding {@see UnitOfWorkBoundaries} and the subscriber
@@ -32,30 +33,43 @@ final readonly class BoundaryEvents
 {
     public EventDispatcher $dispatcher;
 
+    /** @var WeakMap<Command, ArrayInput> one input per command run, as Symfony passes the same input to its events */
+    private WeakMap $inputs;
+
     public function __construct(
         public UnitOfWorkBoundaries $boundaries,
         EventSubscriberInterface ...$subscribers,
     ) {
         $this->dispatcher = new EventDispatcher();
+        $this->inputs     = new WeakMap();
         $this->dispatcher->addSubscriber($this->boundaries);
         foreach ($subscribers as $subscriber) {
             $this->dispatcher->addSubscriber($subscriber);
         }
     }
 
-    public function command(Command $command): void
+    /**
+     * Starts a run of $command; $input distinguishes a command that runs itself in-process (default: one per command).
+     */
+    public function command(Command $command, ?ArrayInput $input = null): void
     {
-        $this->dispatcher->dispatch(new ConsoleCommandEvent($command, new ArrayInput([]), new NullOutput()), UnitOfWorkBoundaries::CONSOLE_COMMAND);
+        $this->dispatcher->dispatch(new ConsoleCommandEvent($command, $input ?? $this->input($command), new NullOutput()), UnitOfWorkBoundaries::CONSOLE_COMMAND);
     }
 
-    public function error(?Command $command): void
+    public function error(?Command $command, ?ArrayInput $input = null): void
     {
-        $this->dispatcher->dispatch(new ConsoleErrorEvent(new ArrayInput([]), new NullOutput(), new RuntimeException('failed'), $command), UnitOfWorkBoundaries::CONSOLE_ERROR);
+        $input ??= $command instanceof Command ? $this->input($command) : new ArrayInput([]);
+        $this->dispatcher->dispatch(new ConsoleErrorEvent($input, new NullOutput(), new RuntimeException('failed'), $command), UnitOfWorkBoundaries::CONSOLE_ERROR);
     }
 
-    public function terminate(Command $command): void
+    public function terminate(Command $command, ?ArrayInput $input = null): void
     {
-        $this->dispatcher->dispatch(new ConsoleTerminateEvent($command, new ArrayInput([]), new NullOutput(), 0), UnitOfWorkBoundaries::CONSOLE_TERMINATE);
+        $this->dispatcher->dispatch(new ConsoleTerminateEvent($command, $input ?? $this->input($command), new NullOutput(), 0), UnitOfWorkBoundaries::CONSOLE_TERMINATE);
+    }
+
+    private function input(Command $command): ArrayInput
+    {
+        return $this->inputs[$command] ??= new ArrayInput([]);
     }
 
     public function request(int $type = HttpKernelInterface::MAIN_REQUEST): void

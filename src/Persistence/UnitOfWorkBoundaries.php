@@ -15,9 +15,9 @@ use WeakMap;
 
 use function array_splice;
 use function count;
+use function max;
 
 use const PHP_INT_MAX;
-use const PHP_INT_MIN;
 
 /**
  * Tracks which unit of work is running in this process, so the bundle acts only at the OUTERMOST boundary of a
@@ -26,15 +26,21 @@ use const PHP_INT_MIN;
  * events of unflushed writes).
  *
  * The state changes at priority `PHP_INT_MAX`, before any other listener can throw:
- * - console: a stack of the running commands; each entry remembers whether its command was the outermost unit when it
- *   started. `console.terminate` removes the entry of ITS command (and the entries above it, nested commands that
- *   never terminated); a terminate without a matching entry never removes another command's entry;
- * - `console.error` marks the entry as failing and the end of the error listeners (priority `PHP_INT_MIN`) unmarks it.
- *   When an error listener throws, Symfony never dispatches the command's `console.terminate`: the entry stays
- *   marked and is dropped at the next request, message, command or worker stop (self-healing, so the process never
- *   stays "inside a command" for good);
- * - a main request in flight (main `kernel.request` → `kernel.finish_request`) and a Messenger message in flight
- *   (received → handled / failed / skipped / worker stopped).
+ * - console: a stack of frames, one per running command, keyed by the Command AND its input (a command that runs
+ *   itself in-process gets two frames). A frame remembers whether its command started as the outermost unit (no
+ *   other frame, no message, no main request) and saves the message / request state of the moment it was pushed;
+ *   removing the frame restores that state, so a message or request whose closing event never came (a throwing
+ *   `WorkerMessageReceivedEvent` or `kernel.exception` listener inside the command) does not outlive the command;
+ * - `console.terminate` removes ITS frame (and the frames above it, nested commands that never terminated); a
+ *   terminate without a matching frame never removes another command's frame;
+ * - `console.error` marks the frame as failing until its own terminate. When an error listener throws, Symfony
+ *   never dispatches that terminate: the marked frame (and those above it) is dropped at the next request, message,
+ *   command or worker stop (self-healing, so the process never stays "inside a command" for good);
+ * - main requests in flight are counted (a main request handled in-process inside another one does not end it
+ *   early); a top-level `kernel.terminate` (no command, no message) resets the count, so a request whose
+ *   `kernel.finish_request` never came does not stay in flight;
+ * - a Messenger message in flight: received → handled / failed / worker stopped. `WorkerMessageSkipEvent` (dispatched
+ *   only by `messenger:failed:retry` when a message is skipped) also ends it.
  *
  * The verdict for each console event ("was this the outermost unit?") is kept per event object (`WeakMap`), so the
  * late listeners that act on it read the value computed when the event started, whatever ran in between.
@@ -57,12 +63,13 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
     public const string CONSOLE_ERROR     = 'console.error';
     public const string CONSOLE_TERMINATE = 'console.terminate';
 
-    /** @var list<array{command: object, outermost: bool, failing: bool}> running commands, outermost first */
-    private array $commands = [];
+    /** @var list<array{command: object, input: object|null, outermost: bool, failing: bool, message: bool, requests: int}> running commands, outermost first */
+    private array $frames = [];
 
     private bool $messageInFlight = false;
 
-    private bool $requestInFlight = false;
+    /** Main requests in flight (main `kernel.request` → `kernel.finish_request`). */
+    private int $requests = 0;
 
     /** @var WeakMap<object, bool> outermost verdict per console event */
     private WeakMap $verdicts;
@@ -73,15 +80,16 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
     }
 
     /**
-     * @return array<string, array{0: string, 1: int}|list<array{0: string, 1: int}>>
+     * @return array<string, array{0: string, 1: int}>
      */
     public static function getSubscribedEvents(): array
     {
         return [
             KernelEvents::REQUEST                   => ['onRequest', PHP_INT_MAX],
             KernelEvents::FINISH_REQUEST            => ['onFinishRequest', PHP_INT_MAX],
+            KernelEvents::TERMINATE                 => ['onKernelTerminate', PHP_INT_MAX],
             self::CONSOLE_COMMAND                   => ['onCommand', PHP_INT_MAX],
-            self::CONSOLE_ERROR                     => [['onErrorStarted', PHP_INT_MAX], ['onErrorHandled', PHP_INT_MIN]],
+            self::CONSOLE_ERROR                     => ['onError', PHP_INT_MAX],
             self::CONSOLE_TERMINATE                 => ['onTerminate', PHP_INT_MAX],
             self::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onMessageReceived', PHP_INT_MAX],
             self::MESSENGER_WORKER_MESSAGE_HANDLED  => ['onMessageFinished', PHP_INT_MAX],
@@ -97,36 +105,54 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
             return;
         }
 
-        $this->dropFailedCommands();
-        // @igor-ignore - Unit-of-work flag, set and unset at the main request boundaries.
-        $this->requestInFlight = true;
+        $this->dropFailedFrames();
+        // @igor-ignore - Count of the main requests in flight (no request data).
+        ++$this->requests;
     }
 
     public function onFinishRequest(FinishRequestEvent $event): void
     {
         if ($event->isMainRequest()) {
-            // @igor-ignore - Unit-of-work flag, set and unset at the main request boundaries.
-            $this->requestInFlight = false;
+            // @igor-ignore - Count of the main requests in flight (no request data).
+            $this->requests = max(0, $this->requests - 1);
+        }
+    }
+
+    /**
+     * End of a top-level request (no command, no message): no main request can still be in flight.
+     */
+    public function onKernelTerminate(): void
+    {
+        if ($this->isHttpOutermost()) {
+            // @igor-ignore - Count of the main requests in flight (no request data).
+            $this->requests = 0;
         }
     }
 
     public function onCommand(ConsoleCommandEvent $event): void
     {
-        $this->dropFailedCommands();
+        $this->dropFailedFrames();
         $outermost = $this->isIdle();
         // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
         $this->verdicts[$event] = $outermost;
         // @igor-ignore - Stack of the running commands (no request data), popped by their own terminate.
-        $this->commands[] = ['command' => $event->getCommand() ?? $event, 'outermost' => $outermost, 'failing' => false];
+        $this->frames[] = [
+            'command'   => $event->getCommand() ?? $event,
+            'input'     => $event->getInput(),
+            'outermost' => $outermost,
+            'failing'   => false,
+            'message'   => $this->messageInFlight,
+            'requests'  => $this->requests,
+        ];
     }
 
     /**
-     * A command failed (or was not found: no command, no entry). Its verdict is its entry's; without an entry it is
-     * the outermost unit only when nothing else runs.
+     * A command failed (or was not found: no command, no frame). Its verdict is its frame's, and the frame stays
+     * marked until its own terminate; without a frame it is the outermost unit only when nothing else runs.
      */
-    public function onErrorStarted(ConsoleErrorEvent $event): void
+    public function onError(ConsoleErrorEvent $event): void
     {
-        $index = $this->indexOf($event->getCommand());
+        $index = $this->indexOf($event->getCommand(), $event->getInput());
         if ($index === null) {
             // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
             $this->verdicts[$event] = $this->isIdle();
@@ -135,28 +161,16 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
         }
 
         // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
-        $this->verdicts[$event] = $this->commands[$index]['outermost'];
-        // @igor-ignore - Failure marker of a running command, cleared when the error listeners end.
-        $this->commands[$index]['failing'] = true;
-    }
-
-    /**
-     * Every error listener ran: Symfony will dispatch the command's terminate.
-     */
-    public function onErrorHandled(ConsoleErrorEvent $event): void
-    {
-        $index = $this->indexOf($event->getCommand());
-        if ($index !== null) {
-            // @igor-ignore - Failure marker of a running command, cleared when the error listeners end.
-            $this->commands[$index]['failing'] = false;
-        }
+        $this->verdicts[$event] = $this->frames[$index]['outermost'];
+        // @igor-ignore - Failure marker of a running command, removed with its frame.
+        $this->frames[$index]['failing'] = true;
     }
 
     public function onTerminate(ConsoleTerminateEvent $event): void
     {
-        $index = $this->indexOf($event->getCommand());
+        $index = $this->indexOf($event->getCommand(), $event->getInput());
         if ($index === null) {
-            $this->dropFailedCommands();
+            $this->dropFailedFrames();
             // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
             $this->verdicts[$event] = $this->isIdle();
 
@@ -164,15 +178,14 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
         }
 
         // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
-        $this->verdicts[$event] = $this->commands[$index]['outermost'];
-        // Its own entry and the nested commands above it that never terminated.
-        // @igor-ignore - Stack of the running commands (no request data), popped by their own terminate.
-        array_splice($this->commands, $index);
+        $this->verdicts[$event] = $this->frames[$index]['outermost'];
+        // Its own frame and the nested commands above it that never terminated.
+        $this->removeFrames($index);
     }
 
     public function onMessageReceived(): void
     {
-        $this->dropFailedCommands();
+        $this->dropFailedFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = true;
     }
@@ -187,7 +200,7 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
     {
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = false;
-        $this->dropFailedCommands();
+        $this->dropFailedFrames();
     }
 
     /**
@@ -204,27 +217,27 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
      */
     public function isHttpOutermost(): bool
     {
-        return $this->commands === [] && !$this->messageInFlight;
+        return $this->frames === [] && !$this->messageInFlight;
     }
 
     public function runningCommands(): int
     {
-        return count($this->commands);
+        return count($this->frames);
     }
 
     private function isIdle(): bool
     {
-        return $this->commands === [] && !$this->messageInFlight && !$this->requestInFlight;
+        return $this->frames === [] && !$this->messageInFlight && $this->requests === 0;
     }
 
-    private function indexOf(?object $command): ?int
+    private function indexOf(?object $command, object $input): ?int
     {
         if ($command === null) {
             return null;
         }
 
-        for ($i = count($this->commands) - 1; $i >= 0; --$i) {
-            if ($this->commands[$i]['command'] === $command) {
+        for ($i = count($this->frames) - 1; $i >= 0; --$i) {
+            if ($this->frames[$i]['command'] === $command && $this->frames[$i]['input'] === $input) {
                 return $i;
             }
         }
@@ -233,15 +246,28 @@ final class UnitOfWorkBoundaries implements EventSubscriberInterface
     }
 
     /**
-     * Drops the commands whose error listeners threw (Symfony never dispatches their terminate), with the nested
-     * entries above them.
+     * Removes the frame at $index and every frame above it, restoring the message / request state saved when that
+     * frame was pushed.
      */
-    private function dropFailedCommands(): void
+    private function removeFrames(int $index): void
     {
-        foreach ($this->commands as $i => $entry) {
-            if ($entry['failing']) {
-                // @igor-ignore - Stack of the running commands (no request data), self-healing after a failed error listener.
-                array_splice($this->commands, $i);
+        // @igor-ignore - Unit-of-work flag restored with the command frame.
+        $this->messageInFlight = $this->frames[$index]['message'];
+        // @igor-ignore - Count of the main requests in flight, restored with the command frame.
+        $this->requests = $this->frames[$index]['requests'];
+        // @igor-ignore - Stack of the running commands (no request data).
+        array_splice($this->frames, $index);
+    }
+
+    /**
+     * Drops the commands whose error listeners threw (Symfony never dispatches their terminate), with the nested
+     * frames above them.
+     */
+    private function dropFailedFrames(): void
+    {
+        foreach ($this->frames as $i => $frame) {
+            if ($frame['failing']) {
+                $this->removeFrames($i);
 
                 return;
             }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
+use Closure;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
@@ -43,12 +44,17 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
+use WeakMap;
 
 use function array_map;
 use function dirname;
 use function gc_collect_cycles;
 use function intdiv;
 use function memory_get_usage;
+
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
 
 /**
  * Rule 6/7 through a real kernel (1.14): which entity manager the bundle uses and flushes, the dedicated
@@ -68,6 +74,14 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     private const int WORKER_MEMORY_MARGIN = 4 * 1024 * 1024;
 
     private string $pageKeyColumn = 'page_key';
+
+    /** @var WeakMap<Command, ArrayInput> */
+    private WeakMap $commandInputs;
+
+    protected function setUp(): void
+    {
+        $this->commandInputs = new WeakMap();
+    }
 
     /** @var list<bool> transaction state of the bundle connection when each event was dispatched */
     private array $inTransaction = [];
@@ -528,6 +542,170 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         self::assertSame(['outer'], $this->eventKeys(), 'the unknown nested command does not drop the outer event');
     }
 
+    /**
+     * NL2-v N1: a command that runs itself in-process, whose inner run's error listener throws, ends with its outer run.
+     */
+    public function testSelfRecursiveCommandWithAThrowingErrorListenerStillEnds(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $runs                              = 0;
+        $application->addCommand(new CallbackCommand('app:recursive', function () use ($application, &$runs, $dispatcher): int {
+            if (++$runs === 1) {
+                $throw = self::throwingListener();
+                $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+                $application->run($this->input('app:recursive'), new NullOutput());
+                $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+
+                return 0;
+            }
+
+            throw new RuntimeException('inner run failed');
+        }));
+
+        self::assertSame(0, $application->run($this->input('app:recursive'), new NullOutput()));
+        $this->assertRequestClears($container, $bundle, 'self-recursive command + throwing error listener');
+    }
+
+    /**
+     * NL2-v N1/N2: listeners that throw at the extreme priorities, and a nested command whose error listener throws.
+     */
+    public function testThrowingListenersAtExtremePrioritiesAndNestedFailuresStillEnd(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:ok', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+        $application->addCommand(new CallbackCommand('app:outer', function () use ($application, $dispatcher): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+            $application->run($this->input('app:fail'), new NullOutput());
+            $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+
+            return 0;
+        }));
+
+        foreach ([
+            [ConsoleEvents::ERROR, PHP_INT_MIN, 'app:fail'],
+            [ConsoleEvents::TERMINATE, PHP_INT_MAX, 'app:ok'],
+            [null, 0, 'app:outer'],
+        ] as [$eventName, $priority, $command]) {
+            $throw = self::throwingListener();
+            if ($eventName !== null) {
+                $dispatcher->addListener($eventName, $throw, $priority);
+            }
+            $application->run($this->input($command), new NullOutput());
+            if ($eventName !== null) {
+                $dispatcher->removeListener($eventName, $throw);
+            }
+            $this->assertRequestClears($container, $bundle, $command . ' with a throwing ' . ($eventName ?? 'nested error') . ' listener');
+        }
+    }
+
+    /**
+     * NL2-v N3: a message or a request whose closing event never came inside an in-process command (a throwing
+     * WorkerMessageReceived listener, a throwing kernel.exception listener) does not outlive the command.
+     */
+    public function testMessageOrRequestLeftOpenInsideACommandDoesNotOutliveIt(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $kernel                            = $this->httpKernel($container);
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:consume', static function () use ($dispatcher): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED, $throw);
+            try {
+                $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+            } finally {
+                $dispatcher->removeListener(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED, $throw);
+            }
+
+            return 0;
+        }));
+        $application->addCommand(new CallbackCommand('app:crawl', static function () use ($dispatcher, $kernel): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(KernelEvents::EXCEPTION, $throw, 4096);
+            try {
+                $kernel->handle(Request::create('/no-such-route'), HttpKernelInterface::MAIN_REQUEST, true);
+            } finally {
+                $dispatcher->removeListener(KernelEvents::EXCEPTION, $throw);
+            }
+
+            return 0;
+        }));
+
+        foreach (['app:consume', 'app:crawl'] as $command) {
+            self::assertNotSame(0, $application->run($this->input($command), new NullOutput()));
+            $this->assertRequestClears($container, $bundle, $command . ': nothing left in flight');
+            $next  = new Command('app:next');
+            $start = new ConsoleCommandEvent($next, new ArrayInput([]), new NullOutput());
+            $dispatcher->dispatch($start, ConsoleEvents::COMMAND);
+            $boundaries = $container->get(UnitOfWorkBoundaries::class);
+            self::assertInstanceOf(UnitOfWorkBoundaries::class, $boundaries);
+            self::assertTrue($boundaries->isOutermost($start), $command . ': the next command is the outermost unit');
+            $dispatcher->dispatch(new ConsoleTerminateEvent($next, $start->getInput(), new NullOutput(), 0), ConsoleEvents::TERMINATE);
+        }
+    }
+
+    /**
+     * An error listener that runs another command in-process: the state stays sane afterwards.
+     */
+    public function testErrorListenerRunningACommandLeavesASaneState(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:notify', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+        $runs     = 0;
+        $listener = function () use ($application, &$runs): void {
+            if ($runs++ === 0) {
+                $application->run($this->input('app:notify'), new NullOutput());
+            }
+        };
+        $dispatcher->addListener(ConsoleEvents::ERROR, $listener);
+        self::assertNotSame(0, $application->run($this->input('app:fail'), new NullOutput()));
+        $dispatcher->removeListener(ConsoleEvents::ERROR, $listener);
+
+        $this->assertRequestClears($container, $bundle, 'after an error listener ran a command');
+    }
+
+    private static function throwingListener(): Closure
+    {
+        return static function (): never {
+            throw new RuntimeException('listener failed');
+        };
+    }
+
+    /**
+     * @return array{0: ContainerInterface, 1: EntityManagerInterface, 2: EventDispatcherInterface}
+     */
+    private function bootWithTenantPage(): array
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $this->publisher($container)->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+
+        return [$container, $this->manager($container, 'page_builder'), $dispatcher];
+    }
+
+    /**
+     * A request that loads a page through the bundle manager leaves nothing managed: the manager was cleared.
+     */
+    private function assertRequestClears(ContainerInterface $container, EntityManagerInterface $bundle, string $label): void
+    {
+        $kernel   = $this->httpKernel($container);
+        $request  = Request::create('/t/show/tenant-a');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame('tenant-a|draft', $response->getContent(), $label);
+        $kernel->terminate($request, $response);
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), $label);
+    }
+
     private function input(string $command): ArrayInput
     {
         $input = new ArrayInput(['command' => $command]);
@@ -652,12 +830,20 @@ final class PageBuilderPersistenceKernelTest extends TestCase
 
     private function commandEvent(Command $command): ConsoleCommandEvent
     {
-        return new ConsoleCommandEvent($command, new ArrayInput([]), new NullOutput());
+        return new ConsoleCommandEvent($command, $this->commandInput($command), new NullOutput());
     }
 
     private function terminateEvent(Command $command): ConsoleTerminateEvent
     {
-        return new ConsoleTerminateEvent($command, new ArrayInput([]), new NullOutput(), 0);
+        return new ConsoleTerminateEvent($command, $this->commandInput($command), new NullOutput(), 0);
+    }
+
+    /**
+     * Symfony passes the same input to every event of one command run.
+     */
+    private function commandInput(Command $command): ArrayInput
+    {
+        return $this->commandInputs[$command] ??= new ArrayInput([]);
     }
 
     /**

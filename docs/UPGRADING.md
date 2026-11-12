@@ -68,8 +68,9 @@ composer require nowo-tech/page-builder-kit-bundle:^1.15.1
 - `Persistence\OwnEntityManagerSubscriber`, `Persistence\PageBuilderTransaction` and the new
   `Persistence\UnitOfWorkBoundaries` are `@internal`: the subscriber's constructor and the transaction's boundary
   methods changed. Do not construct or call them yourself.
-- A failing sub-request (fragment, ESI) no longer discards the main request's unflushed write events; only the main
-  request's failure or end does.
+- `kernel.exception` no longer discards unflushed write events: the end of the main request (`kernel.terminate`, also
+  after a failure) does. A host that never calls `$kernel->terminate()` (FrankenPHP and the Symfony runtime do) keeps
+  them until the next boundary.
 
 ## To 1.15.0
 

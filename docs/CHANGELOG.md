@@ -58,16 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `transaction: host`, a nested command, a command run from a handler or a controller, or a request handled inside a
   command or a message dropped the outer unit's write events: the host's later flush wrote the pages but no
   `Page*Event` was dispatched. Unflushed events are now discarded at the OUTERMOST boundary only; nested boundaries still
-  dispatch what was committed. A failing sub-request no longer counts as a boundary, and an unknown command run
+  dispatch what was committed. `kernel.exception` is no longer a boundary (FrameworkBundle's ErrorListener at -128
+  stops its propagation; `kernel.terminate` follows every main request, failed or not), and an unknown command run
   in-process (`console.error` without a command) counts only when nothing else runs.
-- **New internal `Persistence\UnitOfWorkBoundaries`** judges "outermost" for both: a stack of the running commands
-  (each remembers whether it started as the outermost unit), a Messenger message in flight (ended by handled, failed,
-  `WorkerMessageSkipEvent` and `WorkerStoppedEvent`) and a main request in flight. The state changes at priority
-  `PHP_INT_MAX`, before any other listener can throw, and the clear / discard runs later on the remembered verdict. A
-  throwing `console.terminate` listener no longer leaves the process "inside a command"; a command whose
-  `console.error` listener throws (Symfony then never dispatches its terminate) is dropped at the next request,
-  message, command or worker stop; a terminate without a matching command never ends another command. Without this a
-  long-lived process could stop clearing the bundle's manager for good (stale identity map across requests).
+- **New internal `Persistence\UnitOfWorkBoundaries`** judges "outermost" for both. It keeps a stack of frames, one per
+  running command, keyed by the Command and its input (a command that runs itself in-process gets one frame per
+  run); each frame remembers whether its command started as the outermost unit and saves the message / request
+  state of that moment, restored when the frame is removed. Main requests in flight are counted (nested main
+  requests do not end the outer one early) and reset at a top-level `kernel.terminate`; a Messenger message in flight
+  ends with handled, failed, `WorkerMessageSkipEvent` (only `messenger:failed:retry` dispatches it) and
+  `WorkerStoppedEvent`. The state changes at priority `PHP_INT_MAX`, before any other listener can throw, and the
+  clear / discard runs later on the remembered verdict. A throwing `console.terminate` listener no longer leaves the
+  process "inside a command"; a command whose `console.error` listener throws (Symfony then never dispatches its
+  terminate) stays marked and is dropped at the next request, message, command or worker stop; a message or request
+  left open inside a command (a throwing `WorkerMessageReceivedEvent` or `kernel.exception` listener) does not outlive
+  it; a terminate without a matching frame never ends another command. Without this a long-lived process could stop
+  clearing the bundle's manager for good (stale identity map across requests).
 
 ### Tests
 
@@ -76,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real-dispatcher kernel test with `transaction: host` asserting the outer unit's pages and events survive.
 - In-process `Application::run()` kernel tests: a throwing `console.terminate` listener and a throwing `console.error`
   listener, after which HTTP requests still clear the bundle's manager; an unknown nested command keeps the outer
-  command's write events. Both fail on 1.15.0.
+  command's write events; a self-recursive command and a nested command whose error listener throws, throwing
+  listeners at `PHP_INT_MIN` / `PHP_INT_MAX`, and a message or request left open inside a command. They fail on
+  1.15.0.
 - Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
   per-tenant data, empty unit of work after each request, memory margin 4 MiB.
 
