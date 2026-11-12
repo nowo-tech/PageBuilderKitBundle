@@ -18,6 +18,7 @@ use Nowo\PageBuilderKitBundle\Event\PageTemplateChangedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageUnpublishedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderPendingEventsInterface;
+use Nowo\PageBuilderKitBundle\Persistence\UnitOfWorkBoundaries;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
@@ -26,7 +27,9 @@ use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use stdClass;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\ConsoleEvents;
@@ -433,31 +436,114 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $bundle    = $this->manager($container, 'page_builder');
         $publisher = $this->publisher($container);
 
+        $outer       = new Command('app:outer');
+        $nested      = new Command('app:nested');
+        $fromHandler = new Command('app:from-handler');
+
         // Outer command → nested command → kernel.terminate inside the command.
-        $dispatcher->dispatch($this->commandEvent('app:outer'), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->commandEvent($outer), ConsoleEvents::COMMAND);
         $publisher->createPageByKey('in-command', 'In command', 'en');
-        $dispatcher->dispatch($this->commandEvent('app:nested'), ConsoleEvents::COMMAND);
-        $dispatcher->dispatch($this->terminateEvent('app:nested'), ConsoleEvents::TERMINATE);
+        $dispatcher->dispatch($this->commandEvent($nested), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent($nested), ConsoleEvents::TERMINATE);
         $this->terminate($container);
         self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'the nested boundaries keep the pending page');
         $bundle->flush();
-        $dispatcher->dispatch($this->terminateEvent('app:outer'), ConsoleEvents::TERMINATE);
+        $dispatcher->dispatch($this->terminateEvent($outer), ConsoleEvents::TERMINATE);
         self::assertSame(0, $bundle->getUnitOfWork()->size(), 'the outermost command clears');
 
         // Message → command run from the handler.
-        $dispatcher->dispatch(new stdClass(), OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
         $publisher->createPageByKey('in-message', 'In message', 'en');
-        $dispatcher->dispatch($this->commandEvent('app:from-handler'), ConsoleEvents::COMMAND);
-        $dispatcher->dispatch($this->terminateEvent('app:from-handler'), ConsoleEvents::TERMINATE);
+        $dispatcher->dispatch($this->commandEvent($fromHandler), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent($fromHandler), ConsoleEvents::TERMINATE);
         self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'a command run from the handler keeps the pending page');
         $bundle->flush();
-        $dispatcher->dispatch(new stdClass(), OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_HANDLED);
+        $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
         self::assertSame(0, $bundle->getUnitOfWork()->size());
 
         self::assertSame(['in-command', 'in-message'], $this->pageKeys($bundle));
         self::assertSame(['in-command', 'in-message'], $this->eventKeys(), 'the nested boundaries keep the outer unit\'s write events');
         self::assertSame([false, false], $this->inTransaction);
         self::assertSame(0, $this->pending($container)->countPending());
+    }
+
+    /**
+     * NL2-1 (1.15.1), through a REAL in-process console Application: a throwing `console.terminate` listener and a
+     * throwing `console.error` listener (Symfony then never dispatches the terminate) do not leave the process
+     * "inside a command": the next HTTP requests still clear the bundle's own manager.
+     */
+    public function testThrowingConsoleListenersNeverStopTheOwnManagerClear(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $bundle    = $this->manager($container, 'page_builder');
+        $this->publisher($container)->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $throw = static function (): never {
+            throw new RuntimeException('listener failed');
+        };
+
+        $application = $this->application();
+        $application->addCommand(new CallbackCommand('app:ok', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+
+        foreach ([[ConsoleEvents::TERMINATE, 'app:ok'], [ConsoleEvents::ERROR, 'app:fail']] as [$eventName, $commandName]) {
+            $dispatcher->addListener($eventName, $throw);
+            self::assertNotSame(0, $application->run($this->input($commandName), new NullOutput()));
+            $dispatcher->removeListener($eventName, $throw);
+
+            $kernel   = $this->httpKernel($container);
+            $request  = Request::create('/t/show/tenant-a');
+            $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+            self::assertSame('tenant-a|draft', $response->getContent());
+            $kernel->terminate($request, $response);
+            self::assertSame(0, $bundle->getUnitOfWork()->size(), 'after a throwing ' . $eventName . ' listener the request still clears');
+        }
+    }
+
+    /**
+     * NL2-2 (1.15.1): an unknown command run in-process from a command (`console.error` without a command) never
+     * discards the outer command's unflushed write events.
+     */
+    public function testUnknownNestedCommandKeepsTheOuterWriteEvents(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder', 'transaction' => 'host']);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+
+        $application = $this->application();
+        $application->addCommand(new CallbackCommand('app:outer', function () use ($publisher, $bundle): int {
+            $publisher->createPageByKey('outer', 'Outer', 'en');
+            $nested = $this->application();
+            self::assertNotSame(0, $nested->run($this->input('zzz:no-such-command'), new NullOutput()));
+            $bundle->flush();
+
+            return 0;
+        }));
+
+        self::assertSame(0, $application->run($this->input('app:outer'), new NullOutput()));
+        self::assertSame(['outer'], $this->pageKeys($bundle));
+        self::assertSame(['outer'], $this->eventKeys(), 'the unknown nested command does not drop the outer event');
+    }
+
+    private function input(string $command): ArrayInput
+    {
+        $input = new ArrayInput(['command' => $command]);
+        $input->setInteractive(false);
+
+        return $input;
+    }
+
+    private function application(): Application
+    {
+        self::assertNotNull($this->kernel);
+        $application = new Application($this->kernel);
+        $application->setAutoExit(false);
+        $application->setCatchExceptions(true);
+
+        return $application;
     }
 
     public function testDedicatedManagerThatIsTheHostDefaultIsNeverClearedByTheBundle(): void
@@ -564,14 +650,14 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         return array_map(static fn (object $event): string => $event instanceof PageCreatedEvent ? $event->pageKey : $event::class, $this->events);
     }
 
-    private function commandEvent(string $name): ConsoleCommandEvent
+    private function commandEvent(Command $command): ConsoleCommandEvent
     {
-        return new ConsoleCommandEvent(new Command($name), new ArrayInput([]), new NullOutput());
+        return new ConsoleCommandEvent($command, new ArrayInput([]), new NullOutput());
     }
 
-    private function terminateEvent(string $name): ConsoleTerminateEvent
+    private function terminateEvent(Command $command): ConsoleTerminateEvent
     {
-        return new ConsoleTerminateEvent(new Command($name), new ArrayInput([]), new NullOutput(), 0);
+        return new ConsoleTerminateEvent($command, new ArrayInput([]), new NullOutput(), 0);
     }
 
     /**

@@ -49,23 +49,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `kernel.terminate`. A command run in-process from another command or from a Messenger handler, or a
   `kernel.terminate` inside a command, therefore cleared it in the middle of the outer unit of work; with
   `transaction: host` the host's pending (unflushed) bundle writes were discarded. It now clears (or recreates a closed
-  manager) only at the OUTERMOST boundary: a console depth counter, a Messenger in-flight flag (also ended by
-  `WorkerStoppedEvent`) and a main-request in-flight flag, the same policy as ContactFormBundle 1.7.1. The manager
-  and the registry are injected as `IGNORE_ON_UNINITIALIZED_REFERENCE` iterators, so a boundary never builds the manager.
+  manager) only at the OUTERMOST boundary, the same policy as ContactFormBundle 1.7.1. The manager is injected as an
+  `IGNORE_ON_UNINITIALIZED_REFERENCE` iterator, so a boundary never builds it; the registry is a plain reference.
 - When `doctrine.entity_manager` names the host's default manager, the bundle no longer registers the subscriber: the
   host's manager is the host's to clear (rule 7).
 - **Write events discarded mid-unit (same bug class).** `Persistence\PageBuilderTransaction` discarded the events of
   unflushed writes at every `kernel.terminate`, `kernel.exception`, `console.error` and `console.terminate`. With
   `transaction: host`, a nested command, a command run from a handler or a controller, or a request handled inside a
   command or a message dropped the outer unit's write events: the host's later flush wrote the pages but no
-  `Page*Event` was dispatched. Unflushed events are now discarded at the OUTERMOST boundary only (same console depth
-  counter and Messenger / main-request in-flight flags); nested boundaries still dispatch what was committed.
+  `Page*Event` was dispatched. Unflushed events are now discarded at the OUTERMOST boundary only; nested boundaries still
+  dispatch what was committed. A failing sub-request no longer counts as a boundary, and an unknown command run
+  in-process (`console.error` without a command) counts only when nothing else runs.
+- **New internal `Persistence\UnitOfWorkBoundaries`** judges "outermost" for both: a stack of the running commands
+  (each remembers whether it started as the outermost unit), a Messenger message in flight (ended by handled, failed,
+  `WorkerMessageSkipEvent` and `WorkerStoppedEvent`) and a main request in flight. The state changes at priority
+  `PHP_INT_MAX`, before any other listener can throw, and the clear / discard runs later on the remembered verdict. A
+  throwing `console.terminate` listener no longer leaves the process "inside a command"; a command whose
+  `console.error` listener throws (Symfony then never dispatches its terminate) is dropped at the next request,
+  message, command or worker stop; a terminate without a matching command never ends another command. Without this a
+  long-lived process could stop clearing the bundle's manager for good (stale identity map across requests).
 
 ### Tests
 
 - Unit cases for a nested command, a command inside a handler, a handler inside a command, a request inside a command
   or a message and a command inside a request, for both the manager subscriber and the write-event boundary; a
   real-dispatcher kernel test with `transaction: host` asserting the outer unit's pages and events survive.
+- In-process `Application::run()` kernel tests: a throwing `console.terminate` listener and a throwing `console.error`
+  listener, after which HTTP requests still clear the bundle's manager; an unknown nested command keeps the outer
+  command's write events. Both fail on 1.15.0.
 - Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
   per-tenant data, empty unit of work after each request, memory margin 4 MiB.
 

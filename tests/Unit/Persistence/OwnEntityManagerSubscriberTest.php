@@ -7,18 +7,18 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Persistence;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
+use Nowo\PageBuilderKitBundle\Persistence\UnitOfWorkBoundaries;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Console\ConsoleEvents;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
-use Symfony\Component\HttpKernel\Event\RequestEvent;
+use RuntimeException;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * REQ-RUNTIME-002 rule 4 (1.15.1): the bundle's own manager is cleared only at the OUTERMOST unit-of-work boundary.
+ * REQ-RUNTIME-002 rule 4 (1.15.1): the bundle's own manager is cleared only at the OUTERMOST unit-of-work boundary,
+ * through a real dispatcher with {@see UnitOfWorkBoundaries}.
  */
 #[CoversClass(OwnEntityManagerSubscriber::class)]
 final class OwnEntityManagerSubscriberTest extends TestCase
@@ -31,14 +31,12 @@ final class OwnEntityManagerSubscriberTest extends TestCase
         $events = OwnEntityManagerSubscriber::getSubscribedEvents();
 
         self::assertSame(['onRequest', 4096], $events[KernelEvents::REQUEST]);
-        self::assertSame(['onFinishRequest', -1024], $events[KernelEvents::FINISH_REQUEST]);
         self::assertSame(['onTerminate', -1024], $events[KernelEvents::TERMINATE]);
-        self::assertSame(['onMessageReceived', 4096], $events[OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_RECEIVED]);
-        self::assertSame(['onMessageFinished', -1024], $events[OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_HANDLED]);
-        self::assertSame(['onMessageFinished', -1024], $events[OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_FAILED]);
-        self::assertSame(['onWorkerStopped', -1024], $events[OwnEntityManagerSubscriber::MESSENGER_WORKER_STOPPED]);
-        self::assertSame(['onConsoleCommand', 4096], $events[ConsoleEvents::COMMAND]);
-        self::assertSame(['onConsoleTerminate', -1024], $events[ConsoleEvents::TERMINATE]);
+        self::assertSame(['clearState', 4096], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED]);
+        self::assertSame(['clearState', -1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED]);
+        self::assertSame(['clearState', -1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED]);
+        self::assertSame(['onConsoleBoundary', 4096], $events[UnitOfWorkBoundaries::CONSOLE_COMMAND]);
+        self::assertSame(['onConsoleBoundary', -1024], $events[UnitOfWorkBoundaries::CONSOLE_TERMINATE]);
     }
 
     #[Test]
@@ -47,7 +45,7 @@ final class OwnEntityManagerSubscriberTest extends TestCase
         $registry = $this->createMock(ManagerRegistry::class);
         $registry->expects(self::never())->method(self::anything());
 
-        new OwnEntityManagerSubscriber([], [$registry], 'page_builder')->clearState();
+        new OwnEntityManagerSubscriber(new UnitOfWorkBoundaries(), [], $registry, 'page_builder')->clearState();
     }
 
     #[Test]
@@ -58,141 +56,173 @@ final class OwnEntityManagerSubscriberTest extends TestCase
         $open->expects(self::once())->method('clear');
         $registry = $this->createMock(ManagerRegistry::class);
         $registry->expects(self::never())->method('resetManager');
-        new OwnEntityManagerSubscriber([$open], [$registry], 'page_builder')->clearState();
+        new OwnEntityManagerSubscriber(new UnitOfWorkBoundaries(), [$open], $registry, 'page_builder')->clearState();
 
         $closed = $this->createMock(EntityManagerInterface::class);
         $closed->method('isOpen')->willReturn(false);
         $closed->expects(self::never())->method('clear');
         $registry = $this->createMock(ManagerRegistry::class);
         $registry->expects(self::once())->method('resetManager')->with('page_builder');
-        new OwnEntityManagerSubscriber([$closed], [$registry], 'page_builder')->clearState();
+        new OwnEntityManagerSubscriber(new UnitOfWorkBoundaries(), [$closed], $registry, 'page_builder')->clearState();
     }
 
     #[Test]
     public function clearsAtTheMainRequestStartAndAtTerminateOnly(): void
     {
-        $subscriber = $this->subscriber();
+        $events = $this->events();
 
-        $subscriber->onRequest($this->request(HttpKernelInterface::SUB_REQUEST));
+        $events->request(HttpKernelInterface::SUB_REQUEST);
         self::assertSame(0, $this->clears);
-        $subscriber->onRequest($this->request(HttpKernelInterface::MAIN_REQUEST));
+        $events->request();
         self::assertSame(1, $this->clears);
-        $subscriber->onFinishRequest($this->finish(HttpKernelInterface::SUB_REQUEST));
-        $subscriber->onFinishRequest($this->finish(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onTerminate();
+        $events->finishRequest(HttpKernelInterface::SUB_REQUEST);
+        $events->finishRequest();
+        $events->kernelTerminate();
         self::assertSame(2, $this->clears);
     }
 
     #[Test]
     public function aNestedCommandDoesNotClearTheOuterCommand(): void
     {
-        $subscriber = $this->subscriber();
+        $events = $this->events();
+        $outer  = new Command('app:outer');
+        $nested = new Command('app:nested');
 
-        $subscriber->onConsoleCommand();
+        $events->command($outer);
         self::assertSame(1, $this->clears);
-        $subscriber->onConsoleCommand();
-        $subscriber->onConsoleTerminate();
+        $events->command($nested);
+        $events->terminate($nested);
         self::assertSame(1, $this->clears, 'a nested command must not clear the outer command');
-        $subscriber->onConsoleTerminate();
+        $events->terminate($outer);
         self::assertSame(2, $this->clears);
 
-        // A stray terminate never drives the depth below zero.
-        $subscriber->onConsoleTerminate();
+        // A stray terminate (no matching command) acts only when nothing runs, and never pops another command.
+        $events->command($outer);
         self::assertSame(3, $this->clears);
-        $subscriber->onConsoleCommand();
+        $events->terminate(new Command('app:stray'));
+        self::assertSame(3, $this->clears);
+        $events->terminate($outer);
         self::assertSame(4, $this->clears);
+        $events->terminate(new Command('app:stray'));
+        self::assertSame(5, $this->clears);
     }
 
     #[Test]
     public function aCommandInsideAHandlerDoesNotClearTheMessage(): void
     {
-        $subscriber = $this->subscriber();
+        $events  = $this->events();
+        $command = new Command('app:from-handler');
 
-        $subscriber->onMessageReceived();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
         self::assertSame(1, $this->clears);
-        $subscriber->onConsoleCommand();
-        $subscriber->onConsoleTerminate();
+        $events->command($command);
+        $events->terminate($command);
         self::assertSame(1, $this->clears, 'a command run from a handler must not clear the message');
-        $subscriber->onMessageFinished();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
         self::assertSame(2, $this->clears);
 
-        // A skipped message (no handled / failed event): the stopped worker ends the in-flight state.
-        $subscriber->onMessageReceived();
-        $subscriber->onWorkerStopped();
+        // Skipped message, then a stopped worker: no message in flight any more.
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_SKIPPED);
         self::assertSame(3, $this->clears);
-        $subscriber->onConsoleCommand();
-        self::assertSame(4, $this->clears);
+        $events->command($command);
+        self::assertSame(4, $this->clears, 'a skipped message is no longer in flight');
+        $events->terminate($command);
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED);
+        self::assertSame(6, $this->clears);
+        $events->command($command);
+        self::assertSame(7, $this->clears, 'a stopped worker has no message in flight');
     }
 
     #[Test]
-    public function aHandlerInsideACommandDoesNotClearTheCommandWhenItFinishes(): void
+    public function aHandlerInsideACommandClearsPerMessageButNotTheCommand(): void
     {
-        $subscriber = $this->subscriber();
+        $events  = $this->events();
+        $consume = new Command('messenger:consume');
+        $nested  = new Command('app:nested');
 
-        $subscriber->onConsoleCommand();
+        $events->command($consume);
         self::assertSame(1, $this->clears);
-        // messenger:consume run in-process: each message is its own unit of work.
-        $subscriber->onMessageReceived();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
         self::assertSame(2, $this->clears);
-        $subscriber->onConsoleCommand();
-        $subscriber->onConsoleTerminate();
+        $events->command($nested);
+        $events->terminate($nested);
         self::assertSame(2, $this->clears, 'a command run from the handler must not clear the message');
-        $subscriber->onMessageFinished();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED);
         self::assertSame(3, $this->clears);
-        $subscriber->onConsoleTerminate();
+        $events->terminate($consume);
         self::assertSame(4, $this->clears);
     }
 
     #[Test]
     public function aRequestInsideACommandOrAMessageDoesNotClearIt(): void
     {
-        $subscriber = $this->subscriber();
+        $events  = $this->events();
+        $command = new Command('app:crawler');
 
-        $subscriber->onConsoleCommand();
+        $events->command($command);
         self::assertSame(1, $this->clears);
-        $subscriber->onRequest($this->request(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onFinishRequest($this->finish(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onTerminate();
+        $events->mainRequest();
         self::assertSame(1, $this->clears, 'a request handled inside a command must not clear it');
-        $subscriber->onConsoleTerminate();
+        $events->terminate($command);
         self::assertSame(2, $this->clears);
 
-        $subscriber->onMessageReceived();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
         self::assertSame(3, $this->clears);
-        $subscriber->onRequest($this->request(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onFinishRequest($this->finish(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onTerminate();
+        $events->mainRequest();
         self::assertSame(3, $this->clears, 'a request handled inside a message must not clear it');
-        $subscriber->onMessageFinished();
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
         self::assertSame(4, $this->clears);
     }
 
     #[Test]
     public function aCommandInsideAMainRequestDoesNotClearTheRequest(): void
     {
-        $subscriber = $this->subscriber();
+        $events  = $this->events();
+        $command = new Command('app:from-controller');
 
-        $subscriber->onRequest($this->request(HttpKernelInterface::MAIN_REQUEST));
+        $events->request();
         self::assertSame(1, $this->clears);
-        $subscriber->onConsoleCommand();
-        $subscriber->onConsoleTerminate();
+        $events->command($command);
+        $events->terminate($command);
         self::assertSame(1, $this->clears, 'a command run from a controller must not clear the request');
-        $subscriber->onFinishRequest($this->finish(HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onConsoleCommand();
+        $events->finishRequest(HttpKernelInterface::SUB_REQUEST);
+        $events->command($command);
+        $events->terminate($command);
+        self::assertSame(1, $this->clears);
+        $events->finishRequest();
+        $events->kernelTerminate();
         self::assertSame(2, $this->clears);
     }
 
-    private function request(int $type): RequestEvent
+    /**
+     * NL2-1: a command whose error listeners threw never terminates; the process heals at the next unit.
+     */
+    #[Test]
+    public function aCommandWhoseErrorListenerThrewDoesNotBlockLaterRequests(): void
     {
-        return new RequestEvent($this->createStub(HttpKernelInterface::class), new Request(), $type);
+        $events  = $this->events();
+        $command = new Command('app:failing');
+        $events->dispatcher->addListener(UnitOfWorkBoundaries::CONSOLE_ERROR, static function (): never {
+            throw new RuntimeException('error listener failed');
+        });
+
+        $events->command($command);
+        try {
+            $events->error($command);
+            self::fail('the error listener throws');
+        } catch (RuntimeException) {
+        }
+        self::assertSame(1, $events->boundaries->runningCommands(), 'no terminate was dispatched');
+
+        self::assertSame(1, $this->clears);
+        $events->mainRequest();
+        self::assertSame(3, $this->clears, 'the next request is outermost again');
+        self::assertSame(0, $events->boundaries->runningCommands());
     }
 
-    private function finish(int $type): FinishRequestEvent
-    {
-        return new FinishRequestEvent($this->createStub(HttpKernelInterface::class), new Request(), $type);
-    }
-
-    private function subscriber(): OwnEntityManagerSubscriber
+    private function events(): BoundaryEvents
     {
         $this->clears = 0;
         $manager      = $this->createStub(EntityManagerInterface::class);
@@ -201,6 +231,8 @@ final class OwnEntityManagerSubscriberTest extends TestCase
             ++$this->clears;
         });
 
-        return new OwnEntityManagerSubscriber([$manager], [], 'page_builder');
+        $boundaries = new UnitOfWorkBoundaries();
+
+        return new BoundaryEvents($boundaries, new OwnEntityManagerSubscriber($boundaries, [$manager], $this->createStub(ManagerRegistry::class), 'page_builder'));
     }
 }

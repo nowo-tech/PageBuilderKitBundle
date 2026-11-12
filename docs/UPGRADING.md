@@ -65,9 +65,11 @@ composer require nowo-tech/page-builder-kit-bundle:^1.15.1
   discards events of writes that were never flushed (with the same warning as before).
 - If `doctrine.entity_manager` names your default manager, the bundle no longer clears it: clear your own managers at
   every boundary when you run without the services resetter (REQ-RUNTIME-002 rule 7).
-- `Persistence\OwnEntityManagerSubscriber` and `Persistence\PageBuilderTransaction` are `@internal`: the subscriber's
-  constructor changed (iterators instead of the registry) and the transaction's boundary methods changed. Do not
-  construct or call them yourself.
+- `Persistence\OwnEntityManagerSubscriber`, `Persistence\PageBuilderTransaction` and the new
+  `Persistence\UnitOfWorkBoundaries` are `@internal`: the subscriber's constructor and the transaction's boundary
+  methods changed. Do not construct or call them yourself.
+- A failing sub-request (fragment, ESI) no longer discards the main request's unflushed write events; only the main
+  request's failure or end does.
 
 ## To 1.15.0
 
