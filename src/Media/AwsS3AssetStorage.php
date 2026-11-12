@@ -4,21 +4,15 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Media;
 
-use finfo;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Throwable;
 
 use function bin2hex;
-use function class_exists;
 use function count;
-use function finfo_file;
-use function finfo_open;
 use function getimagesize;
 use function in_array;
 use function is_array;
-use function is_int;
 use function is_object;
 use function is_string;
 use function ltrim;
@@ -26,11 +20,11 @@ use function method_exists;
 use function pathinfo;
 use function property_exists;
 use function random_bytes;
+use function realpath;
 use function rtrim;
 use function sprintf;
 use function trim;
 
-use const FILEINFO_MIME_TYPE;
 use const PATHINFO_BASENAME;
 
 /**
@@ -39,7 +33,7 @@ use const PATHINFO_BASENAME;
  * Expects an object exposing uploadFile() + getFileURL() (AwsS3Helper).
  * Optional listFiles($prefix, $limit) enables the media library.
  */
-final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
+final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
@@ -62,16 +56,31 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
         }
     }
 
+    /**
+     * @deprecated since 1.15, use {@see storeUpload()}; removed in 2.0
+     */
     public function store(UploadedFile $file): AssetUploadResult
     {
-        $this->assertValidUpload($file);
+        if (!$file->isValid()) {
+            throw new InvalidArgumentException('Invalid uploaded file.');
+        }
 
-        $mime      = $this->resolveMimeType($file) ?: 'application/octet-stream';
-        $extension = UploadedAssetExtension::resolve($mime, $file->getClientOriginalExtension());
+        return $this->storeUpload(AssetUploadData::fromUploadedFile($file));
+    }
+
+    /**
+     * 1.15: the same checks and the same upload as {@see store()} had, from the framework-free VO.
+     */
+    public function storeUpload(AssetUpload $upload): AssetUploadResult
+    {
+        $this->assertValidUpload($upload);
+
+        $mime      = AssetUploadData::serverMimeType($upload) ?: 'application/octet-stream';
+        $extension = UploadedAssetExtension::resolve($mime, $upload->getClientExtension());
         $folder    = trim($this->folder, '/');
         $key       = ($folder !== '' ? $folder . '/' : '') . bin2hex(random_bytes(16)) . '.' . $extension;
-        $path      = $file->getRealPath();
-        if (!is_string($path) || $path === '') {
+        $path      = realpath(AssetUploadData::pathOf($upload));
+        if (!is_string($path)) {
             // @codeCoverageIgnoreStart
             throw new RuntimeException('Uploaded file has no temporary path.');
             // @codeCoverageIgnoreEnd
@@ -82,7 +91,7 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
 
         $bucket = $this->resolveBucket();
         $src    = $this->resolvePublicUrl($result, $bucket, $key);
-        $name   = $file->getClientOriginalName() !== '' ? $file->getClientOriginalName() : pathinfo($key, PATHINFO_BASENAME);
+        $name   = $upload->getClientName() !== '' ? $upload->getClientName() : pathinfo($key, PATHINFO_BASENAME);
 
         $width = $height = null;
         $size  = @getimagesize($path);
@@ -200,47 +209,20 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetStorageInterfa
         return $url;
     }
 
-    private function assertValidUpload(UploadedFile $file): void
+    /**
+     * The checks of every upload, in the order they always ran: size, detected MIME type.
+     */
+    private function assertValidUpload(AssetUpload $upload): void
     {
-        if (!$file->isValid()) {
-            throw new InvalidArgumentException('Invalid uploaded file.');
-        }
-
-        $size = $file->getSize();
-        if (is_int($size) && $size > $this->maxBytes) {
+        // MZ-B-1: the size and type of the file on disk, never what a direct caller put in the VO.
+        $size = AssetUploadData::serverSize($upload);
+        if ($size !== null && $size > $this->maxBytes) {
             throw new InvalidArgumentException(sprintf('File exceeds max size of %d bytes.', $this->maxBytes)); // covered in rejectsOversized
         }
 
-        $mime = $this->resolveMimeType($file);
+        $mime = AssetUploadData::serverMimeType($upload);
         if ($mime === '' || !in_array($mime, $this->allowedMimeTypes, true)) {
             throw new InvalidArgumentException(sprintf('MIME type "%s" is not allowed.', $mime !== '' ? $mime : 'unknown'));
         }
-    }
-
-    private function resolveMimeType(UploadedFile $file): string
-    {
-        $path = $file->getPathname();
-        if ($path !== '' && class_exists(finfo::class)) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            if ($finfo !== false) {
-                $detected = finfo_file($finfo, $path);
-                if (is_string($detected) && $detected !== '') {
-                    return $detected;
-                }
-            }
-        }
-
-        $client = $file->getClientMimeType();
-        if ($client !== '') {
-            return $client;
-        }
-
-        // @codeCoverageIgnoreStart
-        try {
-            return $file->getMimeType() ?: '';
-        } catch (Throwable) {
-            return '';
-        }
-        // @codeCoverageIgnoreEnd
     }
 }

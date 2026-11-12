@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
@@ -29,6 +30,8 @@ final class NowoPageBuilderKitBundle extends Bundle
         $container->addCompilerPass(new WidgetPackPass());
         $container->addCompilerPass(new GrapesBlockPackPass());
         $container->addCompilerPass(new CsrfProtectionPass());
+        // 1.15: asset storage ports (storage=service class, the handler's port; host definitions are loaded here).
+        $container->addCompilerPass(new AssetStoragePortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 0);
 
         // Before DoctrineBundle's MiddlewaresPass: the after-commit middleware on the bundle connection only (1.14).
         $container->addCompilerPass(new AfterCommitMiddlewarePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);

@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadData;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
@@ -60,6 +61,7 @@ use const UPLOAD_ERR_NO_FILE;
 #[CoversClass(ElementAppearanceNormalizer::class)]
 #[CoversClass(AwsS3AssetStorage::class)]
 #[CoversClass(LocalFilesystemAssetStorage::class)]
+#[CoversClass(AssetUploadData::class)]
 #[CoversClass(GrapesTwigRenderer::class)]
 #[CoversClass(GrapesDocumentSanitizer::class)]
 #[CoversClass(PageRenderProvider::class)]
@@ -418,9 +420,8 @@ final class CoverageGapsTest extends TestCase
         $html      = $sanitizer->sanitizeHtml('<p>hi</p><script>alert(1)</script>');
         self::assertStringNotContainsString('<script', strtolower($html));
 
-        $dir          = sys_get_temp_dir() . '/pbk-lf-' . uniqid('', true);
-        $local        = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png', 'text/plain']);
-        $resolveLocal = new ReflectionMethod(LocalFilesystemAssetStorage::class, 'resolveMimeType');
+        // 1.15: the MIME resolution of an HTTP upload moved from the storages to AssetUploadData (same fallbacks).
+        $resolveLocal = new ReflectionMethod(AssetUploadData::class, 'resolveUploadedMimeType');
         $tmp2         = sys_get_temp_dir() . '/pbk-lf2-' . uniqid('', true);
         file_put_contents($tmp2, 'x');
         $fallbackUpload = new class($tmp2, 'a.txt', 'text/plain', null, true) extends UploadedFile {
@@ -434,7 +435,7 @@ final class CoverageGapsTest extends TestCase
                 return 'text/plain';
             }
         };
-        self::assertSame('text/plain', $resolveLocal->invoke($local, $fallbackUpload));
+        self::assertSame('text/plain', $resolveLocal->invoke(null, $fallbackUpload));
 
         $fallbackUpload2 = new class($tmp2, 'a.txt', '', null, true) extends UploadedFile {
             public function getPathname(): string
@@ -452,7 +453,7 @@ final class CoverageGapsTest extends TestCase
                 return 'text/plain';
             }
         };
-        self::assertSame('text/plain', $resolveLocal->invoke($local, $fallbackUpload2));
+        self::assertSame('text/plain', $resolveLocal->invoke(null, $fallbackUpload2));
 
         $fallbackUpload3 = new class($tmp2, 'a.txt', '', null, true) extends UploadedFile {
             public function getPathname(): string
@@ -470,7 +471,7 @@ final class CoverageGapsTest extends TestCase
                 throw new RuntimeException('boom');
             }
         };
-        self::assertSame('', $resolveLocal->invoke($local, $fallbackUpload3));
+        self::assertSame('', $resolveLocal->invoke(null, $fallbackUpload3));
     }
 
     #[Test]

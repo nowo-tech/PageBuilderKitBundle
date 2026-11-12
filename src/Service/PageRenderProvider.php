@@ -28,7 +28,7 @@ use function sprintf;
 
 final readonly class PageRenderProvider implements PageRenderProviderInterface
 {
-    /** @var list<GrapesTwigContextProviderInterface> */
+    /** @var list<GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface> */
     private array $twigContextProviders;
 
     private PageBuilderKitTraceInterface $trace;
@@ -42,7 +42,7 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
     private PublicHtmlHardener $publicHtmlHardener;
 
     /**
-     * @param iterable<GrapesTwigContextProviderInterface> $twigContextProviders
+     * @param iterable<GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface> $twigContextProviders
      */
     public function __construct(
         private BuilderPageRepositoryInterface $pageRepository,
@@ -251,11 +251,34 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
             ],
         ];
 
+        $pageContext = null;
         foreach ($this->twigContextProviders as $provider) {
+            if ($provider instanceof GrapesTwigPageContextProviderInterface) {
+                $pageContext ??= $this->pageContext($page, $locale);
+                $context = [...$context, ...$provider->getPageContext($pageContext, $locale)];
+
+                continue;
+            }
+
             $context = [...$context, ...$provider->getContext($page, $locale)];
         }
 
         return [...$context, ...$extraContext];
+    }
+
+    private function pageContext(BuilderPage $page, string $locale): PageContext
+    {
+        $translation = $page->getTranslation($locale);
+
+        return new PageContext(
+            $page->getId(),
+            $page->getUuid(),
+            $page->getPageKey(),
+            $page->getStatus(),
+            $page->getPublishedAt(),
+            $translation?->getTitle(),
+            $translation?->getSlug(),
+        );
     }
 
     private function msSince(int $start, ?int $end = null): float
