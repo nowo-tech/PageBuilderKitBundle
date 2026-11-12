@@ -42,6 +42,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Own entity manager cleared mid-unit (REQ-RUNTIME-002 rule 4).** With `doctrine.entity_manager`,
+  `Persistence\OwnEntityManagerSubscriber` cleared the bundle's manager on every `console.terminate` and
+  `kernel.terminate`. A command run in-process from another command or from a Messenger handler, or a
+  `kernel.terminate` inside a command, therefore cleared it in the middle of the outer unit of work; with
+  `transaction: host` the host's pending (unflushed) bundle writes were discarded. It now clears (or recreates a closed
+  manager) only at the OUTERMOST boundary: a console depth counter, a Messenger in-flight flag (also ended by
+  `WorkerStoppedEvent`) and a main-request in-flight flag, the same policy as ContactFormBundle 1.7.1. The manager
+  and the registry are injected as `IGNORE_ON_UNINITIALIZED_REFERENCE` iterators, so a boundary never builds the manager.
+- When `doctrine.entity_manager` names the host's default manager, the bundle no longer registers the subscriber: the
+  host's manager is the host's to clear (rule 7).
+
+### Tests
+
+- Unit cases for a nested command, a command inside a handler, a handler inside a command, a request inside a command
+  or a message and a command inside a request; a real-dispatcher kernel test with `transaction: host`.
+- Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
+  per-tenant data, empty unit of work after each request, memory margin 4 MiB.
+
+### Documentation
+
+- `docs/FRANKENPHP-WORKER-AUDIT.md` header at 1.15.1 with an "Own entity manager boundaries" section; README states
+  "safe with kernel reset false".
+
 ## [1.15.0] - 2026-11-12
 
 ### Added

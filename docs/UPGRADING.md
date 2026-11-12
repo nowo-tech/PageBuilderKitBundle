@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.15.1](#to-1151)
 - [To 1.15.0](#to-1150)
 - [To 1.14.1](#to-1141)
 - [To 1.14.0](#to-1140)
@@ -46,6 +47,22 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.15.1
+
+From **1.15.0**: no migration, no configuration change.
+
+```bash
+composer require nowo-tech/page-builder-kit-bundle:^1.15.1
+```
+
+- Only with `doctrine.entity_manager`: the bundle clears its own manager at the outermost request / message /
+  command boundary only. A command you run in-process from another command, a message handler or a controller no
+  longer clears it, so with `transaction: host` your pending bundle writes survive until your use case flushes.
+- If `doctrine.entity_manager` names your default manager, the bundle no longer clears it: clear your own managers at
+  every boundary when you run without the services resetter (REQ-RUNTIME-002 rule 7).
+- `Persistence\OwnEntityManagerSubscriber` is `@internal`; its constructor changed (iterators instead of the
+  registry). Do not construct it yourself.
 
 ## To 1.15.0
 

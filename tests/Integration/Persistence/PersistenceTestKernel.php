@@ -24,8 +24,9 @@ use function sys_get_temp_dir;
 
 /**
  * Host kernel for the rule 6 tests (1.14): real DoctrineBundle on SQLite files, configurable managers and bundle
- * `doctrine` options. Routes: `/t/create/{key}` (key-based write port), `/t/trace/{user}` (debug
- * trace of the request) and `/t/fail` (failing bundle write). `$debugCollector` boots in debug with the trace on.
+ * `doctrine` options. Routes: `/t/create/{key}` (key-based write port), `/t/show/{key}` (read through the bundle
+ * repository), `/t/trace/{user}` (debug trace of the request) and `/t/fail` (failing bundle write). `$debugCollector`
+ * boots in debug with the trace on.
  */
 final class PersistenceTestKernel extends Kernel
 {
@@ -106,6 +107,7 @@ final class PersistenceTestKernel extends Kernel
         $routes->add('t_create', '/t/create/{key}')->controller([PersistenceTestController::class, 'create']);
         $routes->add('t_commit_fail', '/t/commit-then-fail/{key}')->controller([PersistenceTestController::class, 'commitThenFail']);
         $routes->add('t_trace', '/t/trace/{user}')->controller([PersistenceTestController::class, 'trace']);
+        $routes->add('t_show', '/t/show/{key}')->controller([PersistenceTestController::class, 'show']);
         $routes->add('t_fail', '/t/fail')->controller([PersistenceTestController::class, 'fail']);
     }
 }

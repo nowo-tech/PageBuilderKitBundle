@@ -8,6 +8,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,8 +17,8 @@ use function array_column;
 use function implode;
 
 /**
- * Host controllers of the worker tests: a failing bundle write (closes the manager), a normal one and a debug trace
- * probe.
+ * Host controllers of the worker tests: a failing bundle write (closes the manager), a normal one, a read through the
+ * bundle repository and a debug trace probe.
  */
 final readonly class PersistenceTestController
 {
@@ -25,7 +26,18 @@ final readonly class PersistenceTestController
         private PagePublisherInterface $publisher,
         private ManagerRegistry $registry,
         private PageBuilderKitTraceInterface $trace,
+        private BuilderPageRepositoryInterface $pages,
     ) {
+    }
+
+    /**
+     * Reads one tenant's page through the bundle repository: `<pageKey>|<status>` (1.15.1 worker test).
+     */
+    public function show(string $key): Response
+    {
+        $page = $this->pages->findOneByPageKey($key);
+
+        return $page instanceof BuilderPage ? new Response($page->getPageKey() . '|' . $page->getStatus()->value) : new Response('missing', 404);
     }
 
     /**

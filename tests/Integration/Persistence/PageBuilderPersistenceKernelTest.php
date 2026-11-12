@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageMetadataSavedEvent;
@@ -25,7 +26,14 @@ use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\ConsoleEvents;
+use Symfony\Component\Console\Event\ConsoleCommandEvent;
+use Symfony\Component\Console\Event\ConsoleTerminateEvent;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,6 +43,8 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 use function array_map;
 use function dirname;
+use function gc_collect_cycles;
+use function intdiv;
 use function memory_get_usage;
 
 /**
@@ -48,6 +58,11 @@ final class PageBuilderPersistenceKernelTest extends TestCase
 
     /** @var list<object> */
     private array $events = [];
+
+    /** Requests of the two-tenant worker test (a read and a DBAL write each; SQLite file). */
+    private const int WORKER_ITERATIONS = 1000;
+
+    private const int WORKER_MEMORY_MARGIN = 4 * 1024 * 1024;
 
     private string $pageKeyColumn = 'page_key';
 
@@ -340,8 +355,8 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $request  = Request::create('/t/fail');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
         self::assertSame(500, $response->getStatusCode());
-        $kernel->terminate($request, $response);
         self::assertFalse($bundle->isOpen(), 'the failed write closed the bundle manager');
+        $kernel->terminate($request, $response);
 
         $request  = Request::create('/t/create/after-failure');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
@@ -366,6 +381,87 @@ final class PageBuilderPersistenceKernelTest extends TestCase
 
         self::assertCount(301, $this->events);
         self::assertLessThan(4 * 1024 * 1024, memory_get_usage() - $baseline, 'memory stays flat over many requests');
+    }
+
+    /**
+     * REQ-RUNTIME-002 (1.15.1): two tenants alternate over N requests in ONE kept-alive kernel, no services resetter.
+     * Each tenant's row is changed behind Doctrine's back before its request: a manager that kept the page managed
+     * across requests would serve the stale status (or the other tenant's page) from its identity map.
+     */
+    public function testKeptAliveKernelAlternatingTenantsSeeOnlyFreshOwnData(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $kernel    = $this->httpKernel($container);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+        $publisher->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $publisher->createPageByKey('tenant-b', 'Tenant B', 'en');
+        $this->terminate($container);
+
+        $connection   = $bundle->getConnection();
+        $metadata     = $bundle->getClassMetadata(BuilderPage::class);
+        $statusColumn = $metadata->getColumnName('status');
+        $baseline     = 0;
+        for ($i = 0; $i < self::WORKER_ITERATIONS; ++$i) {
+            $tenant = $i % 2 === 0 ? 'tenant-a' : 'tenant-b';
+            $status = intdiv($i, 2) % 2 === 0 ? PageStatus::Published : PageStatus::Draft;
+            $connection->update($metadata->getTableName(), [$statusColumn => $status->value], [$this->pageKeyColumn => $tenant]);
+
+            $request  = Request::create('/t/show/' . $tenant);
+            $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+            self::assertSame($tenant . '|' . $status->value, $response->getContent(), 'request ' . $i . ' sees only its own, fresh page');
+            $kernel->terminate($request, $response);
+            self::assertSame(0, $bundle->getUnitOfWork()->size(), 'no managed page survives request ' . $i);
+            if ($i === 50) {
+                $baseline = $this->collectedMemory();
+            }
+        }
+
+        self::assertLessThan(self::WORKER_MEMORY_MARGIN, $this->collectedMemory() - $baseline, 'memory stays flat over many requests');
+    }
+
+    /**
+     * REQ-RUNTIME-002 rule 4 (1.15.1), through the real dispatcher: with `transaction: host` on a dedicated manager, a
+     * nested command, a command run from a message handler and a `kernel.terminate` inside a command never clear the
+     * host's pending bundle writes; only the outermost boundary does.
+     */
+    public function testNestedBoundariesNeverDiscardTheHostUnitOfWork(): void
+    {
+        $container  = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder', 'transaction' => 'host']);
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+
+        // Outer command → nested command → kernel.terminate inside the command.
+        $dispatcher->dispatch($this->commandEvent('app:outer'), ConsoleEvents::COMMAND);
+        $publisher->createPageByKey('in-command', 'In command', 'en');
+        $dispatcher->dispatch($this->commandEvent('app:nested'), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent('app:nested'), ConsoleEvents::TERMINATE);
+        $this->terminate($container);
+        self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'the nested boundaries keep the pending page');
+        $bundle->flush();
+        $dispatcher->dispatch($this->terminateEvent('app:outer'), ConsoleEvents::TERMINATE);
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), 'the outermost command clears');
+
+        // Message → command run from the handler.
+        $dispatcher->dispatch(new stdClass(), OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $publisher->createPageByKey('in-message', 'In message', 'en');
+        $dispatcher->dispatch($this->commandEvent('app:from-handler'), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent('app:from-handler'), ConsoleEvents::TERMINATE);
+        self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'a command run from the handler keeps the pending page');
+        $bundle->flush();
+        $dispatcher->dispatch(new stdClass(), OwnEntityManagerSubscriber::MESSENGER_WORKER_MESSAGE_HANDLED);
+        self::assertSame(0, $bundle->getUnitOfWork()->size());
+
+        self::assertSame(['in-command', 'in-message'], $this->pageKeys($bundle));
+    }
+
+    public function testDedicatedManagerThatIsTheHostDefaultIsNeverClearedByTheBundle(): void
+    {
+        $container = $this->boot($this->singleManager(), ['entity_manager' => 'default']);
+
+        self::assertFalse($container->has(OwnEntityManagerSubscriber::class), 'rule 7: the host clears its own default manager');
     }
 
     public function testDefaultPathNeverResetsTheHostManager(): void
@@ -463,6 +559,26 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     private function eventKeys(): array
     {
         return array_map(static fn (object $event): string => $event instanceof PageCreatedEvent ? $event->pageKey : $event::class, $this->events);
+    }
+
+    private function commandEvent(string $name): ConsoleCommandEvent
+    {
+        return new ConsoleCommandEvent(new Command($name), new ArrayInput([]), new NullOutput());
+    }
+
+    private function terminateEvent(string $name): ConsoleTerminateEvent
+    {
+        return new ConsoleTerminateEvent(new Command($name), new ArrayInput([]), new NullOutput(), 0);
+    }
+
+    /**
+     * Memory after a cycle collection (request / event objects form cycles freed only when the collector runs).
+     */
+    private function collectedMemory(): int
+    {
+        gc_collect_cycles();
+
+        return memory_get_usage();
     }
 
     private function httpKernel(ContainerInterface $container): HttpKernel
