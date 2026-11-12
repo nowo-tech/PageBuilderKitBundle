@@ -42,6 +42,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Own entity manager cleared mid-unit (REQ-RUNTIME-002 rule 4).** With `doctrine.entity_manager`,
+  `Persistence\OwnEntityManagerSubscriber` cleared the bundle's manager on every `console.terminate` and
+  `kernel.terminate`. A command run in-process from another command or from a Messenger handler, or a
+  `kernel.terminate` inside a command, therefore cleared it in the middle of the outer unit of work; with
+  `transaction: host` the host's pending (unflushed) bundle writes were discarded. It now clears (or recreates a closed
+  manager) only at the OUTERMOST boundary, the same policy as ContactFormBundle 1.7.1. The manager is injected as an
+  `IGNORE_ON_UNINITIALIZED_REFERENCE` iterator, so a boundary never builds it; the registry is a plain reference.
+- When `doctrine.entity_manager` names the host's default manager, the bundle no longer registers the subscriber: the
+  host's manager is the host's to clear (rule 7).
+- **Write events discarded mid-unit (same bug class).** `Persistence\PageBuilderTransaction` discarded the events of
+  unflushed writes at every `kernel.terminate`, `kernel.exception`, `console.error` and `console.terminate`. With
+  `transaction: host`, a nested command, a command run from a handler or a controller, or a request handled inside a
+  command or a message dropped the outer unit's write events: the host's later flush wrote the pages but no
+  `Page*Event` was dispatched. Unflushed events are now discarded at the OUTERMOST boundary only; nested boundaries still
+  dispatch what was committed. `kernel.exception` is no longer a boundary (FrameworkBundle's ErrorListener at -128
+  stops its propagation; `kernel.terminate` follows every main request, failed or not), and an unknown command run
+  in-process (`console.error` without a command) counts only when nothing else runs.
+- **New internal `Persistence\UnitOfWorkBoundaries`** judges "outermost" for both. It keeps a stack of frames, one per
+  running command, keyed by the Command and its input (a command that runs itself in-process gets one frame per
+  run); each frame remembers whether its command started as the outermost unit and saves the message / request
+  state of that moment, restored when the frame is removed. Main requests in flight are counted (nested main
+  requests do not end the outer one early) and reset at a top-level `kernel.terminate`; a Messenger message in flight
+  ends with handled, failed, `WorkerMessageSkipEvent` (only `messenger:failed:retry` dispatches it) and
+  `WorkerStoppedEvent`. The state changes at priority `PHP_INT_MAX`, before any other listener can throw, and the
+  clear / discard runs later on the remembered verdict. A throwing `console.terminate` listener no longer leaves the
+  process "inside a command"; a command whose `console.error` listener throws (Symfony then never dispatches its
+  terminate) stays marked and is dropped at the next request, message, command or worker stop; a message or request
+  left open inside a command (a throwing `WorkerMessageReceivedEvent` or `kernel.exception` listener) does not outlive
+  it; a terminate without a matching frame never ends another command. Every handler drops failed frames first and
+  then applies its own change, so a restored flag never overrides the event being handled.
+- Safety net: the start of an outermost main request dispatches committed events and discards unflushed ones left by
+  a previous request whose runtime never called `kernel.terminate`. Without this a long-lived process could stop
+  clearing the bundle's manager for good (stale identity map across requests).
+
+### Tests
+
+- Unit cases for a nested command, a command inside a handler, a handler inside a command, a request inside a command
+  or a message and a command inside a request, for both the manager subscriber and the write-event boundary; a
+  real-dispatcher kernel test with `transaction: host` asserting the outer unit's pages and events survive.
+- In-process `Application::run()` kernel tests: a throwing `console.terminate` listener and a throwing `console.error`
+  listener, after which HTTP requests still clear the bundle's manager; an unknown nested command keeps the outer
+  command's write events; a self-recursive command and a nested command whose error listener throws, throwing
+  listeners at `PHP_INT_MIN` / `PHP_INT_MAX`, a message or request left open inside a command, and a failed command
+  inside a failed message with and without a worker stop. They fail on 1.15.0.
+- Kept-alive kernel worker test without the services resetter: 1,000 requests alternating two tenants, fresh
+  per-tenant data, empty unit of work after each request, memory margin 4 MiB.
+
+### Documentation
+
+- `docs/FRANKENPHP-WORKER-AUDIT.md` header at 1.15.1 with an "Own entity manager boundaries" section; README states
+  "safe with kernel reset false".
+
 ## [1.15.0] - 2026-11-12
 
 ### Added

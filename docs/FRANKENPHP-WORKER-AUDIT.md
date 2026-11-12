@@ -3,8 +3,8 @@
 | Field | Value |
 |-------|-------|
 | Package | `nowo-tech/page-builder-kit-bundle` (`symfony-bundle`) |
-| Audited revision | **1.14.1 (unreleased): debug trace boundaries (REQ-RUNTIME-002)**; earlier full review v1.3.0 + Phase 5 MVP |
-| Audit date | 2026-11-11 (trace boundaries); 2026-10-02 (full review) |
+| Audited revision | **1.15.1: outermost unit-of-work boundaries of the bundle's own entity manager (REQ-RUNTIME-002 rule 4)**; 1.14.1 debug trace boundaries; earlier full review v1.3.0 + Phase 5 MVP |
+| Audit date | 2026-11-12 (own manager boundaries); 2026-11-11 (trace boundaries); 2026-10-02 (full review) |
 | Method | Manual review of `src/` services, controllers, subscribers, Twig extension, DI extension, DataCollector/trace, content fields, capabilities |
 | **Verdict** | ✅ **Compatible with long-lived workers** for bundle-owned correctness: shared services are readonly or assign-once; request-scoped debug state is cleared at the main request / Messenger / console boundaries by the bundle itself and also implements `ResetInterface`; per-request access/capability checks ask AuthorizationChecker without storing the user. |
 
@@ -13,6 +13,7 @@
 - [Execution model assumed](#execution-model-assumed)
 - [Summary](#summary)
 - [Services reviewed (post–Phase 3–5)](#services-reviewed-postphase-35)
+- [Own entity manager boundaries](#own-entity-manager-boundaries)
 - [Debug trace boundaries](#debug-trace-boundaries)
 - [BuilderLocales static bind](#builderlocales-static-bind)
 - [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
@@ -54,13 +55,53 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 | `Security\PageBuilderProtection` | yes | none | ✅ |
 | `EventSubscriber\PageBuilderKitAdminAccessSubscriber` | yes | none | ✅ |
 | `EventSubscriber\WorkerStateResetSubscriber` | yes | none | ✅ |
-| `Persistence\PageBuilderTransaction` (1.14) | yes | request-scoped event outbox | ✅ dispatched or discarded at `kernel.terminate` / `kernel.exception` / console / Messenger boundaries, plus `ResetInterface` |
-| `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`) | yes | none | ✅ resets the bundle's own manager when closed (next request / message), clears it at the end of each request / message / command; never touches the host managers |
+| `Persistence\PageBuilderTransaction` (1.14; outermost boundaries since 1.15.1) | yes | request-scoped event outbox | ✅ committed events dispatched at every `kernel.terminate` / console / Messenger boundary; unflushed events discarded at the OUTERMOST boundary only (judged by `UnitOfWorkBoundaries`), plus `ResetInterface` |
+| `Persistence\UnitOfWorkBoundaries` (1.15.1) | yes | command frames (Command + input), message in flight, main-request count, per-event verdicts (`WeakMap`) | ✅ changed at the boundary events themselves (priority `PHP_INT_MAX`), frames restore the message / request state, self-healing after a failed error listener; no request, user or tenant data; deliberately not reset by `kernel.reset` (it describes units still running) |
+| `Persistence\OwnEntityManagerSubscriber` (1.14, only with `doctrine.entity_manager`; outermost boundaries since 1.15.1) | yes | none (`readonly`) | ✅ recreates the bundle's own manager when closed and clears it at the OUTERMOST request / message / command boundary only; never touches the host managers (not registered when `doctrine.entity_manager` is the host's default manager) |
 | `Debug\PageBuilderKitTrace` | yes (debug + collector only) | request buffer | ✅ cleared at every boundary by `PageBuilderKitTraceBoundarySubscriber`, plus `ResetInterface` |
 | `Debug\PageBuilderKitTraceBoundarySubscriber` (1.14.1, debug + collector only) | yes | none (lazy iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` to the trace) | ✅ |
 | `DataCollector\PageBuilderKitDataCollector` | profiler | request | ✅ |
 | `Locale\BuilderLocales` | yes | readonly config; static bind optional | ✅ with terminate reset |
 | Admin / public controllers | yes | none | ✅ |
+
+## Own entity manager boundaries
+
+- **State:** with `doctrine.entity_manager` the bundle owns that manager (it maps the bundle entities only) and keeps
+  it usable in a kept-alive kernel. `UnitOfWorkBoundaries` tracks which unit runs: a stack of frames, one per
+  running command, keyed by the Command and its input (one frame per run of a self-recursive command), each
+  remembering whether its command started as the outermost unit and saving the message / request state of that
+  moment (restored when the frame is removed); a count of the main requests in flight (reset at a top-level
+  `kernel.terminate`) and a Messenger message in flight. It changes at priority `PHP_INT_MAX` (before any other
+  listener can throw); a terminate removes only its own frame (and nested frames that never terminated); a command
+  whose `console.error` listener threw (no terminate follows) stays marked and is dropped at the next request,
+  message, command or worker stop. Every handler drops failed frames first, then applies its own change. No
+  request, user or tenant data.
+- **Resetter:** the services resetter (`kernel.reset`) empties `PageBuilderTransaction` (its pending events), but
+  `UnitOfWorkBoundaries` keeps its own state on purpose: it is process-lifetime nesting state, correct with or
+  without the resetter, and `OwnEntityManagerSubscriber` is stateless.
+- **Cleared by the bundle (1.15.1):** the manager is cleared (or recreated when a failed flush closed it) at the
+  OUTERMOST boundary only: the main `kernel.request` / `kernel.terminate` outside a command and a message; Messenger
+  received / handled / failed; the outermost `console.command` / `console.terminate` outside a message and a main
+  request. `WorkerStoppedEvent` and `WorkerMessageSkipEvent` (only dispatched by `messenger:failed:retry`) end the
+  in-flight message. The manager is injected as an
+  iterator of an `IGNORE_ON_UNINITIALIZED_REFERENCE` reference, so a boundary never builds it.
+- **Write events:** `PageBuilderTransaction` follows the same policy (1.15.1): committed events are dispatched at
+  every boundary, events of unflushed writes are discarded only at the outermost one. `kernel.exception` is not a
+  boundary (FrameworkBundle's ErrorListener at -128 stops its propagation); `kernel.terminate` is, and the start of
+  an outermost main request is a safety net for a runtime that never called `kernel.terminate`.
+- **Before 1.15.1 (1.14.0 – 1.15.0):** every `console.terminate` and `kernel.terminate` cleared the manager (and
+  discarded the unflushed write events). A command
+  run in-process from another command or from a Messenger handler, or a `kernel.terminate` inside a command, cleared
+  it in the middle of the outer unit; with `transaction: host` the host's pending (unflushed) bundle writes were
+  discarded.
+- **Tests:** `tests/Unit/Persistence/OwnEntityManagerSubscriberTest.php` (nested command, command inside a handler,
+  handler inside a command, request inside a command or a message, command inside a request, closed manager);
+  `PageBuilderPersistenceKernelTest::testNestedBoundariesNeverDiscardTheHostUnitOfWork` (real dispatcher,
+  `transaction: host`); `PageBuilderPersistenceKernelTest::testKeptAliveKernelAlternatingTenantsSeeOnlyFreshOwnData`
+  boots **one** kernel, never calls `services_resetter`, and drives `http_kernel` handle / terminate for **1,000**
+  requests alternating two tenants (`tenant-a`, `tenant-b`); each tenant's row is changed through DBAL before its
+  request, each response holds only that tenant's fresh status, the unit of work is empty after every request, and
+  memory stays within **4 MiB** after a 50-request warm-up.
 
 ## Debug trace boundaries
 
@@ -98,7 +139,8 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 - Optional: `EntityManager::clear()` or `FRANKENPHP_LOOP_MAX` for memory bounds on busy workers.
 - With `doctrine.entity_manager` (1.14) the bundle recovers and clears its own manager itself, without the services
   resetter: `tests/Integration/Persistence/PageBuilderPersistenceKernelTest.php` drives `http_kernel`
-  handle/terminate directly (a failed write, then 300 requests with flat memory and an empty unit of work).
+  handle/terminate directly (a failed write, then 300 requests with flat memory and an empty unit of work; since
+  1.15.1 also 1,000 requests alternating two tenants, see [Own entity manager boundaries](#own-entity-manager-boundaries)).
 - Do not put user/capability flags in Twig globals — use `nowo_page_builder_can()` / `nowo_page_builder_can_edit()` per render.
 
 ## Re-audit triggers

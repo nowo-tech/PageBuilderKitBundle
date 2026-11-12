@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\DependencyInjection\Compiler;
 
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
+use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -22,7 +23,8 @@ use function str_starts_with;
  * DoctrineBundle's `auto_mapping` (the Flex default on the default manager) maps every bundle's `Entity` directory,
  * so with a dedicated manager configured the entities would be mapped twice and `getManagerForClass()` would return
  * the default manager. This pass removes the bundle namespace from the mapping driver chain of every other manager
- * and fails the build when the configured manager does not exist or does not map the entities.
+ * and fails the build when the configured manager does not exist or does not map the entities. When the configured
+ * manager is the host's default manager, the bundle does not clear it at the unit-of-work boundaries (1.15.1).
  */
 final readonly class PageBuilderEntityManagerPass implements CompilerPassInterface
 {
@@ -56,6 +58,12 @@ final readonly class PageBuilderEntityManagerPass implements CompilerPassInterfa
 
         if ($this->checkOnly) {
             return;
+        }
+
+        // The host's default manager is the host's to clear (REQ-RUNTIME-002 rule 7): never touched by the bundle.
+        $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
+        if ($name === $default) {
+            $container->removeDefinition(OwnEntityManagerSubscriber::class);
         }
 
         foreach (array_keys($managers) as $manager) {

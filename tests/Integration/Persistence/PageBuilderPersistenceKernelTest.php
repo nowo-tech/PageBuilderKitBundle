@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
+use Closure;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageMetadataSavedEvent;
@@ -17,6 +19,7 @@ use Nowo\PageBuilderKitBundle\Event\PageTemplateChangedEvent;
 use Nowo\PageBuilderKitBundle\Event\PageUnpublishedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderPendingEventsInterface;
+use Nowo\PageBuilderKitBundle\Persistence\UnitOfWorkBoundaries;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
@@ -25,17 +28,33 @@ use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
+use stdClass;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\ConsoleEvents;
+use Symfony\Component\Console\Event\ConsoleCommandEvent;
+use Symfony\Component\Console\Event\ConsoleTerminateEvent;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
+use WeakMap;
 
 use function array_map;
 use function dirname;
+use function gc_collect_cycles;
+use function intdiv;
 use function memory_get_usage;
+
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
 
 /**
  * Rule 6/7 through a real kernel (1.14): which entity manager the bundle uses and flushes, the dedicated
@@ -49,7 +68,20 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     /** @var list<object> */
     private array $events = [];
 
+    /** Requests of the two-tenant worker test (a read and a DBAL write each; SQLite file). */
+    private const int WORKER_ITERATIONS = 1000;
+
+    private const int WORKER_MEMORY_MARGIN = 4 * 1024 * 1024;
+
     private string $pageKeyColumn = 'page_key';
+
+    /** @var WeakMap<Command, ArrayInput> */
+    private WeakMap $commandInputs;
+
+    protected function setUp(): void
+    {
+        $this->commandInputs = new WeakMap();
+    }
 
     /** @var list<bool> transaction state of the bundle connection when each event was dispatched */
     private array $inTransaction = [];
@@ -340,8 +372,8 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $request  = Request::create('/t/fail');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
         self::assertSame(500, $response->getStatusCode());
-        $kernel->terminate($request, $response);
         self::assertFalse($bundle->isOpen(), 'the failed write closed the bundle manager');
+        $kernel->terminate($request, $response);
 
         $request  = Request::create('/t/create/after-failure');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
@@ -366,6 +398,365 @@ final class PageBuilderPersistenceKernelTest extends TestCase
 
         self::assertCount(301, $this->events);
         self::assertLessThan(4 * 1024 * 1024, memory_get_usage() - $baseline, 'memory stays flat over many requests');
+    }
+
+    /**
+     * REQ-RUNTIME-002 (1.15.1): two tenants alternate over N requests in ONE kept-alive kernel, no services resetter.
+     * Each tenant's row is changed behind Doctrine's back before its request: a manager that kept the page managed
+     * across requests would serve the stale status (or the other tenant's page) from its identity map.
+     */
+    public function testKeptAliveKernelAlternatingTenantsSeeOnlyFreshOwnData(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $kernel    = $this->httpKernel($container);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+        $publisher->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $publisher->createPageByKey('tenant-b', 'Tenant B', 'en');
+        $this->terminate($container);
+
+        $connection   = $bundle->getConnection();
+        $metadata     = $bundle->getClassMetadata(BuilderPage::class);
+        $statusColumn = $metadata->getColumnName('status');
+        $baseline     = 0;
+        for ($i = 0; $i < self::WORKER_ITERATIONS; ++$i) {
+            $tenant = $i % 2 === 0 ? 'tenant-a' : 'tenant-b';
+            $status = intdiv($i, 2) % 2 === 0 ? PageStatus::Published : PageStatus::Draft;
+            $connection->update($metadata->getTableName(), [$statusColumn => $status->value], [$this->pageKeyColumn => $tenant]);
+
+            $request  = Request::create('/t/show/' . $tenant);
+            $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+            self::assertSame($tenant . '|' . $status->value, $response->getContent(), 'request ' . $i . ' sees only its own, fresh page');
+            $kernel->terminate($request, $response);
+            self::assertSame(0, $bundle->getUnitOfWork()->size(), 'no managed page survives request ' . $i);
+            if ($i === 50) {
+                $baseline = $this->collectedMemory();
+            }
+        }
+
+        self::assertLessThan(self::WORKER_MEMORY_MARGIN, $this->collectedMemory() - $baseline, 'memory stays flat over many requests');
+    }
+
+    /**
+     * REQ-RUNTIME-002 rule 4 (1.15.1), through the real dispatcher: with `transaction: host` on a dedicated manager, a
+     * nested command, a command run from a message handler and a `kernel.terminate` inside a command never clear the
+     * host's pending bundle writes nor discard their write events; only the outermost boundary does.
+     */
+    public function testNestedBoundariesNeverDiscardTheHostUnitOfWork(): void
+    {
+        $container  = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder', 'transaction' => 'host']);
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+
+        $outer       = new Command('app:outer');
+        $nested      = new Command('app:nested');
+        $fromHandler = new Command('app:from-handler');
+
+        // Outer command → nested command → kernel.terminate inside the command.
+        $dispatcher->dispatch($this->commandEvent($outer), ConsoleEvents::COMMAND);
+        $publisher->createPageByKey('in-command', 'In command', 'en');
+        $dispatcher->dispatch($this->commandEvent($nested), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent($nested), ConsoleEvents::TERMINATE);
+        $this->terminate($container);
+        self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'the nested boundaries keep the pending page');
+        $bundle->flush();
+        $dispatcher->dispatch($this->terminateEvent($outer), ConsoleEvents::TERMINATE);
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), 'the outermost command clears');
+
+        // Message → command run from the handler.
+        $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $publisher->createPageByKey('in-message', 'In message', 'en');
+        $dispatcher->dispatch($this->commandEvent($fromHandler), ConsoleEvents::COMMAND);
+        $dispatcher->dispatch($this->terminateEvent($fromHandler), ConsoleEvents::TERMINATE);
+        self::assertNotSame([], $bundle->getUnitOfWork()->getScheduledEntityInsertions(), 'a command run from the handler keeps the pending page');
+        $bundle->flush();
+        $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
+        self::assertSame(0, $bundle->getUnitOfWork()->size());
+
+        self::assertSame(['in-command', 'in-message'], $this->pageKeys($bundle));
+        self::assertSame(['in-command', 'in-message'], $this->eventKeys(), 'the nested boundaries keep the outer unit\'s write events');
+        self::assertSame([false, false], $this->inTransaction);
+        self::assertSame(0, $this->pending($container)->countPending());
+    }
+
+    /**
+     * NL2-1 (1.15.1), through a REAL in-process console Application: a throwing `console.terminate` listener and a
+     * throwing `console.error` listener (Symfony then never dispatches the terminate) do not leave the process
+     * "inside a command": the next HTTP requests still clear the bundle's own manager.
+     */
+    public function testThrowingConsoleListenersNeverStopTheOwnManagerClear(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $bundle    = $this->manager($container, 'page_builder');
+        $this->publisher($container)->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $throw = static function (): never {
+            throw new RuntimeException('listener failed');
+        };
+
+        $application = $this->application();
+        $application->addCommand(new CallbackCommand('app:ok', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+
+        foreach ([[ConsoleEvents::TERMINATE, 'app:ok'], [ConsoleEvents::ERROR, 'app:fail']] as [$eventName, $commandName]) {
+            $dispatcher->addListener($eventName, $throw);
+            self::assertNotSame(0, $application->run($this->input($commandName), new NullOutput()));
+            $dispatcher->removeListener($eventName, $throw);
+
+            $kernel   = $this->httpKernel($container);
+            $request  = Request::create('/t/show/tenant-a');
+            $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+            self::assertSame('tenant-a|draft', $response->getContent());
+            $kernel->terminate($request, $response);
+            self::assertSame(0, $bundle->getUnitOfWork()->size(), 'after a throwing ' . $eventName . ' listener the request still clears');
+        }
+    }
+
+    /**
+     * NL2-2 (1.15.1): an unknown command run in-process from a command (`console.error` without a command) never
+     * discards the outer command's unflushed write events.
+     */
+    public function testUnknownNestedCommandKeepsTheOuterWriteEvents(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder', 'transaction' => 'host']);
+        $bundle    = $this->manager($container, 'page_builder');
+        $publisher = $this->publisher($container);
+
+        $application = $this->application();
+        $application->addCommand(new CallbackCommand('app:outer', function () use ($publisher, $bundle): int {
+            $publisher->createPageByKey('outer', 'Outer', 'en');
+            $nested = $this->application();
+            self::assertNotSame(0, $nested->run($this->input('zzz:no-such-command'), new NullOutput()));
+            $bundle->flush();
+
+            return 0;
+        }));
+
+        self::assertSame(0, $application->run($this->input('app:outer'), new NullOutput()));
+        self::assertSame(['outer'], $this->pageKeys($bundle));
+        self::assertSame(['outer'], $this->eventKeys(), 'the unknown nested command does not drop the outer event');
+    }
+
+    /**
+     * NL2-v N1: a command that runs itself in-process, whose inner run's error listener throws, ends with its outer run.
+     */
+    public function testSelfRecursiveCommandWithAThrowingErrorListenerStillEnds(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $runs                              = 0;
+        $application->addCommand(new CallbackCommand('app:recursive', function () use ($application, &$runs, $dispatcher): int {
+            if (++$runs === 1) {
+                $throw = self::throwingListener();
+                $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+                $application->run($this->input('app:recursive'), new NullOutput());
+                $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+
+                return 0;
+            }
+
+            throw new RuntimeException('inner run failed');
+        }));
+
+        self::assertSame(0, $application->run($this->input('app:recursive'), new NullOutput()));
+        $this->assertRequestClears($container, $bundle, 'self-recursive command + throwing error listener');
+    }
+
+    /**
+     * NL2-v N1/N2: listeners that throw at the extreme priorities, and a nested command whose error listener throws.
+     */
+    public function testThrowingListenersAtExtremePrioritiesAndNestedFailuresStillEnd(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:ok', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+        $application->addCommand(new CallbackCommand('app:outer', function () use ($application, $dispatcher): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+            $application->run($this->input('app:fail'), new NullOutput());
+            $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+
+            return 0;
+        }));
+
+        foreach ([
+            [ConsoleEvents::ERROR, PHP_INT_MIN, 'app:fail'],
+            [ConsoleEvents::TERMINATE, PHP_INT_MAX, 'app:ok'],
+            [null, 0, 'app:outer'],
+        ] as [$eventName, $priority, $command]) {
+            $throw = self::throwingListener();
+            if ($eventName !== null) {
+                $dispatcher->addListener($eventName, $throw, $priority);
+            }
+            $application->run($this->input($command), new NullOutput());
+            if ($eventName !== null) {
+                $dispatcher->removeListener($eventName, $throw);
+            }
+            $this->assertRequestClears($container, $bundle, $command . ' with a throwing ' . ($eventName ?? 'nested error') . ' listener');
+        }
+    }
+
+    /**
+     * NL2-v N3: a message or a request whose closing event never came inside an in-process command (a throwing
+     * WorkerMessageReceived listener, a throwing kernel.exception listener) does not outlive the command.
+     */
+    public function testMessageOrRequestLeftOpenInsideACommandDoesNotOutliveIt(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $kernel                            = $this->httpKernel($container);
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:consume', static function () use ($dispatcher): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED, $throw);
+            try {
+                $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+            } finally {
+                $dispatcher->removeListener(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED, $throw);
+            }
+
+            return 0;
+        }));
+        $application->addCommand(new CallbackCommand('app:crawl', static function () use ($dispatcher, $kernel): int {
+            $throw = self::throwingListener();
+            $dispatcher->addListener(KernelEvents::EXCEPTION, $throw, 4096);
+            try {
+                $kernel->handle(Request::create('/no-such-route'), HttpKernelInterface::MAIN_REQUEST, true);
+            } finally {
+                $dispatcher->removeListener(KernelEvents::EXCEPTION, $throw);
+            }
+
+            return 0;
+        }));
+
+        foreach (['app:consume', 'app:crawl'] as $command) {
+            self::assertNotSame(0, $application->run($this->input($command), new NullOutput()));
+            $this->assertRequestClears($container, $bundle, $command . ': nothing left in flight');
+            $next  = new Command('app:next');
+            $start = new ConsoleCommandEvent($next, new ArrayInput([]), new NullOutput());
+            $dispatcher->dispatch($start, ConsoleEvents::COMMAND);
+            $boundaries = $container->get(UnitOfWorkBoundaries::class);
+            self::assertInstanceOf(UnitOfWorkBoundaries::class, $boundaries);
+            self::assertTrue($boundaries->isOutermost($start), $command . ': the next command is the outermost unit');
+            $dispatcher->dispatch(new ConsoleTerminateEvent($next, $start->getInput(), new NullOutput(), 0), ConsoleEvents::TERMINATE);
+        }
+    }
+
+    /**
+     * NL2-v R1: a worker running in-process outside a command; its handler runs a command whose error listener throws
+     * (the frame stays marked, no terminate), the message fails, then the worker stops (or not): the next main request
+     * is the outermost unit again and clears the bundle's own manager.
+     */
+    public function testFailedCommandInsideAFailedMessageDoesNotLeaveTheMessageInFlight(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+
+        foreach ([true, false] as $workerStops) {
+            $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+            $throw = self::throwingListener();
+            $dispatcher->addListener(ConsoleEvents::ERROR, $throw);
+            self::assertNotSame(0, $application->run($this->input('app:fail'), new NullOutput()));
+            $dispatcher->removeListener(ConsoleEvents::ERROR, $throw);
+            $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED);
+            if ($workerStops) {
+                $dispatcher->dispatch(new stdClass(), UnitOfWorkBoundaries::MESSENGER_WORKER_STOPPED);
+            }
+
+            $this->assertRequestClears($container, $bundle, 'failed command in a failed message, worker stops: ' . ($workerStops ? 'yes' : 'no'));
+        }
+    }
+
+    /**
+     * An error listener that runs another command in-process: the state stays sane afterwards.
+     */
+    public function testErrorListenerRunningACommandLeavesASaneState(): void
+    {
+        [$container, $bundle, $dispatcher] = $this->bootWithTenantPage();
+        $application                       = $this->application();
+        $application->addCommand(new CallbackCommand('app:notify', static fn (): int => 0));
+        $application->addCommand(new CallbackCommand('app:fail', static function (): never {
+            throw new RuntimeException('command failed');
+        }));
+        $runs     = 0;
+        $listener = function () use ($application, &$runs): void {
+            if ($runs++ === 0) {
+                $application->run($this->input('app:notify'), new NullOutput());
+            }
+        };
+        $dispatcher->addListener(ConsoleEvents::ERROR, $listener);
+        self::assertNotSame(0, $application->run($this->input('app:fail'), new NullOutput()));
+        $dispatcher->removeListener(ConsoleEvents::ERROR, $listener);
+
+        $this->assertRequestClears($container, $bundle, 'after an error listener ran a command');
+    }
+
+    private static function throwingListener(): Closure
+    {
+        return static function (): never {
+            throw new RuntimeException('listener failed');
+        };
+    }
+
+    /**
+     * @return array{0: ContainerInterface, 1: EntityManagerInterface, 2: EventDispatcherInterface}
+     */
+    private function bootWithTenantPage(): array
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: true), ['entity_manager' => 'page_builder']);
+        $this->publisher($container)->createPageByKey('tenant-a', 'Tenant A', 'en');
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+
+        return [$container, $this->manager($container, 'page_builder'), $dispatcher];
+    }
+
+    /**
+     * A request that loads a page through the bundle manager leaves nothing managed: the manager was cleared.
+     */
+    private function assertRequestClears(ContainerInterface $container, EntityManagerInterface $bundle, string $label): void
+    {
+        $kernel   = $this->httpKernel($container);
+        $request  = Request::create('/t/show/tenant-a');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame('tenant-a|draft', $response->getContent(), $label);
+        $kernel->terminate($request, $response);
+        self::assertSame(0, $bundle->getUnitOfWork()->size(), $label);
+    }
+
+    private function input(string $command): ArrayInput
+    {
+        $input = new ArrayInput(['command' => $command]);
+        $input->setInteractive(false);
+
+        return $input;
+    }
+
+    private function application(): Application
+    {
+        self::assertNotNull($this->kernel);
+        $application = new Application($this->kernel);
+        $application->setAutoExit(false);
+        $application->setCatchExceptions(true);
+
+        return $application;
+    }
+
+    public function testDedicatedManagerThatIsTheHostDefaultIsNeverClearedByTheBundle(): void
+    {
+        $container = $this->boot($this->singleManager(), ['entity_manager' => 'default']);
+
+        self::assertFalse($container->has(OwnEntityManagerSubscriber::class), 'rule 7: the host clears its own default manager');
     }
 
     public function testDefaultPathNeverResetsTheHostManager(): void
@@ -463,6 +854,34 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     private function eventKeys(): array
     {
         return array_map(static fn (object $event): string => $event instanceof PageCreatedEvent ? $event->pageKey : $event::class, $this->events);
+    }
+
+    private function commandEvent(Command $command): ConsoleCommandEvent
+    {
+        return new ConsoleCommandEvent($command, $this->commandInput($command), new NullOutput());
+    }
+
+    private function terminateEvent(Command $command): ConsoleTerminateEvent
+    {
+        return new ConsoleTerminateEvent($command, $this->commandInput($command), new NullOutput(), 0);
+    }
+
+    /**
+     * Symfony passes the same input to every event of one command run.
+     */
+    private function commandInput(Command $command): ArrayInput
+    {
+        return $this->commandInputs[$command] ??= new ArrayInput([]);
+    }
+
+    /**
+     * Memory after a cycle collection (request / event objects form cycles freed only when the collector runs).
+     */
+    private function collectedMemory(): int
+    {
+        gc_collect_cycles();
+
+        return memory_get_usage();
     }
 
     private function httpKernel(ContainerInterface $container): HttpKernel

@@ -10,6 +10,7 @@ use Doctrine\ORM\Event\PostFlushEventArgs;
 use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderOutbox;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
+use Nowo\PageBuilderKitBundle\Persistence\UnitOfWorkBoundaries;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -17,8 +18,10 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use stdClass;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 #[CoversClass(PageBuilderTransaction::class)]
@@ -91,7 +94,7 @@ final class PageBuilderTransactionTest extends TestCase
         $outbox->transactionEnded($driver, true);
         $this->transactionActive = false;
 
-        // A later write never flushed, then the request fails (kernel.exception, LG-PBK-L1).
+        // A later write never flushed, then the request fails and ends (kernel.terminate, LG-PBK-L1).
         $transaction->commit(new PageCreatedEvent('never', 'flushed'));
         $transaction->onBoundary();
         self::assertSame([$committed], $this->dispatched);
@@ -199,9 +202,100 @@ final class PageBuilderTransactionTest extends TestCase
     public function subscribesToEveryBoundary(): void
     {
         $events = PageBuilderTransaction::getSubscribedEvents();
-        self::assertSame(['onBoundary', 1024], $events[KernelEvents::TERMINATE]);
-        self::assertSame(['onBoundary', -1024], $events[KernelEvents::EXCEPTION]);
+        self::assertSame(['onHttpTerminate', 1024], $events[KernelEvents::TERMINATE]);
+        self::assertArrayNotHasKey(KernelEvents::EXCEPTION, $events, 'kernel.terminate is the HTTP boundary');
+        self::assertSame(['onConsoleBoundary', -1024], $events[UnitOfWorkBoundaries::CONSOLE_ERROR]);
+        self::assertSame(['onConsoleBoundary', 1024], $events[UnitOfWorkBoundaries::CONSOLE_TERMINATE]);
+        self::assertSame(['onMessageFinished', 1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED]);
+        self::assertSame(['onMessageFinished', -1024], $events[UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED]);
+        self::assertSame(['onHttpRequest', 4096], $events[KernelEvents::REQUEST]);
         self::assertCount(6, $events);
+    }
+
+    /**
+     * 1.15.1: nested boundaries dispatch what was committed but never discard the outer unit's unflushed events.
+     */
+    #[Test]
+    public function nestedBoundariesKeepTheOuterUnflushedEvents(): void
+    {
+        $boundaries  = new UnitOfWorkBoundaries();
+        $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), true, boundaries: $boundaries);
+        $events      = new BoundaryEvents($boundaries, $transaction);
+        $outer       = new Command('app:outer');
+        $nested      = new Command('app:nested');
+
+        // Nested command (error and terminate), an unknown nested command, a request handled inside the command.
+        $events->command($outer);
+        $transaction->commit(new PageCreatedEvent('outer', 'command'));
+        $events->command($nested);
+        $events->error($nested);
+        $events->terminate($nested);
+        $events->error(null);
+        $events->request();
+        $events->exception();
+        $events->finishRequest();
+        $events->kernelTerminate();
+        self::assertSame(1, $transaction->countPending(), 'nested boundaries keep the outer command\'s events');
+        $events->error($outer);
+        self::assertSame(0, $transaction->countPending(), 'the outermost command\'s failure discards them');
+        $events->terminate($outer);
+
+        // A command run from a handler, and a request handled inside a message.
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED);
+        $transaction->commit(new PageCreatedEvent('outer', 'message'));
+        $events->command($nested);
+        $events->terminate($nested);
+        $events->mainRequest();
+        self::assertSame(1, $transaction->countPending(), 'a command or request inside the message keeps its events');
+        $events->message(UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED);
+        self::assertSame(0, $transaction->countPending());
+
+        // A command run from a controller; an exception (sub-request or main) is not a boundary (NL2-3, NL2-v N4).
+        $events->request();
+        $transaction->commit(new PageCreatedEvent('outer', 'request'));
+        $events->command($nested);
+        $events->terminate($nested);
+        $events->exception(HttpKernelInterface::SUB_REQUEST);
+        $events->exception();
+        self::assertSame(1, $transaction->countPending(), 'a command or a failing (sub-)request keeps the request\'s events');
+        $events->finishRequest();
+        $events->kernelTerminate();
+        self::assertSame(0, $transaction->countPending(), 'the end of the main request discards them');
+
+        // An unknown command with nothing else running is the outermost unit (NL2-2).
+        $transaction->commit(new PageCreatedEvent('top', 'level'));
+        $events->error(null);
+        self::assertSame(0, $transaction->countPending());
+        self::assertSame([], $this->dispatched, 'never flushed: nothing dispatched');
+    }
+
+    /**
+     * Safety net (1.15.1): a runtime that never called kernel.terminate; the next outermost main request discards the
+     * leftover unflushed events, a request inside a command or a sub-request does not.
+     */
+    #[Test]
+    public function anOutermostMainRequestDiscardsLeftoversOfAnUnterminatedRequest(): void
+    {
+        $boundaries  = new UnitOfWorkBoundaries();
+        $transaction = new PageBuilderTransaction($this->manager(), $this->dispatcher(), true, boundaries: $boundaries);
+        $events      = new BoundaryEvents($boundaries, $transaction);
+        $command     = new Command('app:crawl');
+
+        $events->request();
+        $transaction->commit(new PageCreatedEvent('left', 'over'));
+        $events->finishRequest();
+        $events->request(HttpKernelInterface::SUB_REQUEST);
+        $events->command($command);
+        $events->request();
+        self::assertSame(1, $transaction->countPending(), 'a sub-request or a request inside a command keeps them');
+        $events->finishRequest();
+        $events->terminate($command);
+        self::assertSame(0, $transaction->countPending(), 'the outermost command ended');
+
+        $transaction->commit(new PageCreatedEvent('left', 'over'));
+        $events->request();
+        self::assertSame(0, $transaction->countPending(), 'the next outermost main request discards them');
+        self::assertSame([], $this->dispatched);
     }
 
     private function manager(bool $flushes = false): EntityManagerInterface

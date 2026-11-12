@@ -25,6 +25,7 @@ use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderEntityManagerFactory;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
+use Nowo\PageBuilderKitBundle\Persistence\UnitOfWorkBoundaries;
 use Nowo\PageBuilderKitBundle\Security\AllowAllPageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\ConfigurablePageBuilderKitAccessChecker;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface;
@@ -266,8 +267,14 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
                 ->setArguments([new Reference('doctrine')]);
         } else {
             $container->setAlias(self::ENTITY_MANAGER_SERVICE, sprintf('doctrine.orm.%s_entity_manager', $entityManagerName));
+            // Only a manager the unit of work already built: a boundary never builds one (REQ-RUNTIME-002, 1.15.1).
             $container->register(OwnEntityManagerSubscriber::class, OwnEntityManagerSubscriber::class)
-                ->setArguments([new Reference('doctrine'), $entityManagerName])
+                ->setArguments([
+                    new Reference(UnitOfWorkBoundaries::class),
+                    new IteratorArgument([new Reference(sprintf('doctrine.orm.%s_entity_manager', $entityManagerName), ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE)]),
+                    new Reference('doctrine'),
+                    $entityManagerName,
+                ])
                 ->addTag('kernel.event_subscriber');
         }
 

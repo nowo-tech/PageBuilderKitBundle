@@ -13,6 +13,8 @@
 
 This bundle is **FrankenPHP worker mode friendly**. Shared services stay request-safe; optional `BuilderLocales` static binding is cleared after each request. See [FRANKENPHP-WORKER-AUDIT.md](docs/FRANKENPHP-WORKER-AUDIT.md).
 
+**Safe with kernel reset false** (`FRANKENPHP_RESET_KERNEL=false`, also without the services resetter): the bundle clears its own request state, and its own entity manager (`doctrine.entity_manager`) only at the outermost request / message / command boundary (1.15.1). Your app still clears its own entity managers (see the audit).
+
 <table>
   <tr>
     <td align="center" width="33%">

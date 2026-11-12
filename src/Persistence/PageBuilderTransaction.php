@@ -11,9 +11,9 @@ use Doctrine\ORM\Events;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
@@ -40,8 +40,11 @@ use function str_starts_with;
  * bundle flush or a host flush, {@see dispatchPending()}, and the end of the request / message / command (also a
  * failed one: a committed write keeps its event, LG-PBK-L1). Never inside a flush nor inside a transaction.
  *
- * Events of writes never flushed are discarded at every boundary; everything is dropped on `kernel.reset`
- * (FrankenPHP worker mode without kernel reset).
+ * Events of writes never flushed are discarded at the OUTERMOST boundary only (1.15.1, judged by
+ * {@see UnitOfWorkBoundaries}, the same policy as `OwnEntityManagerSubscriber`), so a nested command or a request
+ * handled inside a command never drops the outer unit's events; everything is dropped on `kernel.reset` (the nesting
+ * state lives in `UnitOfWorkBoundaries`, which the services resetter does not touch). The start of an outermost main
+ * request is a safety net for a runtime that never called `kernel.terminate`.
  *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
@@ -65,20 +68,62 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly LoggerInterface $logger = new NullLogger(),
         private readonly ?RequestStack $requestStack = null,
         private readonly PageBuilderOutbox $outbox = new PageBuilderOutbox(),
+        private readonly UnitOfWorkBoundaries $boundaries = new UnitOfWorkBoundaries(),
     ) {
     }
 
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::EXCEPTION  => ['onBoundary', -1024],
-            KernelEvents::TERMINATE  => ['onBoundary', 1024],
-            ConsoleEvents::ERROR     => ['onBoundary', -1024],
-            ConsoleEvents::TERMINATE => ['onBoundary', 1024],
-            // symfony/messenger is optional: event names as strings.
-            'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent' => ['onBoundary', 1024],
-            'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent'  => ['onBoundary', -1024],
+            KernelEvents::REQUEST                                  => ['onHttpRequest', 4096],
+            KernelEvents::TERMINATE                                => ['onHttpTerminate', 1024],
+            UnitOfWorkBoundaries::CONSOLE_ERROR                    => ['onConsoleBoundary', -1024],
+            UnitOfWorkBoundaries::CONSOLE_TERMINATE                => ['onConsoleBoundary', 1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED => ['onMessageFinished', 1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED  => ['onMessageFinished', -1024],
         ];
+    }
+
+    /**
+     * Start of an outermost main request: safety net for a runtime that never called `kernel.terminate` after the
+     * previous request. Committed events are dispatched and events of writes never flushed are discarded, so they
+     * never reach the new request's unit of work (1.15.1). Nothing happens inside a command or a message.
+     */
+    public function onHttpRequest(RequestEvent $event): void
+    {
+        if ($event->isMainRequest() && $this->boundaries->isHttpOutermost()) {
+            $this->onBoundary();
+        }
+    }
+
+    /**
+     * End of a request (also a failed one): a full boundary only outside a command and a Messenger message; an
+     * in-process `HttpKernel::handle()` from a command or a handler only dispatches what was committed (1.15.1).
+     *
+     * `kernel.exception` is not a boundary since 1.15.1: FrameworkBundle's ErrorListener (priority -128) stops its
+     * propagation, sub-requests share the main request's unit of work, and `kernel.terminate` follows every main
+     * request, failed or not (LG-PBK-L1: a committed write keeps its event).
+     */
+    public function onHttpTerminate(): void
+    {
+        $this->onBoundary($this->boundaries->isHttpOutermost());
+    }
+
+    /**
+     * Failure or end of a command: a full boundary only for the outermost command (outside a message and a main
+     * request). An unknown command (no command on the error event) is the outermost unit only when nothing else runs.
+     */
+    public function onConsoleBoundary(object $event): void
+    {
+        $this->onBoundary($this->boundaries->isOutermost($event));
+    }
+
+    /**
+     * End of a Messenger message (handled or failed): each message is its own unit of work.
+     */
+    public function onMessageFinished(): void
+    {
+        $this->onBoundary();
     }
 
     public function isHostControlled(): bool
@@ -181,15 +226,19 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     }
 
     /**
-     * End of a request, message or command (also a failed one): dispatches what was committed, discards the events of
-     * writes never flushed.
+     * End of a request, message or command (also a failed one): dispatches what was committed and, at the OUTERMOST
+     * boundary only, discards the events of writes never flushed. A nested boundary (a command run from another
+     * command, a handler or a controller; a request handled inside a command or a message) keeps them for the outer
+     * unit of work, whose use case may still flush (1.15.1).
      */
-    public function onBoundary(): void
+    public function onBoundary(bool $outermost = true): void
     {
         try {
             $this->dispatchPending();
         } finally {
-            $this->discardUnflushed();
+            if ($outermost) {
+                $this->discardUnflushed();
+            }
         }
     }
 

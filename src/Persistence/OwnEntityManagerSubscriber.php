@@ -6,68 +6,110 @@ namespace Nowo\PageBuilderKitBundle\Persistence;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
-use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Keeps the bundle's OWN entity manager (`doctrine.entity_manager`) usable in a kept-alive kernel (1.14).
+ * Keeps the bundle's OWN entity manager (`doctrine.entity_manager`) usable in a kept-alive kernel (1.14; outermost
+ * boundaries since 1.15.1).
  *
- * Registered only when `doctrine.entity_manager` is set: that manager maps the bundle entities only, so the bundle
- * may recover it (reset when a failed flush closed it) at the start of the next request or message, and clear it at
- * the end so no managed page survives into the next request. The host's managers are never reset nor cleared.
+ * Registered only when `doctrine.entity_manager` is set and is not the host's default manager: that manager maps the
+ * bundle entities only, so the bundle recreates it when a failed flush closed it and clears it at every OUTERMOST
+ * unit-of-work boundary, so no managed page survives into the next request, message or command (REQ-RUNTIME-002
+ * rule 4). The host's managers are never reset nor cleared (rule 7: the host clears its own managers).
  *
- * @internal
+ * Boundaries (same policy as ContactFormBundle 1.7.1 `ContactFormEntityManagerClearSubscriber`), judged by
+ * {@see UnitOfWorkBoundaries}, which tracks the running units at the extreme priorities:
+ * - HTTP: the main `kernel.request` (priority 4096) and `kernel.terminate` (priority -1024), only outside a console
+ *   command and a Messenger message. An in-process `HttpKernel::handle()` from a command or a handler does not clear
+ *   the unit that runs it; sub-requests share their main request's unit of work;
+ * - Messenger: when a message is received (priority 4096) and after it is handled or failed (priority -1024);
+ * - console: when the OUTERMOST command starts and terminates. A command run in-process from another command, a
+ *   message handler or a controller does not clear the outer unit's manager (with `transaction: host` that would
+ *   discard the host's pending changes).
+ *
+ * The manager arrives as an iterator of an IGNORE_ON_UNINITIALIZED_REFERENCE reference, so a boundary only touches a
+ * manager the unit of work already built and never builds one itself; the registry is a plain reference.
+ *
+ * @internal registered by the bundle; the constructor is not a public API
  */
 final readonly class OwnEntityManagerSubscriber implements EventSubscriberInterface
 {
+    /**
+     * @param iterable<EntityManagerInterface> $entityManagers the bundle-owned manager (skipped while uninitialized)
+     * @param ManagerRegistry $registry the Doctrine registry, to recreate a closed manager
+     * @param string $managerName `doctrine.entity_manager`
+     */
     public function __construct(
+        private UnitOfWorkBoundaries $boundaries,
+        private iterable $entityManagers,
         private ManagerRegistry $registry,
         private string $managerName,
     ) {
     }
 
+    /**
+     * @return array<string, array{0: string, 1: int}>
+     */
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::REQUEST => ['onRequest', 4096],
-            // symfony/messenger is optional: event names as strings.
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent' => ['recover', 4096],
-            KernelEvents::TERMINATE                                            => ['clear', -1024],
-            ConsoleEvents::TERMINATE                                           => ['clear', -1024],
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent'  => ['clear', -1024],
-            'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent'   => ['clear', -1024],
+            KernelEvents::REQUEST                                   => ['onRequest', 4096],
+            KernelEvents::TERMINATE                                 => ['onTerminate', -1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED => ['clearState', 4096],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED  => ['clearState', -1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED   => ['clearState', -1024],
+            UnitOfWorkBoundaries::CONSOLE_COMMAND                   => ['onConsoleBoundary', 4096],
+            UnitOfWorkBoundaries::CONSOLE_TERMINATE                 => ['onConsoleBoundary', -1024],
         ];
     }
 
+    /**
+     * Start of a main request: recovers / clears only outside a command and a message.
+     */
     public function onRequest(RequestEvent $event): void
     {
-        if ($event->isMainRequest()) {
-            $this->recover();
+        if ($event->isMainRequest() && $this->boundaries->isHttpOutermost()) {
+            $this->clearState();
         }
     }
 
     /**
-     * Resets the bundle manager when a failed write closed it (the lazy manager is re-created in place).
+     * End of a request: clears only outside a command and a message (an in-process HttpKernel::handle()).
      */
-    public function recover(): void
+    public function onTerminate(): void
     {
-        $manager = $this->registry->getManager($this->managerName);
-        if ($manager instanceof EntityManagerInterface && !$manager->isOpen()) {
+        if ($this->boundaries->isHttpOutermost()) {
+            $this->clearState();
+        }
+    }
+
+    /**
+     * Start or end of a command: clears only for the outermost command (outside a message and a main request).
+     */
+    public function onConsoleBoundary(object $event): void
+    {
+        if ($this->boundaries->isOutermost($event)) {
+            $this->clearState();
+        }
+    }
+
+    /**
+     * Recreates the bundle's manager when a failed write closed it, clears it when it is open (unflushed changes of
+     * the finished unit are discarded); nothing when it was never built.
+     */
+    public function clearState(): void
+    {
+        foreach ($this->entityManagers as $entityManager) {
+            if ($entityManager->isOpen()) {
+                // @igor-ignore - This IS the unit-of-work boundary reset of the bundle's own manager (no state kept).
+                $entityManager->clear();
+
+                continue;
+            }
+
             $this->registry->resetManager($this->managerName);
-        }
-    }
-
-    /**
-     * Detaches every managed bundle entity at the end of the request, message or command.
-     */
-    public function clear(): void
-    {
-        $manager = $this->registry->getManager($this->managerName);
-        if (!$manager instanceof EntityManagerInterface || $manager->isOpen()) {
-            // @igor-ignore - This IS the request-boundary reset of the bundle's own manager (no state kept).
-            $manager->clear();
         }
     }
 }
