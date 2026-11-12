@@ -41,6 +41,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Framework-free asset storage port (REQ-ARCH-001 rule 3).** `Media\PageBuilderAssetUploadStorageInterface::
+  storeUpload(AssetUpload): AssetUploadResult`. `Media\AssetUpload` is a bundle VO (`openStream()`, `moveTo()`,
+  `getClientName()`, `getClientExtension()`, `getSize()`, `getMimeType()` detected on the server); its values live in an
+  internal `WeakMap`, so VarDumper, `var_export()`, `print_r()`, `json_encode()` and `(array)` casts show no temporary
+  path or client name, and it cannot be cloned or serialized. The built-in local and S3 storages implement it with
+  the same checks as `store()`.
+- `AssetStoragePortsPass`: with `storage: service` the new port's alias points at the service when it implements it,
+  the deprecated alias (marked deprecated) only when it implements that one; the upload handler uses the host service
+  of the new port (alias, decorator or `service`), else the deprecated one.
+- **Entity-free Twig context port (rule 1).** `Service\GrapesTwigPageContextProviderInterface::getPageContext(
+  PageContext, string)`, autoconfigured with the same tag; `Service\PageContext` VO (id, uuid, page key, status,
+  published at, title, slug).
+- Tests: old-versus-new equivalence for 10 uploads on the local and S3 storages and through the handler (upload
+  error, size limit, server-side MIME allowlist, MIME/extension mismatch, polyglot `.php`, spoofed client type, SVG,
+  `..` in the name): same exceptions, stored content, MIME, extension, name and image size; Twig context old versus
+  new (same HTML); `lint:container` kernels for built-in local and S3, new port only, deprecated port only, both, a
+  decorator, `storage: service` with each kind of service, and a DDD host adapter of its own domain service.
+
+### Deprecated
+
+- `Media\PageBuilderAssetStorageInterface` and its alias, `LocalFilesystemAssetStorage::store()` and
+  `AwsS3AssetStorage::store()` (use `storeUpload()`); a storage implementing only the old interface still works and
+  triggers a runtime deprecation per upload. Removed in 2.0.
+- `Service\GrapesTwigContextProviderInterface` (use `GrapesTwigPageContextProviderInterface`). Removed in 2.0.
+
+Upload validation is unchanged (the MIME resolution of an HTTP upload moved into `AssetUploadData`, same result).
+REQ-RUNTIME-002: no new service state (the VO data is a `WeakMap` keyed by the per-request VO; Igor 155/155 OK); the
+1.14.1 trace boundary subscriber is unchanged.
+
 ## [1.14.1] - 2026-11-11
 
 Next patch: 1.14.1.

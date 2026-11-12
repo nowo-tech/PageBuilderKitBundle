@@ -348,13 +348,13 @@ Also available from GrapesJS core (always on): Block / Style / Layer / Trait / S
 
 Built-in context: `title`, `slug`, `pageKey`, `locale`, `status`, `page.*`, `seo.*`.
 
-Host extras — implement `GrapesTwigContextProviderInterface` (auto-tagged):
+Host extras — implement `GrapesTwigPageContextProviderInterface` (auto-tagged; 1.15, entity-free). The entity-based
+`GrapesTwigContextProviderInterface` is deprecated (removed in 2.0) and still works:
 
 ```php
-#[AutoconfigureTag('nowo_page_builder_kit.grapes_twig_context')]
-final class AppGrapesTwigContextProvider implements GrapesTwigContextProviderInterface
+final class AppGrapesTwigContextProvider implements GrapesTwigPageContextProviderInterface
 {
-    public function getContext(BuilderPage $page, string $locale): array
+    public function getPageContext(PageContext $page, string $locale): array
     {
         return ['productName' => 'Acme'];
     }
@@ -384,7 +384,7 @@ With `grapesjs.a11y_helpers: true` (default), the canvas exposes category **A11y
 | --- | --- | --- |
 | `assets_upload.enabled` | `false` | Enable `POST …/assets/upload` and `GET …/assets` (library) for GrapesJS + content admin. |
 | `assets_upload.storage` | `local` | `local` \| `s3` \| `service`. |
-| `assets_upload.service` | `null` | Custom `PageBuilderAssetStorageInterface` id when `storage=service`. |
+| `assets_upload.service` | `null` | Custom storage id when `storage=service`: implements `PageBuilderAssetUploadStorageInterface` (1.15), or the deprecated `PageBuilderAssetStorageInterface`. |
 | `assets_upload.max_bytes` | `5242880` | Max upload size. |
 | `assets_upload.allowed_mime` | jpeg/png/gif/webp | Allowlist checked against the **detected** (finfo) MIME type. The stored extension is always derived from that MIME type (`jpg`/`png`/`gif`/`webp`/`avif`/`svg`, otherwise `bin`); uploads whose file-name extension does not match (e.g. a GIF polyglot named `x.php`) are rejected. `image/svg+xml` is **not** in the default list: SVG served from your origin can run scripts (stored XSS). Add it only if uploads come from fully trusted users or are served from a separate origin / with a restrictive CSP. |
 | `assets_upload.local.directory` | `%kernel.project_dir%/public/uploads/page-builder` | Disk path. |
@@ -394,7 +394,7 @@ With `grapesjs.a11y_helpers: true` (default), the canvas exposes category **A11y
 | `assets_upload.s3.private` | `false` | `false` → public-read ACL. |
 | `assets_upload.s3.public_base_url` | `''` | Optional CDN/CloudFront base URL. |
 
-Suggest: `core/aws-s3-bundle`. Custom backends implement `PageBuilderAssetStorageInterface`.
+Suggest: `core/aws-s3-bundle`. Custom backends implement `PageBuilderAssetUploadStorageInterface` (1.15).
 
 Or pass ad-hoc Twig context:
 

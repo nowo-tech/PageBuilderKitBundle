@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Media;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -12,14 +13,19 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function count;
 use function is_array;
+use function trigger_deprecation;
 
 /**
  * Orchestrates multi-file uploads for the GrapesJS Asset Manager.
+ *
+ * 1.15: the storage the container resolved ({@see AssetStoragePortsPass})
+ * gets an {@see AssetUpload} VO through {@see PageBuilderAssetUploadStorageInterface}; a host storage that implements
+ * only the deprecated {@see PageBuilderAssetStorageInterface} still gets the `UploadedFile`, as before.
  */
 final readonly class AssetUploadHandler
 {
     public function __construct(
-        private PageBuilderAssetStorageInterface $storage,
+        private PageBuilderAssetUploadStorageInterface|PageBuilderAssetStorageInterface $storage,
         private bool $enabled = false,
         private LoggerInterface $logger = new NullLogger(),
     ) {
@@ -46,7 +52,7 @@ final readonly class AssetUploadHandler
             if (!$file instanceof UploadedFile) {
                 continue;
             }
-            $assets[] = $this->storage->store($file)->toGrapesAsset();
+            $assets[] = $this->store($file)->toGrapesAsset();
         }
 
         if ($assets === []) {
@@ -59,6 +65,22 @@ final readonly class AssetUploadHandler
         $this->logger->info('Page builder assets uploaded.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'asset_upload', 'count' => count($assets)]);
 
         return $assets;
+    }
+
+    private function store(UploadedFile $file): AssetUploadResult
+    {
+        if (!$this->storage instanceof PageBuilderAssetUploadStorageInterface) {
+            trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.15', 'Storing page builder assets through "%s" is deprecated, implement "%s" instead; removed in 2.0.', PageBuilderAssetStorageInterface::class, PageBuilderAssetUploadStorageInterface::class);
+
+            return $this->storage->store($file);
+        }
+
+        // The check every built-in storage ran first on the UploadedFile (same message).
+        if (!$file->isValid()) {
+            throw new InvalidArgumentException('Invalid uploaded file.');
+        }
+
+        return $this->storage->storeUpload(AssetUploadData::fromUploadedFile($file));
     }
 
     public function supportsLibrary(): bool

@@ -30,6 +30,7 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 |------|--------|-------|
 | Mutable state in shared services | ✅ | `DocumentService`, `PageRenderProvider`, `ContentFieldsService`, registries: no cross-request caches |
 | Static properties | ⚠️ Documented | `BuilderLocales::$boundInstance` bound in `boot()`, cleared on `kernel.terminate` |
+| Static `WeakMap` (1.15) | ✅ | `Media\AssetUploadData` keeps each `AssetUpload` VO's path / client name in a `WeakMap` keyed by the per-request VO: entries are collected with the VO, nothing crosses requests |
 | Request / user captured in services | ✅ | Access checker + capabilities evaluate per call |
 | Twig extension | ✅ | Functions only (`can_edit`, `can`, render); no per-user globals |
 | Debug / DataCollector | ✅ | `PageBuilderKitTrace` cleared by `PageBuilderKitTraceBoundarySubscriber` (main `kernel.request`, Messenger received / handled / failed, `console.terminate`); `ResetInterface` kept |

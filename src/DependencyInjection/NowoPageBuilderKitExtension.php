@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceBoundarySubscriber;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
@@ -20,6 +21,7 @@ use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
+use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderEntityManagerFactory;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
@@ -33,6 +35,7 @@ use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
@@ -224,6 +227,9 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
         $container->registerForAutoconfiguration(GrapesTwigContextProviderInterface::class)
             ->addTag('nowo_page_builder_kit.grapes_twig_context');
+        // 1.15: entity-free twin, same tag (PageRenderProvider calls getPageContext() on it).
+        $container->registerForAutoconfiguration(GrapesTwigPageContextProviderInterface::class)
+            ->addTag('nowo_page_builder_kit.grapes_twig_context');
 
         $container->registerForAutoconfiguration(WidgetPackInterface::class)
             ->addTag('nowo_page_builder_kit.widget_pack');
@@ -309,10 +315,15 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             };
         }
 
-        $container->setAlias(PageBuilderAssetStorageInterface::class, $storageId)->setPublic(false);
+        // 1.15: the built-in storages implement both ports. With storage=service the class is known only once the host's
+        // services are loaded: AssetStoragePortsPass aliases the port(s) it implements and wires the handler's storage.
+        if (!$enabled || $upload['storage'] !== 'service') {
+            $container->setAlias(PageBuilderAssetUploadStorageInterface::class, $storageId)->setPublic(false);
+            $container->setAlias(PageBuilderAssetStorageInterface::class, $storageId)->setPublic(false)
+                ->setDeprecated(AssetStoragePortsPass::PACKAGE, '1.15', AssetStoragePortsPass::DEPRECATION);
+        }
 
         $container->getDefinition(AssetUploadHandler::class)
-            ->setArgument('$storage', new Reference(PageBuilderAssetStorageInterface::class))
             ->setArgument('$enabled', $enabled);
     }
 

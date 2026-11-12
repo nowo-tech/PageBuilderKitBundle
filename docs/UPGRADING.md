@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.15.0](#to-1150)
 - [To 1.14.1](#to-1141)
 - [To 1.14.0](#to-1140)
 - [To 1.13.1](#to-1131)
@@ -45,6 +46,44 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.15.0
+
+From **1.14.x**: no migration, no configuration change. Additive (REQ-ARCH-001 rules 1 and 3); the deprecated ports
+keep working until 2.0.
+
+```bash
+composer require nowo-tech/page-builder-kit-bundle:^1.15
+```
+
+**Asset storage.** `Media\PageBuilderAssetStorageInterface::store(UploadedFile)` is deprecated. Implement
+`Media\PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)`:
+
+| Before (`UploadedFile`) | After (`AssetUpload`) |
+|---|---|
+| `getClientOriginalName()` | `getClientName()` (same value) |
+| `getClientOriginalExtension()` | `getClientExtension()` |
+| `getSize()` | `getSize()` (`null` instead of `false` when unknown) |
+| finfo on `getPathname()` (+ client type / guesser fallback) | `getMimeType()` (the same resolution, done once by the bundle) |
+| `getPathname()` / `fopen()` | `openStream()` (you close it) |
+| `move($dir, $name)` | `moveTo($dir, $name)` (same move for an HTTP upload; `RuntimeException` instead of `FileException`) |
+| `isValid()` | checked by the bundle before your storage is called (`Invalid uploaded file.`) |
+
+- `storage: service` accepts either kind of service; the handler uses the new port when your service implements it
+  (also when it implements both), otherwise the old `store()` with a runtime deprecation. The deprecated alias exists
+  only when the storage implements the deprecated interface, so `lint:container` stays green.
+- If you aliased `PageBuilderAssetStorageInterface` in your services, alias (or decorate)
+  `PageBuilderAssetUploadStorageInterface` instead.
+- The built-in local and S3 storages implement both ports and run the same checks on both (size, detected MIME
+  allowlist, MIME/extension match, `..` in the name for local); their `store()` is deprecated.
+
+**Twig context providers.** `Service\GrapesTwigContextProviderInterface::getContext(BuilderPage, string)` is
+deprecated. Implement `Service\GrapesTwigPageContextProviderInterface::getPageContext(PageContext, string)` (same
+tag, autoconfigured); `PageContext` carries `id`, `uuid`, `pageKey`, `status`, `publishedAt`, `title`, `slug`. A
+service implementing both gets only `getPageContext()` called.
+
+**Removed in 2.0:** `PageBuilderAssetStorageInterface` (and its alias), the storages' `store()`,
+`GrapesTwigContextProviderInterface`.
 
 ## To 1.14.1
 

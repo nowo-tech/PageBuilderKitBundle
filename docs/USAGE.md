@@ -19,6 +19,8 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Admin routes](#admin-routes)
 - [DocumentService](#documentservice)
 - [Standard Symfony and DDD / hexagonal hosts](#standard-symfony-and-ddd--hexagonal-hosts)
+  - [Standard Symfony host](#standard-symfony-host)
+  - [DDD / hexagonal host](#ddd--hexagonal-host)
 - [Document JSON API and CSRF](#document-json-api-and-csrf)
 - [Twig rendering](#twig-rendering)
 - [Public HTML cleanup](#public-html-cleanup)
@@ -118,7 +120,9 @@ Key-based alternative (1.14, no entity in the signature): autowire `PagePublishe
 
 Both paths are supported (1.14); the standard one is the zero-config default.
 
-**Standard Symfony host.** Nothing to configure. The admin UI and `DocumentService` write the bundle entities on the
+### Standard Symfony host
+
+Nothing to configure. The admin UI and `DocumentService` write the bundle entities on the
 entity manager that maps them (your default one) and flush right away. Listen to the write events when you need to
 react (cache purge, search index, audit):
 
@@ -142,7 +146,9 @@ Events (`Nowo\PageBuilderKitBundle\Event`): `PageCreatedEvent`, `PageDocumentSav
 open, and never for a write that was rolled back (also when your code wraps a bundle call in its own transaction, or
 rolls back a savepoint). A DBAL middleware on the bundle's connection tracks the real commits and rollbacks.
 
-**DDD / hexagonal host.** Keep your domain free of the bundle entities: address pages by key through
+### DDD / hexagonal host
+
+Keep your domain free of the bundle entities: address pages by key through
 `PagePublisherInterface`, read them through `PageRenderProviderInterface`, and react to the ID-only events.
 
 ```yaml
@@ -183,6 +189,50 @@ final readonly class PublishLandingPage
   `transaction: bundle` (the default) it flushes that manager, which in a standard host is the default one.
 - XML-mapped hosts: the bundle entities keep their own attribute mapping; register it with `auto_mapping` or an
   explicit `NowoPageBuilderKitBundle` mapping when `auto_mapping` is off. There is no host entity to extend.
+- **Ports without framework types or entities (1.15).** Asset storage: implement
+  `Media\PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)` (an `AssetUpload` VO: `openStream()`,
+  `moveTo()`, `getClientName()`, `getClientExtension()`, `getSize()`, `getMimeType()` detected on the server) instead
+  of the deprecated `PageBuilderAssetStorageInterface::store(UploadedFile)`. Twig context: implement
+  `Service\GrapesTwigPageContextProviderInterface::getPageContext(PageContext, string $locale)` (a `PageContext` VO:
+  `id`, `uuid`, `pageKey`, `status`, `publishedAt`, `title`, `slug`) instead of the deprecated
+  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)`.
+
+```php
+use Nowo\PageBuilderKitBundle\Media\AssetUpload;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadResult;
+use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
+
+final readonly class MediaLibraryAssetStorage implements PageBuilderAssetUploadStorageInterface
+{
+    public function __construct(private MediaLibrary $library) {}   // your domain service
+
+    public function storeUpload(AssetUpload $upload): AssetUploadResult
+    {
+        if (!in_array($upload->getMimeType(), ['image/png', 'image/jpeg'], true)) {
+            throw new \InvalidArgumentException('Only PNG and JPEG.');
+        }
+        $stream = $upload->openStream();
+        try {
+            $id = $this->library->add(AssetUpload::lastSegment($upload->getClientName()), $stream);
+        } finally {
+            fclose($stream);
+        }
+
+        return new AssetUploadResult('/media/' . $id, $upload->getClientName(), storageKey: $id);
+    }
+}
+```
+
+```yaml
+nowo_page_builder_kit:
+    grapesjs:
+        assets_upload: { enabled: true, storage: service, service: App\Infrastructure\MediaLibraryAssetStorage }
+```
+
+  The `AssetUpload` VO keeps its temporary path and client name outside its properties (no leak in dumps, `var_export()`
+  or `(array)` casts) and cannot be cloned or serialized. The bundle calls your storage only for a valid HTTP upload;
+  size, MIME and name checks are your storage's job, as before (the built-in local / S3 storages run exactly the same
+  checks on both ports).
 
 ## Document JSON API and CSRF
 
@@ -379,7 +429,7 @@ Optional blocks: Custom HTML (`grapesjs.allow_custom_code`), Script (`grapesjs.a
 1. Insert tokens from the Block Manager category **Twig**, or type `{{ title }}` in text.
 2. On public render, `GrapesTwigRenderer` evaluates a **sandboxed** Twig template.
 3. Built-in vars: `title`, `slug`, `pageKey`, `locale`, `status`, `page.title`, …
-4. Host vars: implement `GrapesTwigContextProviderInterface` or pass `$context` to `getRenderedTree()` / `nowo_page_builder_render()`.
+4. Host vars: implement `GrapesTwigPageContextProviderInterface` (1.15; the entity-based `GrapesTwigContextProviderInterface` is deprecated) or pass `$context` to `getRenderedTree()` / `nowo_page_builder_render()`.
 
 Demo: `/twig` and `/p/twig`.
 
@@ -442,10 +492,9 @@ final class PageBuilderAccessChecker implements PageBuilderKitAccessCheckerInter
 Provide array context from the host (Doctrine → plain arrays/scalars — sandbox cannot call entity methods):
 
 ```php
-#[AutoconfigureTag('nowo_page_builder_kit.grapes_twig_context')]
-final class ProductsTwigContext implements GrapesTwigContextProviderInterface
+final class ProductsTwigContext implements GrapesTwigPageContextProviderInterface   // auto-tagged
 {
-    public function getContext(BuilderPage $page, string $locale): array
+    public function getPageContext(PageContext $page, string $locale): array
     {
         return [
             'products' => [
@@ -514,7 +563,9 @@ nowo_page_builder_kit:
                 public_base_url: 'https://cdn.example.com'  # optional CloudFront
 ```
 
-Custom backends: implement `PageBuilderAssetStorageInterface` and set `storage: service` + `service: app.my_storage`.
+Custom backends: implement `PageBuilderAssetUploadStorageInterface` (1.15; `PageBuilderAssetStorageInterface` is
+deprecated) and set `storage: service` + `service: app.my_storage`. You can also alias or decorate
+`PageBuilderAssetUploadStorageInterface` in your services: the upload handler uses your service.
 For media library browsing, also implement `PageBuilderAssetLibraryInterface::list()`.
 
 Endpoints:
@@ -682,7 +733,7 @@ Additional types: `repeater`, `group`, `reference`. Nesting is practically unlim
 
 - Content admin image fields: **Library** picker (lists uploaded assets) + upload.
 - Canvas: `assetsLibraryUrl` seeds Grapes Asset Manager; Traits panel **Dynamic tag** binds text/link/image to `[[fields.key]]`.
-- Optional host storage: implement `PageBuilderAssetLibraryInterface::list()` alongside `PageBuilderAssetStorageInterface`.
+- Optional host storage: implement `PageBuilderAssetLibraryInterface::list()` alongside `PageBuilderAssetUploadStorageInterface`.
 
 ```twig
 {% for item in fields.faqs %}
