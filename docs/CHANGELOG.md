@@ -48,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `getClientName()`, `getClientExtension()`, `getSize()`, `getMimeType()` detected on the server); its values live in an
   internal `WeakMap`, so VarDumper, `var_export()`, `print_r()`, `json_encode()` and `(array)` casts show no temporary
   path or client name, and it cannot be cloned or serialized. The built-in local and S3 storages implement it with
-  the same checks as `store()`.
+  the same checks as `store()`, and read the size (`filesize()`) and the MIME type (finfo) from the file on disk, so a
+  direct `storeUpload()` caller cannot bypass `max_bytes` or `allowed_mime` with a null size or a MIME type of its
+  choice (the VO's type is used only when finfo has no answer, as before).
 - `AssetStoragePortsPass`: with `storage: service` the new port's alias points at the service when it implements it,
   the deprecated alias (marked deprecated) only when it implements that one; the upload handler uses the host service
   of the new port (alias, decorator or `service`), else the deprecated one.

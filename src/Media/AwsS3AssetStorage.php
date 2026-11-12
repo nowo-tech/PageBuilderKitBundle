@@ -75,7 +75,7 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageI
     {
         $this->assertValidUpload($upload);
 
-        $mime      = ($upload->getMimeType() ?? '') ?: 'application/octet-stream';
+        $mime      = AssetUploadData::serverMimeType($upload) ?: 'application/octet-stream';
         $extension = UploadedAssetExtension::resolve($mime, $upload->getClientExtension());
         $folder    = trim($this->folder, '/');
         $key       = ($folder !== '' ? $folder . '/' : '') . bin2hex(random_bytes(16)) . '.' . $extension;
@@ -214,12 +214,13 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageI
      */
     private function assertValidUpload(AssetUpload $upload): void
     {
-        $size = $upload->getSize();
+        // MZ-B-1: the size and type of the file on disk, never what a direct caller put in the VO.
+        $size = AssetUploadData::serverSize($upload);
         if ($size !== null && $size > $this->maxBytes) {
             throw new InvalidArgumentException(sprintf('File exceeds max size of %d bytes.', $this->maxBytes)); // covered in rejectsOversized
         }
 
-        $mime = $upload->getMimeType() ?? '';
+        $mime = AssetUploadData::serverMimeType($upload);
         if ($mime === '' || !in_array($mime, $this->allowedMimeTypes, true)) {
             throw new InvalidArgumentException(sprintf('MIME type "%s" is not allowed.', $mime !== '' ? $mime : 'unknown'));
         }

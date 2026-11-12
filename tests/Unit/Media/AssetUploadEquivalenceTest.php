@@ -124,6 +124,55 @@ final class AssetUploadEquivalenceTest extends TestCase
     }
 
     /**
+     * MZ-B-1: a host calling storeUpload() directly cannot bypass max_bytes with a null (or lying) size, nor the finfo
+     * allowlist with a MIME type of its choice: the built-in storages read both from the file on disk.
+     *
+     * @return iterable<string, array{string, ?int, ?string, string}>
+     */
+    public static function directCalls(): iterable
+    {
+        $png = base64_decode(self::PNG, true);
+
+        yield 'oversized, null size' => [$png . str_repeat("\0", 400), null, 'image/png', 'File exceeds max size of 300 bytes.'];
+        yield 'oversized, lying size' => [$png . str_repeat("\0", 400), 10, 'image/png', 'File exceeds max size of 300 bytes.'];
+        yield 'PHP with a spoofed image/png' => ["<?php echo 'x';\n", 16, 'image/png', 'MIME type "text/x-php" is not allowed.'];
+        yield 'SVG with a spoofed image/png' => ['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', null, 'image/png', 'MIME type "image/svg+xml" is not allowed.'];
+    }
+
+    #[Test]
+    #[DataProvider('directCalls')]
+    public function directStoreUploadUsesTheSizeAndTypeOfTheFileOnDisk(string $content, ?int $size, ?string $mime, string $message): void
+    {
+        foreach (['local', 's3'] as $kind) {
+            $path = $this->dir . '/' . uniqid('direct', true);
+            file_put_contents($path, $content);
+            $storage = $kind === 'local'
+                ? new LocalFilesystemAssetStorage($this->dir . '/public', '/uploads', 300, ['image/png'])
+                : new AwsS3AssetStorage($this->s3Helper(), 'page-builder', false, 300, ['image/png']);
+
+            try {
+                $storage->storeUpload(new AssetUpload($path, 'x.png', $size, $mime));
+                self::fail($kind . ': the upload must be rejected');
+            } catch (InvalidArgumentException $exception) {
+                self::assertSame($message, $exception->getMessage(), $kind);
+            }
+        }
+    }
+
+    #[Test]
+    public function directStoreUploadStoresTheDetectedTypeNotTheGivenOne(): void
+    {
+        $path = $this->dir . '/gif-src';
+        file_put_contents($path, base64_decode(self::GIF, true));
+
+        $result = new LocalFilesystemAssetStorage($this->dir . '/public', '/uploads', 300, ['image/png', 'image/gif'])
+            ->storeUpload(new AssetUpload($path, 'anim.gif', null, 'image/png'));
+
+        self::assertSame('image/gif', $result->mimeType);
+        self::assertStringEndsWith('.gif', (string) $result->storageKey);
+    }
+
+    /**
      * @param callable(AwsS3AssetStorage|LocalFilesystemAssetStorage, UploadedFile): AssetUploadResult $store
      *
      * @return array<string, mixed>

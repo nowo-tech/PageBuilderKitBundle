@@ -25,6 +25,8 @@ use const PATHINFO_EXTENSION;
  * - {@see getMimeType()} is the type **detected on the server** from the content (finfo), with the same fallbacks the
  *   built-in storages always used for an HTTP upload (the client type, then the MIME guesser, when finfo has no
  *   answer). It is what the `allowed_mime` allowlist checks.
+ * - The built-in storages do not trust {@see getSize()} / {@see getMimeType()} of a VO they receive: they read the size
+ *   and run finfo on the file itself.
  * - {@see getClientName()} is the name the client sent (for an HTTP upload: `UploadedFile::getClientOriginalName()`).
  *   It is untrusted: never use it as a path; {@see moveTo()} keeps only its last segment.
  *

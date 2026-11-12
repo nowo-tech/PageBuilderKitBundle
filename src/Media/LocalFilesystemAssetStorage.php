@@ -73,7 +73,7 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetUplo
             // @codeCoverageIgnoreEnd
         }
 
-        $mime      = $upload->getMimeType() ?? '';
+        $mime      = AssetUploadData::serverMimeType($upload);
         $extension = UploadedAssetExtension::resolve($mime, $upload->getClientExtension());
         $basename  = bin2hex(random_bytes(16)) . '.' . $extension;
         $upload->moveTo($this->directory, $basename);
@@ -174,12 +174,13 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetUplo
      */
     private function assertValidUpload(AssetUpload $upload): void
     {
-        $size = $upload->getSize();
+        // MZ-B-1: the size and type of the file on disk, never what a direct caller put in the VO.
+        $size = AssetUploadData::serverSize($upload);
         if ($size !== null && $size > $this->maxBytes) {
             throw new InvalidArgumentException(sprintf('File exceeds max size of %d bytes.', $this->maxBytes));
         }
 
-        $mime = $upload->getMimeType() ?? '';
+        $mime = AssetUploadData::serverMimeType($upload);
         if ($mime === '' || !in_array($mime, $this->allowedMimeTypes, true)) {
             throw new InvalidArgumentException(sprintf('MIME type "%s" is not allowed.', $mime !== '' ? $mime : 'unknown'));
         }

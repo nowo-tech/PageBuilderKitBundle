@@ -14,8 +14,11 @@ use Throwable;
 use WeakMap;
 
 use function class_exists;
+use function clearstatcache;
+use function filesize;
 use function finfo_file;
 use function finfo_open;
+use function is_file;
 use function is_string;
 
 use const FILEINFO_MIME_TYPE;
@@ -107,6 +110,29 @@ final class AssetUploadData
         unset(self::$origins[$upload]);
 
         return $moved->getPathname();
+    }
+
+    /**
+     * Size of the file on disk (MZ-B-1): the built-in storages never trust the size a caller put in the VO. Falls back
+     * to the VO's size only when the file cannot be stat'ed.
+     */
+    public static function serverSize(AssetUpload $upload): ?int
+    {
+        $path = self::pathOf($upload);
+        clearstatcache(true, $path);
+        $size = is_file($path) ? @filesize($path) : false;
+
+        return $size === false ? $upload->getSize() : $size;
+    }
+
+    /**
+     * MIME type detected by finfo on the file on disk (MZ-B-1): the built-in storages never trust the type a caller put
+     * in the VO. Only when finfo has no answer, the VO's type (for an HTTP upload: the same client-type / guesser
+     * fallback as before 1.15).
+     */
+    public static function serverMimeType(AssetUpload $upload): string
+    {
+        return self::detectMimeType(self::pathOf($upload)) ?? $upload->getMimeType() ?? '';
     }
 
     /** finfo on the content; null when finfo is missing or has no answer. */

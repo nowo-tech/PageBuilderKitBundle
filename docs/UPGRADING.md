@@ -75,7 +75,8 @@ composer require nowo-tech/page-builder-kit-bundle:^1.15
 - If you aliased `PageBuilderAssetStorageInterface` in your services, alias (or decorate)
   `PageBuilderAssetUploadStorageInterface` instead.
 - The built-in local and S3 storages implement both ports and run the same checks on both (size, detected MIME
-  allowlist, MIME/extension match, `..` in the name for local); their `store()` is deprecated.
+  allowlist, MIME/extension match, `..` in the name for local); their `store()` is deprecated. They take the size and
+  MIME type from the file on disk, not from the VO you pass to `storeUpload()`.
 
 **Twig context providers.** `Service\GrapesTwigContextProviderInterface::getContext(BuilderPage, string)` is
 deprecated. Implement `Service\GrapesTwigPageContextProviderInterface::getPageContext(PageContext, string)` (same
