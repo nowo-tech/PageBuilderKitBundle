@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.16.0](#to-1160)
 - [To 1.15.2](#to-1152)
 - [To 1.15.1](#to-1151)
 - [To 1.15.0](#to-1150)
@@ -48,6 +49,25 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.16.0
+
+From **1.15.x** (next minor, unreleased): no migration, no configuration change, nothing to do. The entities keep
+their attribute mapping unless you opt in.
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+- **XML mapping (opt-in, REQ-ARCH-001 rule 2).** Hosts whose entity managers load XML mapping only set
+  `nowo_page_builder_kit.doctrine.mapping_type: xml`: the bundle registers
+  `src/Resources/config/doctrine-xml/*.orm.xml` on `doctrine.entity_manager` (or the default manager) instead of the
+  attributes. Same tables, columns, indexes and constraints, so `doctrine:migrations:diff` finds nothing.
+- **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): without
+  `doctrine.entity_manager`, `doctrine.transaction: bundle` keeps flushing the manager that maps the entities (your
+  default one, REQ-ARCH-001 rule 6). Set `doctrine.entity_manager` (and `transaction: host` for DDD hosts) now if the
+  bundle must never commit your pending changes. The deprecated `PageBuilderAssetStorageInterface::store(UploadedFile)`
+  and `GrapesTwigContextProviderInterface` are removed in 2.0.
 
 ## To 1.15.2
 

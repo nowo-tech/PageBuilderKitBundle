@@ -137,7 +137,7 @@ Demo default URL: `http://localhost:8137`.
 
 ### Additional documentation
 
-- [Architecture (Mermaid)](docs/ARCHITECTURE.md)
+- [Architecture](docs/ARCHITECTURE.md) — diagrams, ports, SPI, events, standard Symfony and DDD hosts (REQ-ARCH-001)
 - [Widget authors](docs/WIDGET_AUTHORS.md)
 - [Cookbook (packs + templates)](docs/COOKBOOK.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)

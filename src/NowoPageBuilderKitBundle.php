@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle;
 
-use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AfterCommitMiddlewarePass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderMappingDriverPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetTypePass;
@@ -39,14 +39,9 @@ final class NowoPageBuilderKitBundle extends Bundle
         // Before the mapping passes: a clear error for an unknown doctrine.entity_manager (1.14).
         $container->addCompilerPass(new PageBuilderEntityManagerPass(checkOnly: true), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
 
-        $entityDir = __DIR__ . '/Entity';
-        if (is_dir($entityDir)) {
-            $container->addCompilerPass(DoctrineOrmMappingsPass::createAttributeMappingDriver(
-                ['Nowo\\PageBuilderKitBundle\\Entity'],
-                [$entityDir],
-                [NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER],
-            ));
-        }
+        // On doctrine.entity_manager when set, else the default entity manager. 1.16: attribute mapping (default) or the
+        // shipped XML mapping (doctrine.mapping_type: xml).
+        $container->addCompilerPass(new PageBuilderMappingDriverPass(__DIR__ . '/Entity'));
 
         // After the mapping pass above (and DoctrineBundle's auto_mapping): keep the entities on one manager (1.14).
         $container->addCompilerPass(new PageBuilderEntityManagerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, -10);

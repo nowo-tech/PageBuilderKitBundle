@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Since 1.16.0: XML mapping of the bundle entity (same tables, columns, indexes and constraints as its attributes). Used with nowo_page_builder_kit.doctrine.mapping_type: xml, or by a host that maps the bundle entities itself. -->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\PageBuilderKitBundle\Entity\BuilderDocumentLocale" table="pb_document_locale">
+        <unique-constraints>
+            <unique-constraint name="pb_document_locale_document_locale" columns="document_id,locale"/>
+        </unique-constraints>
+        <id name="id" type="integer">
+            <generator strategy="AUTO"/>
+        </id>
+        <field name="locale" type="string" length="8"/>
+        <field name="widgetProps" type="json"/>
+        <many-to-one field="document" target-entity="Nowo\PageBuilderKitBundle\Entity\BuilderDocument" inversed-by="locales">
+            <join-column nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
+    </entity>
+</doctrine-mapping>

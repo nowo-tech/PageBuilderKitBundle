@@ -21,9 +21,10 @@ final class ConfigurationTest extends TestCase
     #[Test]
     public function doctrineEntityManagerAndTransactionMode(): void
     {
-        $config = new Processor()->processConfiguration(new Configuration(), [['doctrine' => ['entity_manager' => 'page_builder', 'transaction' => 'host']]]);
+        $config = new Processor()->processConfiguration(new Configuration(), [['doctrine' => ['entity_manager' => 'page_builder', 'transaction' => 'host', 'mapping_type' => 'xml']]]);
         self::assertSame('page_builder', $config['doctrine']['entity_manager']);
         self::assertSame('host', $config['doctrine']['transaction']);
+        self::assertSame('xml', $config['doctrine']['mapping_type']);
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('non-empty entity manager name');
@@ -49,6 +50,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame('default', $config['doctrine']['connection']);
         self::assertNull($config['doctrine']['entity_manager']);
         self::assertSame('bundle', $config['doctrine']['transaction']);
+        self::assertSame('attribute', $config['doctrine']['mapping_type']);
         self::assertSame(
             HtmlSanitizeStrategy::Allowlist->value,
             $config['html']['sanitize']['strategy'],

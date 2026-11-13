@@ -187,8 +187,10 @@ final readonly class PublishLandingPage
   own admin UI is a use case of its own: while one of its controllers serves the request it still flushes its writes.
 - Without `entity_manager`, the bundle uses the manager returned by `getManagerForClass()` for its entities; with
   `transaction: bundle` (the default) it flushes that manager, which in a standard host is the default one.
-- XML-mapped hosts: the bundle entities keep their own attribute mapping; register it with `auto_mapping` or an
-  explicit `NowoPageBuilderKitBundle` mapping when `auto_mapping` is off. There is no host entity to extend.
+- XML-mapped hosts: set `doctrine.mapping_type: xml` (1.16) and the bundle registers its shipped XML mapping
+  (`src/Resources/config/doctrine-xml/*.orm.xml`, the same tables and columns as the attributes) on `entity_manager`
+  (or the default manager) instead of the attributes. The default stays `attribute`. There is no host entity to
+  extend. See [ARCHITECTURE.md](ARCHITECTURE.md#standard-symfony-and-ddd-hosts).
 - **Ports without framework types or entities (1.15).** Asset storage: implement
   `Media\PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)` (an `AssetUpload` VO: `openStream()`,
   `moveTo()`, `getClientName()`, `getClientExtension()`, `getSize()`, `getMimeType()` detected on the server) instead

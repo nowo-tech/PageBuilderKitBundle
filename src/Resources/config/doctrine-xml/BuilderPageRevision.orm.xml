@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Since 1.16.0: XML mapping of the bundle entity (same tables, columns, indexes and constraints as its attributes). Used with nowo_page_builder_kit.doctrine.mapping_type: xml, or by a host that maps the bundle entities itself. -->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision" table="pb_page_revision" repository-class="Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepository">
+        <id name="id" type="integer">
+            <generator strategy="AUTO"/>
+        </id>
+        <field name="structure" type="json"/>
+        <field name="widgetPropsByLocale" type="json"/>
+        <field name="createdAt" type="datetime_immutable"/>
+        <field name="label" type="string" length="255" nullable="true"/>
+        <many-to-one field="page" target-entity="Nowo\PageBuilderKitBundle\Entity\BuilderPage" inversed-by="revisions">
+            <join-column nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
+    </entity>
+</doctrine-mapping>

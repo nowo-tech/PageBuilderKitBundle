@@ -53,12 +53,19 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `DependencyInjection/Compiler/WidgetPackPass.php` | Tagged widget packs → registry | FR-P4-PACK-003, FR-P4-PACK-004 |
 | `DependencyInjection/Compiler/GrapesBlockPackPass.php` | Tagged Grapes block packs → registry | FR-P4-PACK-003, FR-P9-DX-002 |
 | `DependencyInjection/Compiler/CsrfProtectionPass.php` | Refuses to compile without form CSRF protection (fail closed) | REQ-SEC-005 |
+| `DependencyInjection/Compiler/PageBuilderMappingDriverPass.php` | Attribute (default) or XML mapping of the entities (1.16, `doctrine.mapping_type`) | FR-ORM-001 |
 
 ## Entities
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
 | `Entity/BuilderPage.php` | Page aggregate | FR-ORM-001, FR-DOC-001 |
+| `Resources/config/doctrine-xml/BuilderDocument.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
+| `Resources/config/doctrine-xml/BuilderDocumentLocale.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
+| `Resources/config/doctrine-xml/BuilderPage.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
+| `Resources/config/doctrine-xml/BuilderPageRevision.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
+| `Resources/config/doctrine-xml/BuilderPageTemplate.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
+| `Resources/config/doctrine-xml/BuilderPageTranslation.orm.xml` | XML mapping, same as the attributes (1.16, opt-in) | FR-ORM-001 |
 | `Entity/BuilderPageTranslation.php` | Localized title/slug/SEO | FR-I18N-001, FR-ORM-001 |
 | `Entity/BuilderDocument.php` | JSON structure storage | FR-DOC-001, FR-P2-DOC-001, FR-ORM-001 |
 | `Entity/BuilderDocumentLocale.php` | Per-locale widget props | FR-DOC-003, FR-I18N-001 |
