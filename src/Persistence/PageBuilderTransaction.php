@@ -14,6 +14,7 @@ use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
@@ -87,11 +88,12 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     /**
      * Start of an outermost main request: safety net for a runtime that never called `kernel.terminate` after the
      * previous request. Committed events are dispatched and events of writes never flushed are discarded, so they
-     * never reach the new request's unit of work (1.15.1). Nothing happens inside a command or a message.
+     * never reach the new request's unit of work (1.15.1). Nothing happens inside a command, a message or another main
+     * request (audit NX CR2).
      */
     public function onHttpRequest(RequestEvent $event): void
     {
-        if ($event->isMainRequest() && $this->boundaries->isHttpOutermost()) {
+        if ($event->isMainRequest() && $this->boundaries->isOutermost($event)) {
             $this->onBoundary();
         }
     }
@@ -104,9 +106,9 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      * propagation, sub-requests share the main request's unit of work, and `kernel.terminate` follows every main
      * request, failed or not (LG-PBK-L1: a committed write keeps its event).
      */
-    public function onHttpTerminate(): void
+    public function onHttpTerminate(TerminateEvent $event): void
     {
-        $this->onBoundary($this->boundaries->isHttpOutermost());
+        $this->onBoundary($this->boundaries->isOutermost($event));
     }
 
     /**
@@ -119,11 +121,12 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     }
 
     /**
-     * End of a Messenger message (handled or failed): each message is its own unit of work.
+     * End of a Messenger message (handled or failed): each message is its own unit of work; a message handled by a
+     * worker run in-process inside another message's handler only dispatches what was committed (audit NX CR1).
      */
-    public function onMessageFinished(): void
+    public function onMessageFinished(object $event): void
     {
-        $this->onBoundary();
+        $this->onBoundary($this->boundaries->isOutermost($event));
     }
 
     public function isHostControlled(): bool

@@ -16,6 +16,9 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 
 #[CoversClass(PageBuilderKitTraceBoundarySubscriber::class)]
 final class PageBuilderKitTraceBoundarySubscriberTest extends TestCase
@@ -26,9 +29,9 @@ final class PageBuilderKitTraceBoundarySubscriberTest extends TestCase
         $events = PageBuilderKitTraceBoundarySubscriber::getSubscribedEvents();
 
         self::assertSame(['onMainRequest', 4096], $events['kernel.request']);
-        self::assertSame('clear', $events['Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent'][0]);
-        self::assertSame('clear', $events['Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent'][0]);
-        self::assertSame('clear', $events['Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent'][0]);
+        self::assertSame('clear', $events[WorkerMessageReceivedEvent::class][0]);
+        self::assertSame('clear', $events[WorkerMessageHandledEvent::class][0]);
+        self::assertSame('clear', $events[WorkerMessageFailedEvent::class][0]);
         self::assertSame('clear', $events['console.terminate'][0]);
     }
 

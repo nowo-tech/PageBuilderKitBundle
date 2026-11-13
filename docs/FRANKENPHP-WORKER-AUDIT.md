@@ -64,6 +64,8 @@ With the stock Symfony kernel, `FRANKENPHP_RESET_KERNEL=false` still runs `servi
 | `Locale\BuilderLocales` | yes | readonly config; static bind optional | ✅ with terminate reset |
 | Admin / public controllers | yes | none | ✅ |
 
+Note (audit OB2): with a custom asynchronous Messenger `MessageExecutionStrategyInterface` the tracker loses its nested-worker protection (a worker run inside a handler may clear the outer message's unit); the boundary clears still happen.
+
 ## Own entity manager boundaries
 
 - **State:** with `doctrine.entity_manager` the bundle owns that manager (it maps the bundle entities only) and keeps

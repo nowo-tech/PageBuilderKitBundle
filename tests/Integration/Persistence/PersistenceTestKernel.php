@@ -33,7 +33,7 @@ use function sys_get_temp_dir;
  * repository), `/t/trace/{user}` (debug trace of the request) and `/t/fail` (failing bundle write). `$debugCollector`
  * boots in debug with the trace on.
  */
-final class PersistenceTestKernel extends Kernel
+final class PersistenceTestKernel extends Kernel implements CompilerPassInterface
 {
     use MicroKernelTrait;
 
@@ -108,6 +108,9 @@ final class PersistenceTestKernel extends Kernel
             'session'              => ['storage_factory_id' => 'session.storage.factory.mock_file'],
             'default_locale'       => 'en',
             'translator'           => ['fallbacks' => ['en']],
+            // symfony/messenger is a dev dependency for the worker tests; the framework's own worker listeners (reset
+            // services) are the host's choice and stay off here, so the bundle's boundaries are tested alone.
+            'messenger' => ['enabled' => false],
         ]);
         $container->extension('security', [
             'firewalls' => ['main' => ['security' => false]],
@@ -124,6 +127,15 @@ final class PersistenceTestKernel extends Kernel
             'revisions' => ['enabled' => $this->revisions],
             'debug'     => ['collector' => $this->debugCollector],
         ]);
+    }
+
+    /**
+     * DoctrineBundle clears EVERY manager after each Messenger message when symfony/messenger is installed (a dev
+     * dependency here, for the worker tests): removed, so the worker tests see the bundle's own boundaries only.
+     */
+    public function process(ContainerBuilder $container): void
+    {
+        $container->removeDefinition('doctrine.orm.messenger.event_subscriber.doctrine_clear_entity_manager');
     }
 
     private function configureRoutes(RoutingConfigurator $routes): void

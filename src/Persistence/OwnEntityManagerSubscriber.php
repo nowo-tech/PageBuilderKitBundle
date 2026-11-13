@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
@@ -22,9 +23,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * Boundaries (same policy as ContactFormBundle 1.7.1 `ContactFormEntityManagerClearSubscriber`), judged by
  * {@see UnitOfWorkBoundaries}, which tracks the running units at the extreme priorities:
  * - HTTP: the main `kernel.request` (priority 4096) and `kernel.terminate` (priority -1024), only outside a console
- *   command and a Messenger message. An in-process `HttpKernel::handle()` from a command or a handler does not clear
- *   the unit that runs it; sub-requests share their main request's unit of work;
- * - Messenger: when a message is received (priority 4096) and after it is handled or failed (priority -1024);
+ *   command and a Messenger message, and a main request only outside another main request (audit NX CR2). An
+ *   in-process `HttpKernel::handle()` from a command, a handler or a controller does not clear the unit that runs it;
+ *   sub-requests share their main request's unit of work;
+ * - Messenger: when a message is received (priority 4096) and after it is handled or failed (priority -1024), only
+ *   outside another message (a worker run in-process by a handler does not clear the outer message, audit NX CR1);
  * - console: when the OUTERMOST command starts and terminates. A command run in-process from another command, a
  *   message handler or a controller does not clear the outer unit's manager (with `transaction: host` that would
  *   discard the host's pending changes).
@@ -57,20 +60,20 @@ final readonly class OwnEntityManagerSubscriber implements EventSubscriberInterf
         return [
             KernelEvents::REQUEST                                   => ['onRequest', 4096],
             KernelEvents::TERMINATE                                 => ['onTerminate', -1024],
-            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED => ['clearState', 4096],
-            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED  => ['clearState', -1024],
-            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED   => ['clearState', -1024],
-            UnitOfWorkBoundaries::CONSOLE_COMMAND                   => ['onConsoleBoundary', 4096],
-            UnitOfWorkBoundaries::CONSOLE_TERMINATE                 => ['onConsoleBoundary', -1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onBoundary', 4096],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_HANDLED  => ['onBoundary', -1024],
+            UnitOfWorkBoundaries::MESSENGER_WORKER_MESSAGE_FAILED   => ['onBoundary', -1024],
+            UnitOfWorkBoundaries::CONSOLE_COMMAND                   => ['onBoundary', 4096],
+            UnitOfWorkBoundaries::CONSOLE_TERMINATE                 => ['onBoundary', -1024],
         ];
     }
 
     /**
-     * Start of a main request: recovers / clears only outside a command and a message.
+     * Start of a main request: recovers / clears only outside a command, a message and another main request.
      */
     public function onRequest(RequestEvent $event): void
     {
-        if ($event->isMainRequest() && $this->boundaries->isHttpOutermost()) {
+        if ($event->isMainRequest() && $this->boundaries->isOutermost($event)) {
             $this->clearState();
         }
     }
@@ -78,17 +81,16 @@ final readonly class OwnEntityManagerSubscriber implements EventSubscriberInterf
     /**
      * End of a request: clears only outside a command and a message (an in-process HttpKernel::handle()).
      */
-    public function onTerminate(): void
+    public function onTerminate(TerminateEvent $event): void
     {
-        if ($this->boundaries->isHttpOutermost()) {
-            $this->clearState();
-        }
+        $this->onBoundary($event);
     }
 
     /**
-     * Start or end of a command: clears only for the outermost command (outside a message and a main request).
+     * Start or end of a command or a Messenger message: clears only for the outermost one (a command outside a message
+     * and a main request; a message outside another message, e.g. a worker run in-process by a handler).
      */
-    public function onConsoleBoundary(object $event): void
+    public function onBoundary(object $event): void
     {
         if ($this->boundaries->isOutermost($event)) {
             $this->clearState();
