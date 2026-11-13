@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Doctrine\ORM\Mapping\Driver\AttributeDriver;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\PageBuilderKitBundle\NowoPageBuilderKitBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
@@ -15,11 +16,13 @@ use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
+use function dirname;
 use function md5;
 use function serialize;
 use function sys_get_temp_dir;
@@ -37,12 +40,15 @@ final class PersistenceTestKernel extends Kernel implements CompilerPassInterfac
     /**
      * @param array<string, mixed> $doctrine host `doctrine` config
      * @param array<string, mixed> $bundleDoctrine `nowo_page_builder_kit.doctrine`
+     * @param bool $hostDefaultDriver the host gives its default manager's chain a catch-all default
+     *                                driver (what DoctrineBundle 3.4 `auto_discover_entities` does)
      */
     public function __construct(
         private readonly array $doctrine,
         private readonly array $bundleDoctrine = [],
         private readonly bool $revisions = false,
         private readonly bool $debugCollector = false,
+        private readonly bool $hostDefaultDriver = false,
     ) {
         parent::__construct('test', $debugCollector);
     }
@@ -66,12 +72,28 @@ final class PersistenceTestKernel extends Kernel implements CompilerPassInterfac
 
     public function getCacheDir(): string
     {
-        return $this->getProjectDir() . '/' . md5(serialize([$this->doctrine, $this->bundleDoctrine, $this->revisions, $this->debugCollector])) . '/cache';
+        return $this->getProjectDir() . '/' . md5(serialize([$this->doctrine, $this->bundleDoctrine, $this->revisions, $this->debugCollector, $this->hostDefaultDriver])) . '/cache';
     }
 
     public function getLogDir(): string
     {
         return $this->getProjectDir() . '/log';
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        if (!$this->hostDefaultDriver) {
+            return;
+        }
+
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                // An attribute driver answers "not transient" for any class carrying #[ORM\Entity], whatever its paths.
+                $container->getDefinition('doctrine.orm.default_metadata_driver')
+                    ->addMethodCall('setDefaultDriver', [new Definition(AttributeDriver::class, [[dirname(__DIR__, 2) . '/Fixtures/Host'], true])]);
+            }
+        });
     }
 
     private function configureContainer(ContainerConfigurator $container): void

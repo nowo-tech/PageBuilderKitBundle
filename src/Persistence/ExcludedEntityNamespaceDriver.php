@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\PageBuilderKitBundle\Persistence;
+
+use Doctrine\Persistence\Mapping\ClassMetadata;
+use Doctrine\Persistence\Mapping\Driver\MappingDriver;
+use Doctrine\Persistence\Mapping\Driver\MappingDriverChain;
+use Doctrine\Persistence\Mapping\MappingException;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
+
+use function sprintf;
+
+/**
+ * Metadata driver that maps nothing: registered for the bundle entity namespace on every entity manager other than
+ * `nowo_page_builder_kit.doctrine.entity_manager` by {@see PageBuilderEntityManagerPass}.
+ *
+ * A {@see MappingDriverChain} asks its namespace drivers before its default driver, so this driver makes the bundle
+ * entities transient on those managers even when their chain has a default driver that claims every class carrying
+ * `#[ORM\Entity]` (DoctrineBundle 3.4 `auto_discover_entities`, enabled by default on a manager without `mappings` and
+ * `auto_mapping`). `ManagerRegistry::getManagerForClass()` then answers the configured manager on DoctrineBundle 2.x
+ * and 3.x alike. Stateless (worker-safe).
+ */
+final class ExcludedEntityNamespaceDriver implements MappingDriver
+{
+    public function loadMetadataForClass(string $className, ClassMetadata $metadata): void
+    {
+        throw new MappingException(sprintf('Class "%s" is not mapped on this entity manager (nowo_page_builder_kit.doctrine.entity_manager maps it on another one).', $className));
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    public function getAllClassNames(): array
+    {
+        return [];
+    }
+
+    public function isTransient(string $className): bool
+    {
+        return true;
+    }
+}
