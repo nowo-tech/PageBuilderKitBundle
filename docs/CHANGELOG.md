@@ -44,6 +44,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **XML mapping of the six entities (REQ-ARCH-001 rule 2):** `src/Resources/config/doctrine-xml/*.orm.xml`, the same
+  tables, columns, indexes, constraints, associations and lifecycle callbacks as the attributes
+  (`XmlMappingParityTest` compares the metadata and the schema with both naming strategies). New option
+  `doctrine.mapping_type` (`attribute` by default, unchanged; `xml`) registers it on `doctrine.entity_manager` (or the
+  default manager) for hosts whose managers load XML mapping only; `NowoPageBuilderKitExtension::XML_MAPPING_DIR`
+  points at the directory for hosts that map it themselves.
+- **`docs/ARCHITECTURE.md`:** ports, SPI and events table, the standard Symfony and DDD host paths, the REQ-ARCH-001
+  status per rule, and what waits for 2.0 (the rule 6 default: `transaction: bundle` without `entity_manager` flushes
+  the host's default manager).
+
 ## [1.15.2] - 2026-11-13
 
 ### Fixed

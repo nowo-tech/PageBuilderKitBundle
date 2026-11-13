@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Since 1.16.0: XML mapping of the bundle entity (same tables, columns, indexes and constraints as its attributes). Used with nowo_page_builder_kit.doctrine.mapping_type: xml, or by a host that maps the bundle entities itself. -->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\PageBuilderKitBundle\Entity\BuilderPage" table="pb_page" repository-class="Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository">
+        <id name="id" type="integer">
+            <generator strategy="AUTO"/>
+        </id>
+        <field name="uuid" type="string" length="36" unique="true"/>
+        <field name="pageKey" type="string" length="64" unique="true"/>
+        <field name="status" type="string" length="16" enum-type="Nowo\PageBuilderKitBundle\Enum\PageStatus"/>
+        <field name="publishedAt" type="datetime_immutable" nullable="true"/>
+        <field name="createdAt" type="datetime_immutable"/>
+        <field name="updatedAt" type="datetime_immutable"/>
+        <one-to-many field="translations" target-entity="Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation" mapped-by="page" orphan-removal="true">
+            <cascade>
+                <cascade-persist/>
+                <cascade-remove/>
+            </cascade>
+        </one-to-many>
+        <one-to-one field="document" target-entity="Nowo\PageBuilderKitBundle\Entity\BuilderDocument" mapped-by="page">
+            <cascade>
+                <cascade-persist/>
+                <cascade-remove/>
+            </cascade>
+        </one-to-one>
+        <one-to-many field="revisions" target-entity="Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision" mapped-by="page" orphan-removal="true">
+            <cascade>
+                <cascade-persist/>
+                <cascade-remove/>
+            </cascade>
+            <order-by>
+                <order-by-field name="createdAt" direction="DESC"/>
+            </order-by>
+        </one-to-many>
+        <lifecycle-callbacks>
+            <lifecycle-callback type="preUpdate" method="touchUpdatedAt"/>
+        </lifecycle-callbacks>
+    </entity>
+</doctrine-mapping>

@@ -63,6 +63,12 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
     /** Container parameter holding `doctrine.entity_manager` (null: the manager that maps the bundle entities). */
     public const string ENTITY_MANAGER_PARAMETER = 'nowo_page_builder_kit.doctrine.entity_manager';
 
+    /** Container parameter holding `doctrine.mapping_type` (`attribute` or `xml`), 1.16. */
+    public const string MAPPING_TYPE_PARAMETER = 'nowo_page_builder_kit.doctrine.mapping_type';
+
+    /** Directory of the XML mapping of the six bundle entities (1.16, same tables and columns as the attributes). */
+    public const string XML_MAPPING_DIR = __DIR__ . '/../Resources/config/doctrine-xml';
+
     /** Entity manager used by every bundle read and write (alias of the configured one, or resolved by entity class). */
     public const string ENTITY_MANAGER_SERVICE = 'nowo_page_builder_kit.entity_manager';
 
@@ -136,6 +142,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter('nowo_page_builder_kit.doctrine.table_prefix', $config['doctrine']['table_prefix']);
         $container->setParameter('nowo_page_builder_kit.doctrine.connection', $config['doctrine']['connection']);
         $container->setParameter(self::ENTITY_MANAGER_PARAMETER, $config['doctrine']['entity_manager']);
+        $container->setParameter(self::MAPPING_TYPE_PARAMETER, $config['doctrine']['mapping_type']);
         $container->setParameter('nowo_page_builder_kit.doctrine.transaction', $config['doctrine']['transaction']);
         $this->registerEntityManager($container, $config['doctrine']['entity_manager'], $config['doctrine']['transaction'] === 'host');
         $container->setParameter('nowo_page_builder_kit.security.access_roles', $config['security']['access_roles']);

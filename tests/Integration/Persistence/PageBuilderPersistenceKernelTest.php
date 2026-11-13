@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
 use Closure;
+use Doctrine\Bundle\DoctrineBundle\Mapping\MappingDriver as DoctrineBundleMappingDriver;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\Driver\XmlDriver;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\Mapping\Driver\MappingDriver;
+use Doctrine\Persistence\Mapping\Driver\MappingDriverChain;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageRevision;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
@@ -30,6 +35,7 @@ use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use RuntimeException;
 use stdClass;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -152,6 +158,36 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $repository = $container->get(BuilderPageRepositoryInterface::class);
         self::assertInstanceOf(BuilderPageRepositoryInterface::class, $repository);
         self::assertSame('about', $repository->findOneByPageKey('about')?->getPageKey());
+    }
+
+    /**
+     * 1.16 (REQ-ARCH-001 rule 2): a DDD host whose managers load XML mapping only maps the bundle entities from the
+     * shipped XML (`doctrine.mapping_type: xml`) on its dedicated manager, in `host` transaction mode; the key-based
+     * port, the repository and the id events behave as with the attribute mapping.
+     */
+    public function testXmlMappingOnADedicatedManagerInHostTransactionMode(): void
+    {
+        $container = $this->boot($this->twoManagers(autoMapping: false), ['entity_manager' => 'page_builder', 'transaction' => 'host', 'mapping_type' => 'xml']);
+        $default   = $this->manager($container, 'default');
+        $bundle    = $this->manager($container, 'page_builder');
+
+        self::assertInstanceOf(XmlDriver::class, $this->bundleDriver($bundle));
+        self::assertTrue($default->getMetadataFactory()->isTransient(BuilderPage::class), 'not mapped on the host manager');
+        self::assertCount(6, $bundle->getMetadataFactory()->getAllMetadata());
+
+        $uuid = $this->publisher($container)->createPageByKey('xml-page', 'XML page', 'en');
+        self::assertSame([], $this->pageKeys($bundle), 'host mode: the bundle does not flush');
+        self::assertSame([], $this->events);
+        $bundle->flush(); // the host's unit of work on the bundle manager
+        self::assertSame(['xml-page'], $this->pageKeys($bundle));
+        self::assertCount(1, $this->events);
+        self::assertInstanceOf(PageCreatedEvent::class, $this->events[0]);
+        self::assertSame(['xml-page', $uuid], [$this->events[0]->pageKey, $this->events[0]->pageUuid]);
+        self::assertSame([false], $this->inTransaction, 'dispatched after the host commit');
+
+        $repository = $container->get(BuilderPageRepositoryInterface::class);
+        self::assertInstanceOf(BuilderPageRepositoryInterface::class, $repository);
+        self::assertSame('xml-page', $repository->findOneByPageKey('xml-page')?->getPageKey());
     }
 
     /**
@@ -1103,5 +1139,19 @@ final class PageBuilderPersistenceKernelTest extends TestCase
             ],
             'orm' => $orm,
         ];
+    }
+
+    /**
+     * The metadata driver of the bundle namespace in the manager's chain (DoctrineBundle wraps the chain).
+     */
+    private function bundleDriver(EntityManagerInterface $manager): ?MappingDriver
+    {
+        $driver = $manager->getConfiguration()->getMetadataDriverImpl();
+        if ($driver instanceof DoctrineBundleMappingDriver) {
+            $driver = new ReflectionProperty($driver, 'driver')->getValue($driver);
+        }
+        self::assertInstanceOf(MappingDriverChain::class, $driver);
+
+        return $driver->getDrivers()[PageBuilderEntityManagerPass::ENTITY_NAMESPACE] ?? null;
     }
 }
