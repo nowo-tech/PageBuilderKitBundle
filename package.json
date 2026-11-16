@@ -17,15 +17,15 @@
     "dev:inline-edit": "VITE_ENTRY=inline-edit vite build --watch"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5",
-    "@vitest/coverage-v8": "^5.0.5",
-    "grapesjs": "0.22.9",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.0",
+    "grapesjs": "0.23.9",
     "grapick": "0.1.13",
-    "jsdom": "^30.1.3",
+    "jsdom": "^31.0.1",
     "only-allow": "^1.2.2",
-    "typescript": "~5.7.3",
-    "vite": "^6.4.4",
-    "vitest": "^5.0.5"
+    "typescript": "~7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   },
   "description": "Build and unit tests of the Page Builder Kit Bundle TypeScript (GrapesJS canvas, inline edit, admin media picker)"
 }
