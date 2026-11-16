@@ -110,7 +110,16 @@ As a maintainer, I boot the Symfony 8 FrankenPHP demo on port **8137** and run Q
 | --- | --- |
 | FR-ORM-001 | Entities persist pages, translations, documents, locale props, revision snapshots |
 | FR-ORM-002 | Optional `table_prefix` via `TablePrefixListener` |
+| FR-ORM-003 | Optional dedicated entity manager (`doctrine.entity_manager`, 1.14): bundle entities mapped only there (`PageBuilderEntityManagerPass`, `ExcludedEntityNamespaceDriver`), resolved by `PageBuilderEntityManagerFactory`, kept usable in a kept-alive worker (`OwnEntityManagerSubscriber`) |
+| FR-ORM-004 | Bundle unit of work (`doctrine.transaction: bundle` default, or `host`): `PageBuilderTransaction` + after-commit DBAL middleware report the real transactions to `PageBuilderOutbox`, which dispatches write events only after the outermost commit and drops them on rollback (1.14) |
 | FR-I18N-001 | Widget props and page translations use configured locales with default fallback |
+
+### Ports and write events (`FR-ARC-*`, `FR-EVT-*`)
+
+| ID | Requirement |
+| --- | --- |
+| FR-ARC-001 | Framework-free ports for hosts (REQ-ARCH-001, 1.14–1.15): key-based `PagePublisherInterface`, entity-free `GrapesTwigPageContextProviderInterface` + `PageContext`, `PageBuilderAssetUploadStorageInterface` + `AssetUpload` VO (wired by `AssetStoragePortsPass`); the entity / HttpFoundation contracts stay as deprecated twins |
+| FR-EVT-001 | Write events `Page{Created,DocumentSaved,MetadataSaved,Published,Unpublished,RevisionRestored,TemplateChanged}Event` are plain value objects (ids and scalars) dispatched after commit (FR-ORM-004) |
 
 ### Demo and quality (`FR-DEMO-*`, `FR-QA-*`)
 
@@ -141,7 +150,7 @@ Still deferred (not Phase 1–5 MVP acceptance criteria):
 | --- | --- |
 | SC-01 | Editors can create a page and save a document from the canvas |
 | SC-02 | Published pages render at `/p/{pageKey}` or via `nowo_page_builder_render()` |
-| SC-03 | [`code-inventory.md`](code-inventory.md) maps all production files under `src/` (current tree; all shipped phases): **165/165** (`git ls-files src \| wc -l`) |
+| SC-03 | [`code-inventory.md`](code-inventory.md) maps all production files under `src/` (current tree; all shipped phases): **210/210** (`git ls-files src \| grep -v Resources/assets/tests \| wc -l`) |
 | SC-04 | Demo answers on `http://localhost:8137` |
 | SC-05 | `make demo-smoke` returns HTTP 200 |
 

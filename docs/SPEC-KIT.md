@@ -206,7 +206,7 @@ git ls-files src | wc -l
 
 The **Total production sources** row in `code-inventory.md` must match this count.
 
-In **PageBuilderKitBundle**, the baseline inventory covers **165/165** files — see [`specs/001-baseline/code-inventory.md`](../specs/001-baseline/code-inventory.md).
+In **PageBuilderKitBundle**, the baseline inventory covers **210/210** production files (the Vitest suite in `src/Resources/assets/tests` excluded) — see [`specs/001-baseline/code-inventory.md`](../specs/001-baseline/code-inventory.md).
 Shipped phases live in `specs/002-phase2-grapesjs/` … `specs/009-product-polish-compliance/`; the `001-baseline` inventory is canonical across all phases.
 
 ---

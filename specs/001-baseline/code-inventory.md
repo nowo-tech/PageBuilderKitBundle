@@ -2,11 +2,11 @@
 
 **Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md) · [Phase 7](../008-phase7-media-tags-nesting/spec.md) · [Phase 9](../009-product-polish-compliance/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-10-20 (post **v1.8.1**)
+**Last audited:** 2026-11-16 (post **v1.16.0**)
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **165** files (every file tracked under `src/`; audit: `git ls-files src | wc -l`)
+**Total production sources:** **210** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
 
 ## Bundle entry
 
@@ -54,6 +54,9 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `DependencyInjection/Compiler/GrapesBlockPackPass.php` | Tagged Grapes block packs → registry | FR-P4-PACK-003, FR-P9-DX-002 |
 | `DependencyInjection/Compiler/CsrfProtectionPass.php` | Refuses to compile without form CSRF protection (fail closed) | REQ-SEC-005 |
 | `DependencyInjection/Compiler/PageBuilderMappingDriverPass.php` | Attribute (default) or XML mapping of the entities (1.16, `doctrine.mapping_type`) | FR-ORM-001 |
+| `DependencyInjection/Compiler/PageBuilderEntityManagerPass.php` | Maps the bundle entities only on `doctrine.entity_manager` (1.14) | FR-ORM-003 |
+| `DependencyInjection/Compiler/AfterCommitMiddlewarePass.php` | Attaches the after-commit DBAL middleware to the bundle's connection only (1.14) | FR-ORM-004 |
+| `DependencyInjection/Compiler/AssetStoragePortsPass.php` | Wires the 1.15 asset upload storage port and the deprecated storage alias | FR-ARC-001, FR-P2-ADM-005 |
 
 ## Entities
 
@@ -90,6 +93,34 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `EventSubscriber/PageBuilderKitAdminAccessSubscriber.php` | Admin route access + capabilities | FR-SEC-001, FR-P5-ACL-005, REQ-UI-002 |
 | `EventSubscriber/WorkerStateResetSubscriber.php` | Clears locale bind on terminate | FR-WRK-001 |
 
+## Write events
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Event/PageCreatedEvent.php` | Page created (admin, template, duplicate, import) (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PageDocumentSavedEvent.php` | Page document saved (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PageMetadataSavedEvent.php` | Page translations / SEO metadata saved (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PagePublishedEvent.php` | Page published (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PageUnpublishedEvent.php` | Page back to draft (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PageRevisionRestoredEvent.php` | Revision restored as the live document (plain VO, dispatched after commit) | FR-EVT-001 |
+| `Event/PageTemplateChangedEvent.php` | Page template saved, imported or deleted (plain VO, dispatched after commit) | FR-EVT-001 |
+
+## Persistence — entity manager, unit of work and outbox
+
+| Source file | Purpose | Requirement IDs |
+| --- | --- | --- |
+| `Persistence/PageBuilderEntityManagerFactory.php` | Resolves the manager that maps the bundle entities when `doctrine.entity_manager` is not set | FR-ORM-003 |
+| `Persistence/ExcludedEntityNamespaceDriver.php` | Maps nothing for the bundle namespace on every other entity manager | FR-ORM-003 |
+| `Persistence/OwnEntityManagerSubscriber.php` | Keeps the bundle's own entity manager usable in a kept-alive kernel | FR-ORM-003, FR-WRK-001 |
+| `Persistence/UnitOfWorkBoundaries.php` | Tracks the outermost request / message / command boundary (REQ-RUNTIME-002) | FR-WRK-001 |
+| `Persistence/PageBuilderTransaction.php` | Unit-of-work boundary of the bundle writes (`doctrine.transaction: bundle|host`) | FR-ORM-004 |
+| `Persistence/PageBuilderPendingEventsInterface.php` | Write events recorded and not dispatched yet | FR-ORM-004, FR-EVT-001 |
+| `Persistence/PageBuilderOutbox.php` | Per-transaction outbox: dispatch after the outermost commit, drop on rollback | FR-ORM-004, FR-EVT-001 |
+| `Persistence/TransactionObserverInterface.php` | Observer of the real transactions and savepoints of the bundle connection | FR-ORM-004 |
+| `Persistence/AfterCommitMiddleware.php` | DBAL middleware reporting real transactions to the observers | FR-ORM-004 |
+| `Persistence/AfterCommitDriver.php` | Driver of the after-commit middleware | FR-ORM-004 |
+| `Persistence/AfterCommitConnection.php` | Connection of the after-commit middleware (transactions + savepoints) | FR-ORM-004 |
+
 ## Forms
 
 | Source file | Purpose | Requirement IDs |
@@ -125,6 +156,9 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Media/AssetUploadResult.php` | Upload result VO | FR-P2-ADM-005 |
 | `Media/LocalFilesystemAssetStorage.php` | Local disk storage + list | FR-P2-ADM-005, FR-P7-MED-001 |
 | `Media/AwsS3AssetStorage.php` | S3 storage | FR-P2-ADM-005 |
+| `Media/PageBuilderAssetUploadStorageInterface.php` | Framework-free upload storage port (1.15; twin of the deprecated storage contract) | FR-ARC-001, FR-P2-ADM-005 |
+| `Media/AssetUpload.php` | Uploaded file as a bundle value object (no `UploadedFile`) | FR-ARC-001, FR-P2-ADM-005 |
+| `Media/AssetUploadData.php` | Keeps upload values outside the VO; builds it from an HTTP upload | FR-ARC-001, FR-P2-ADM-005 |
 | `Media/UploadedAssetExtension.php` | Stored extension derived from detected MIME (never the client name) | FR-P2-ADM-005, FR-SEC-005 |
 
 ## Repository
@@ -167,6 +201,9 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Service/GrapesDocumentSanitizer.php` | Sanitize Grapes HTML/CSS + locale content | FR-P2-REN-003, FR-P9-ENG-003 |
 | `Service/GrapesTwigRenderer.php` | Sandboxed Twig in Grapes HTML | FR-P2-REN-002 |
 | `Service/GrapesTwigContextProviderInterface.php` | Host Twig context hook | FR-P2-REN-002 |
+| `Service/GrapesTwigPageContextProviderInterface.php` | Entity-free host Twig context hook (1.15) | FR-ARC-001, FR-P2-REN-002 |
+| `Service/PageContext.php` | Page being rendered, by id and key (no entity) | FR-ARC-001, FR-P2-REN-002 |
+| `Service/PagePublisherInterface.php` | Key-based write port (implemented by `DocumentService`) | FR-ARC-001, FR-DOC-001 |
 
 ## HTML
 
@@ -321,16 +358,18 @@ Maps production files under `src/` to functional requirements across shipped pha
 | --- | ---: | ---: |
 | Bundle entry | 1 | 1 |
 | Controllers | 12 | 12 |
-| Debug / Web Profiler | 4 | 4 |
-| Dependency injection and compiler | 8 | 8 |
-| Entities | 6 | 6 |
+| Debug / Web Profiler | 5 | 5 |
+| Dependency injection and compiler | 12 | 12 |
+| Entities | 12 | 12 |
 | Enums and locale | 6 | 6 |
 | Event subscribers | 2 | 2 |
+| Write events | 7 | 7 |
+| Persistence — entity manager, unit of work and outbox | 11 | 11 |
 | Forms | 13 | 13 |
 | Grapes block packs | 2 | 2 |
-| Media | 7 | 7 |
+| Media | 10 | 10 |
 | Repository | 8 | 8 |
-| Services | 23 | 23 |
+| Services | 26 | 26 |
 | HTML | 2 | 2 |
 | Content fields and bind slots | 4 | 4 |
 | Utilities | 1 | 1 |
@@ -342,4 +381,4 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Resources — admin and public Twig | 27 | 27 |
 | Resources — frontend assets | 12 | 12 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **175** | **175** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **210** | **210** |
