@@ -1,51 +1,61 @@
-<!DOCTYPE html>
-<html lang="{{ app.request.locale|default('en') }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Page Builder Kit Demo{% endblock %}</title>
+{#
+  REQ-DEMO-014: the demo shell is UiKit's admin layout with its default theme (no CSS framework, no CDN). Demo pages
+  use the blocks `title`, `stylesheets`, `toolbar`, `body` and `javascripts`, mapped to the UiKit regions below.
+#}
+{% extends '@NowoUiKit/layout/admin.html.twig' %}
+
+{% block nowo_ui_document_title %}{% block title %}Page Builder Kit Demo{% endblock %}{% endblock %}
+
+{% block nowo_ui_head %}
+    {{ parent() }}
     {% if page_tree is defined and page_tree.seo is defined %}
         {% include '@NowoPageBuilderKitBundle/public/_seo_meta.html.twig' with { seo: page_tree.seo } %}
     {% endif %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
     <link rel="stylesheet" href="{{ asset('css/page-builder.css', 'nowo_page_builder_kit') }}">
     {{ vite_entry_link_tags('app') }}
     {% block stylesheets %}{% endblock %}
-</head>
-<body class="pbk-demo-shell">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid px-3 px-lg-4">
-        <a class="navbar-brand fw-semibold" href="{{ path('showcase') }}">Page Builder Kit · Demo</a>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <a class="btn btn-sm btn-warning" href="{{ path('showcase') }}">Use cases</a>
-            <a class="btn btn-sm btn-outline-light" href="{{ path('home') }}">Home</a>
-            <a class="btn btn-sm btn-outline-light" href="{{ path('compounds') }}">Compounds</a>
-            <a class="btn btn-sm btn-outline-light" href="{{ path('classic') }}">Classic v1</a>
-            <a class="btn btn-sm btn-outline-light" href="{{ path('draft') }}">Draft</a>
-            <a class="btn btn-sm btn-outline-light" href="{{ path('i18n') }}">i18n</a>
-            <a class="btn btn-sm btn-outline-info" href="{{ path('multi_render') }}">Multi-render</a>
-            <span class="vr text-secondary d-none d-lg-inline"></span>
-            <a class="btn btn-sm btn-outline-warning" href="{{ path('admin_page_builder_list') }}">Admin</a>
+{% endblock %}
+
+{% block nowo_ui_navigation %}
+    {% set _route = app.request.attributes.get('_route') %}
+    {% set _params = app.request.attributes.get('_route_params')|default({}) %}
+    <header class="nowo-ui-header" data-testid="demo-masthead">
+        <a class="nowo-ui-brand" href="{{ path('showcase') }}">Page Builder Kit</a>
+        <nav class="nowo-ui-menu" aria-label="Page Builder Kit">
+            {% for route, label in {showcase: 'Use cases', home: 'Home', compounds: 'Compounds', classic: 'Classic v1', draft: 'Draft', i18n: 'i18n', multi_render: 'Multi-render', admin_page_builder_list: 'Admin'} %}
+                <a class="nowo-ui-link" href="{{ path(route) }}"{% if _route == route %} aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav>
+        <div class="nowo-ui-header__end">
             {% if app.user %}
-                <a class="btn btn-sm btn-outline-warning" href="{{ path('app_logout') }}">Logout</a>
+                <a class="nowo-ui-link" href="{{ path('app_logout') }}">Logout</a>
             {% else %}
-                <a class="btn btn-sm btn-primary" href="{{ path('app_login') }}">Login</a>
+                <a class="nowo-ui-link" href="{{ path('app_login') }}">Login</a>
             {% endif %}
-            {% set _route = app.request.attributes.get('_route') %}
-            {% set _params = app.request.attributes.get('_route_params')|default({}) %}
             {% if _route %}
-                <a class="btn btn-sm btn-outline-info" href="{{ path(_route, _params|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">
-                    {{ app.request.locale == 'es' ? 'EN' : 'ES' }}
-                </a>
+                <a class="nowo-ui-link" href="{{ path(_route, _params|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">{{ app.request.locale == 'es' ? 'EN' : 'ES' }}</a>
             {% endif %}
+            {{ include('@NowoUiKitBundle/partials/_theme_toggle.html.twig', { compact: true }, false) }}
         </div>
-    </div>
-</nav>
-{% block toolbar %}{% endblock %}
-<main class="pbk-demo-main">
-    {% block body %}{% endblock %}
-</main>
-{{ vite_entry_script_tags('app') }}
-{% block javascripts %}{% endblock %}
-</body>
-</html>
+    </header>
+{% endblock %}
+
+{% block nowo_ui_flashes %}
+    {% for type, css in {success: 'success', error: 'error', warning: 'warning', info: 'info'} %}
+        {% for message in app.flashes(type) %}
+            <div class="nowo-ui-flash nowo-ui-flash--{{ css }}" role="{{ type == 'error' ? 'alert' : 'status' }}">{{ message }}</div>
+        {% endfor %}
+    {% endfor %}
+{% endblock %}
+
+{% block nowo_ui_content %}{% block toolbar %}{% endblock %}{% block body %}{% endblock %}{% endblock %}
+
+{% block nowo_ui_scripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('app') }}
+    {% block javascripts %}{% endblock %}
+{% endblock %}

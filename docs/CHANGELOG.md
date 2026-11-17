@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Demo: the shell is UiKit's admin layout with its default theme and masthead (no Bootstrap CDN, no Bootstrap Icons CDN); the demo login is a FormKit form (profile `demo`) themed by UiKit's form theme; the demo requires `nowo-tech/ui-kit-bundle` ^2.53 and `nowo-tech/form-kit-bundle` ^2.23; the e2e Playwright image matches the lockfile (v1.65.0); screenshots re-captured (REQ-DEMO-014/015). No bundle runtime change.
 - Spec Kit: `specs/001-baseline/code-inventory.md` maps the 27 files added since 1.8.1 (write events, entity manager / unit of work / outbox persistence layer, after-commit middleware, asset and render ports) and recounts the summary (210/210 production files); `spec.md` documents that existing behaviour as FR-ORM-003, FR-ORM-004, FR-ARC-001 and FR-EVT-001 (REQ-SPECKIT-001/003)
 - CI: Dependabot npm updates for the bundle assets (`/`), `demo/symfony8` and `demo/symfony8/e2e` (REQ-GH-002)
 

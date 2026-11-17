@@ -3,31 +3,26 @@
 {% block title %}Sign in{% endblock %}
 
 {% block body %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h1 class="h3 mb-3">Admin login</h1>
-                <p class="text-muted">Use the in-memory demo account to access PageBuilderKit admin screens.</p>
+<section class="nowo-ui-card">
+    <div class="nowo-ui-card__header"><h1 class="nowo-ui-card__title">Admin login</h1></div>
+    <div class="nowo-ui-card__body">
+        <p class="nowo-ui-muted">Use the in-memory demo account to access PageBuilderKit admin screens.</p>
 
-                {% if error %}
-                    <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-                {% endif %}
+        {% if error %}
+            <div class="nowo-ui-flash nowo-ui-flash--error" role="alert">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+        {% endif %}
 
-                <div class="alert alert-secondary">
-                    Credentials: <code>admin</code> / <code>admin</code>
-                </div>
-
-                {{ form_start(login_form, { action: path('app_login'), attr: { class: 'pbk-demo-login' } }) }}
-                    {% for child in login_form %}
-                        {% if not child.rendered %}
-                            <div class="mb-3">{{ form_row(child) }}</div>
-                        {% endif %}
-                    {% endfor %}
-                    <button class="btn btn-primary w-100" type="submit">Sign in</button>
-                {{ form_end(login_form) }}
-            </div>
+        <div class="nowo-ui-flash nowo-ui-flash--info" role="note">
+            Credentials: <code class="nowo-ui-code">admin</code> / <code class="nowo-ui-code">admin</code>
         </div>
+
+        {{ form_start(login_form, { action: path('app_login'), attr: { class: 'pbk-demo-login' } }) }}
+            {% for child in login_form %}
+                {% if not child.rendered %}
+                    {{ form_row(child) }}
+                {% endif %}
+            {% endfor %}
+        {{ form_end(login_form) }}
     </div>
-</div>
+</section>
 {% endblock %}
