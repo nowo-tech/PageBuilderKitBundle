@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - HTTP tests of every admin and public controller and of the repositories through a real kernel and SQLite (`tests/Integration/Http`); `phpunit.xml.dist` no longer excludes `src/Controller` and `src/Repository`, and the element coverage gate stays above 99 % (REQ-TEST-003).
 
+### Fixed
+
+- The vendored `grapes.min.css` came from GrapesJS 0.23.9 (the `grapesjs` devDependency bump of #51) while the editor itself is imported at `grapesjs.cdn_version` 0.22.9, so stylesheet and script versions differed. `grapesjs` is pinned back to the exact `0.22.9` (package.json and `pnpm-lock.yaml`) and the CSS is rebuilt from it; a unit test now fails when the package.json pin, the lockfile, the `cdn_version` default, `GrapesJsFrontendConfig` or the canvas fallback drift apart. The inline-edit and admin IIFE bundles are emitted with `"use strict"` again (Vite 8 dropped it).
+
 ### Changed
 
 - Demo: the shell is UiKit's admin layout with its default theme and masthead (no Bootstrap CDN, no Bootstrap Icons CDN); the demo login is a FormKit form (profile `demo`) themed by UiKit's form theme; the demo requires `nowo-tech/ui-kit-bundle` ^2.53 and `nowo-tech/form-kit-bundle` ^2.23; the e2e Playwright image matches the lockfile (v1.65.0); screenshots re-captured (REQ-DEMO-014/015). No bundle runtime change.

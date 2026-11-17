@@ -33,6 +33,7 @@ const configs: Record<Entry, { build: object }> = {
         input: 'src/Resources/assets/src/page-builder-inline-edit.ts',
         output: {
           format: 'iife' as const,
+          strict: true,
           entryFileNames: 'js/page-builder-inline-edit.js',
         },
       },
@@ -48,6 +49,7 @@ const configs: Record<Entry, { build: object }> = {
         input: 'src/Resources/assets/src/page-builder-admin.ts',
         output: {
           format: 'iife' as const,
+          strict: true,
           entryFileNames: 'js/page-builder-admin.js',
         },
       },
