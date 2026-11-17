@@ -10,6 +10,10 @@ services:
     App\Demo\:
         resource: '../src/Demo/'
 
+    # FormKit forms (REQ-DEMO-015) are services: FormKit injects its options merger into them.
+    App\Form\:
+        resource: '../src/Form/'
+
     App\Demo\DemoS3Helper:
         arguments:
             $endpoint: '%env(S3_ENDPOINT)%'

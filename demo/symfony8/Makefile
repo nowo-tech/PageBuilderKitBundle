@@ -108,7 +108,7 @@ release-check: ensure-up update-bundle test test-coverage
 
 # Paste into demo/symfony8/Makefile (REQ-DEMO-013). Uses official Playwright image.
 # Keep in sync with @playwright/test in e2e/package-lock.json (browsers ship with the image).
-PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.64.1-jammy
+PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.65.0-jammy
 
 test-e2e: ensure-up
 	@mkdir -p e2e/node_modules
