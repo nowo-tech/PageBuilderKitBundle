@@ -19,13 +19,7 @@
       <directory>src</directory>
     </include>
     <exclude>
-      <!-- REQ-TEST-003 justified exclusion: controllers are thin HTTP adapters (access guard + form handling +
-           render) over covered services; they are exercised end to end by the demo Playwright suite
-           (demo/symfony8/e2e/tests/demo.spec.ts: page list, canvas, content editor, templates) and demo-smoke. -->
-      <directory>src/Controller</directory>
       <directory>src/Resources</directory>
-      <!-- Doctrine ServiceEntityRepository needs a full ORM runtime; covered via contract tests. -->
-      <directory>src/Repository</directory>
     </exclude>
   </source>
   <coverage>

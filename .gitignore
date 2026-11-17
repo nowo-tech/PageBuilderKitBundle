@@ -33,3 +33,6 @@ npm-shrinkwrap.json
 # Cursor local sandbox (machine-specific; REQ-IDE-005)
 .cursor/sandbox.json
 
+
+# local coverage text report
+coverage-output.txt
