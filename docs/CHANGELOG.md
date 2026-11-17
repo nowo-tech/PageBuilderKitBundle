@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Spec Kit: `specs/001-baseline/code-inventory.md` maps the 27 files added since 1.8.1 (write events, entity manager / unit of work / outbox persistence layer, after-commit middleware, asset and render ports) and recounts the summary (210/210 production files); `spec.md` documents that existing behaviour as FR-ORM-003, FR-ORM-004, FR-ARC-001 and FR-EVT-001 (REQ-SPECKIT-001/003)
 - CI: Dependabot npm updates for the bundle assets (`/`), `demo/symfony8` and `demo/symfony8/e2e` (REQ-GH-002)
 
+### Fixed
+
+- A blank required SEO field (`title`, `slug`) on the admin SEO form answered HTTP 500 because `null` reached the `string` setter before `NotBlank` ran; both fields now use `empty_data: ''`, so validation runs and the form answers 422 with the error message.
+
 ## [1.16.0] - 2026-11-13
 
 ### Added

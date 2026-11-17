@@ -171,6 +171,21 @@ final class RevisionsContentTemplatesHttpTest extends AbstractHttpTestCase
         self::assertSame(422, $this->request('POST', $uri, ['builder_page_seo' => ['title' => str_repeat('t', 400), 'slug' => str_repeat('s', 400), '_token' => 'accepted']])->getStatusCode());
     }
 
+    public function testSeoBlankRequiredFieldsAnswer422WithFormErrorNot500(): void
+    {
+        $this->boot();
+        $this->page('alpha', self::grapes());
+        $uri = self::ADMIN . '/pages/alpha/seo';
+
+        foreach (['title', 'slug'] as $blank) {
+            $fields         = ['title' => 'Alpha', 'slug' => 'alpha', '_token' => 'accepted'];
+            $fields[$blank] = '';
+            $response       = $this->request('POST', $uri, ['builder_page_seo' => $fields]);
+            self::assertSame(422, $response->getStatusCode(), $blank . ': ' . substr((string) $response->getContent(), 0, 300));
+            self::assertStringContainsString('should not be blank', (string) $response->getContent());
+        }
+    }
+
     public function testTemplatesListSaveApplyExportImportAndDelete(): void
     {
         $this->boot();
