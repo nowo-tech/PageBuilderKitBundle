@@ -151,7 +151,7 @@ Demo default URL: `http://localhost:8137`.
 
 | Area | Status | Command |
 | --- | --- | --- |
-| PHP `src/` coverage | **99.63%** lines (4585/4602; CI gate **≥99%**; `src/Controller` and `src/Repository` excluded — controllers are covered end to end by the demo Playwright suite, repositories need a full ORM runtime; see `phpunit.xml.dist`) | `make test-coverage` |
+| PHP `src/` coverage | **99.17%** elements (6835/6892; CI gate **≥99%**; every `src/` file is measured: the controllers and repositories are exercised through a real kernel and SQLite in `tests/Integration/Http`) | `make test-coverage` |
 | TS `src/Resources/assets/src` coverage | **96.90%** global (min of statements 99.24% / branches 96.90% / functions 98.00% / lines 99.34%; Vitest + jsdom; gate ≥ 99% lines and statements, ≥ 98% functions, ≥ 96% branches in `vitest.config.ts`) | `make test-ts` |
 | Python | **N/A** | — |
 | Unit / bundle QA | Enabled | `make test` |
