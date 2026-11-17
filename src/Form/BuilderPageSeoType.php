@@ -27,10 +27,12 @@ final class BuilderPageSeoType extends AbstractType
     {
         $this->addWithDefaults($builder, 'title', TextType::class, [
             'label'       => 'form.page_title',
+            'empty_data'  => '',
             'constraints' => [new Assert\NotBlank(), new Assert\Length(max: 255)],
         ]);
         $this->addWithDefaults($builder, 'slug', TextType::class, [
             'label'       => 'form.page_slug',
+            'empty_data'  => '',
             'constraints' => [new Assert\NotBlank(), new Assert\Length(max: 255)],
         ]);
         $this->addWithDefaults($builder, 'metaTitle', TextType::class, [
