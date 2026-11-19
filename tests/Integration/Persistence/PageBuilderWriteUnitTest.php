@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
 use LogicException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTemplate;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
@@ -183,6 +185,52 @@ final class PageBuilderWriteUnitTest extends AbstractHttpTestCase
 
         self::assertTrue($this->em->isOpen(), 'the closed manager was replaced through the registry');
         self::assertSame(1, (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM pb_page_template'));
+    }
+
+    /**
+     * The SEO save is one flush outside a unit: a failed flush (here a duplicate translation) closes the manager,
+     * which is replaced so the next write of a kept-alive worker works (audit UW-2).
+     */
+    public function testAFailedSeoFlushLeavesAnOpenManager(): void
+    {
+        $this->boot();
+        $page = $this->documents->createPage('seo', 'Seo', 'en');
+        $page->addTranslation(new BuilderPageTranslation()->setLocale('en')->setTitle('Twice')->setSlug('twice'));
+
+        try {
+            $this->documents->flushPage($page);
+            self::fail('The duplicate translation must be refused.');
+        } catch (UniqueConstraintViolationException) {
+        }
+
+        self::assertTrue($this->em->isOpen(), 'the closed manager was replaced');
+        $this->documents->createPage('after-seo', 'After', 'en');
+        self::assertSame(2, (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM pb_page'));
+    }
+
+    public function testAnOpenOrUnregisteredManagerIsNotReplaced(): void
+    {
+        $this->boot();
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->expects(self::never())->method('resetManager');
+        new PageBuilderTransaction($this->em, registry: $registry)->replaceClosedManager();
+
+        $this->em->close();
+        new PageBuilderTransaction($this->em)->replaceClosedManager();
+        self::assertFalse($this->em->isOpen(), 'without a registry the host (or its kernel reset) replaces it');
+    }
+
+    public function testTheContentFormOfAPageWithoutADocumentIsRefusedWithAFlash(): void
+    {
+        $this->boot();
+        $this->em->persist(new BuilderPage()->setPageKey('bare')->setUuid('uuid-bare'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $content = self::ADMIN . '/pages/bare/content';
+        self::assertSame(302, $this->request('POST', $content . '?locale=en', ['action' => 'save_values', '_csrf_token' => 'x', 'fieldValues' => ['en' => ['title' => 'x']]])->getStatusCode());
+        self::assertSame(302, $this->request('POST', $content . '/schema', ['_csrf_token' => 'x', 'schema_action' => 'remove', 'key' => 'title'])->getStatusCode());
+        self::assertSame(0, (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM pb_document'), 'nothing written');
     }
 
     public function testKeyBasedWritesOfAnUnknownPageAreRefusedBeforeAnyUnit(): void

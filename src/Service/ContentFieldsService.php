@@ -13,10 +13,14 @@ use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 
+use function array_filter;
 use function array_key_exists;
+use function array_merge;
+use function array_values;
 use function is_array;
 use function is_string;
 use function sprintf;
+use function trim;
 
 /**
  * Persist content-field schema and locale values without touching Grapes layout HTML.
@@ -48,6 +52,78 @@ final readonly class ContentFieldsService
     public function saveValues(BuilderPage $page, array $fieldValues, ?array $fields = null): void
     {
         $this->unit($page, fn () => $this->doSaveValues($page, $fieldValues, $fields));
+    }
+
+    /**
+     * Merges an editor's posted values onto the values stored under the page lock (1.17, REQ-RUNTIME-003 rule 4): the
+     * content form of one locale never writes back other locales or fields it read before another editor's save.
+     *
+     * - `$postedByLocale`: locale => key => value, only the locales and keys the editor submitted. A `bool` field of
+     *   the stored schema missing from a posted locale is saved as false (unchecked checkboxes are not posted).
+     * - `$labels`: key => label for `$labelLocale` (label edits of the form); unknown keys and blank labels are ignored.
+     *
+     * @param array<string, array<string, mixed>> $postedByLocale
+     * @param array<string, string> $labels
+     */
+    public function mergeValues(BuilderPage $page, array $postedByLocale, string $labelLocale = '', array $labels = []): void
+    {
+        $this->unit($page, function () use ($page, $postedByLocale, $labelLocale, $labels): void {
+            $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
+            $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
+            $values    = $this->contentFieldsNormalizer->normalizeValues($structure['fieldValues'] ?? [], $schema);
+
+            foreach ($postedByLocale as $locale => $bag) {
+                foreach ($schema as $field) {
+                    if (($field['type'] ?? '') === ContentFieldType::Bool->value && !array_key_exists($field['key'], $bag)) {
+                        $bag[$field['key']] = '0';
+                    }
+                }
+                $values[$locale] = array_merge($values[$locale] ?? [], $bag);
+            }
+
+            $labelsChanged = false;
+            foreach ($schema as $index => $field) {
+                $label = trim($labels[$field['key']] ?? '');
+                if ($labelLocale === '' || $label === '') {
+                    continue;
+                }
+                $schema[$index] = $this->contentFieldsNormalizer->mergeLabels($field, ['labels' => [$labelLocale => $label], 'label' => $label], $labelLocale);
+                $labelsChanged  = true;
+            }
+
+            $this->doSaveValues($page, $values, $labelsChanged ? $schema : null);
+        });
+    }
+
+    /**
+     * Appends one field definition to the schema stored under the page lock (1.17): a field another editor added in
+     * the meantime is kept.
+     *
+     * @param array<string, mixed> $field
+     */
+    public function saveSchemaWithField(BuilderPage $page, array $field): void
+    {
+        $this->unit($page, function () use ($page, $field): void {
+            $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
+            $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
+            $schema[]  = $field;
+            $this->doSaveSchema($page, $schema);
+        });
+    }
+
+    /**
+     * Removes one field from the schema stored under the page lock (1.17): the other fields stay as committed.
+     */
+    public function saveSchemaWithoutField(BuilderPage $page, string $key): void
+    {
+        $this->unit($page, function () use ($page, $key): void {
+            $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
+            $schema    = array_values(array_filter(
+                $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []),
+                static fn (array $field): bool => $field['key'] !== $key,
+            ));
+            $this->doSaveSchema($page, $schema);
+        });
     }
 
     /**

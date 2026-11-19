@@ -85,8 +85,19 @@ and its request commit mark. No schema change.
   `DocumentService`, `ContentFieldsService`, `PageRevisionService` or `PageTemplateService` from your own code with
   pending changes, flush them first, or give the bundle its own manager (`doctrine.entity_manager`).
   `DocumentService::flushPage()` (your form changed the entities) is unchanged: one flush.
+- **`postLoad` listeners on your manager (for example nowo-tech/doctrine-encrypt-bundle).** A listener that changes
+  entities after loading them (decryption) makes them look changed, so the host runner sees pending changes and every
+  bundle write fails with `LogicException`. Set `nowo_page_builder_kit.doctrine.entity_manager` to a manager of the
+  bundle's own (mapping only the bundle entities, without that listener).
+- **Content form and schema.** The admin content form now sends only the editor's intent:
+  `ContentFieldsService::mergeValues()` (posted locales and keys, unchecked bools, label edits) and `saveSchemaWithField()` /
+  `saveSchemaWithoutField()`, merged onto what is stored, under the page lock. `saveValues()` and `saveSchema()` are unchanged
+  for your code (whole replacement, now one unit under the lock).
+- **Conflict listener priority.** `PageBuilderConflictListener` runs at `kernel.exception` priority 64, before the
+  framework's error listener logs the exception; it still acts on the bundle's routes only.
 - **A closed manager is replaced.** After a write unit whose flush closed your manager, the runner replaces it through
-  the registry (an open manager is never cleared or reset). Before, it stayed closed until your code or the kernel reset
+  the registry (an open manager is never cleared or reset). The SEO save (`DocumentService::flushPage()`, one flush)
+  does the same before it rethrows the failure. Before, it stayed closed until your code or the kernel reset
   it.
 - **Events after the unit.** The write events of a unit are dispatched once, right after its commit (before, after each
   of its flushes). A unit inside your own transaction still waits for your outermost commit.

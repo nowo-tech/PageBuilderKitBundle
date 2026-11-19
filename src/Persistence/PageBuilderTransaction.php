@@ -213,6 +213,22 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     }
 
     /**
+     * After a failed write outside {@see run()} (the single flush of `DocumentService::flushPage()`): a manager the
+     * failed flush closed is replaced through the registry, so the next request of a kept-alive worker can write
+     * (1.17, REQ-RUNTIME-003 rule 2). An open manager is never touched.
+     */
+    public function replaceClosedManager(): void
+    {
+        if (!$this->entityManager->isOpen() && $this->registry instanceof ManagerRegistry) {
+            $this->logger->notice('Page builder: replacing the entity manager a failed write closed.', [
+                'bundle'  => 'NowoPageBuilderKitBundle',
+                'manager' => $this->managerName,
+            ]);
+            $this->registry->resetManager($this->managerName);
+        }
+    }
+
+    /**
      * Inside a transaction: locks the page's document row (`SELECT … FOR UPDATE`; the page row when it has no
      * document yet) and reads the document and its locales again under the lock (1.17, REQ-RUNTIME-003 rule 4), so a
      * read-modify-write starts from the last committed content. Unsaved changes of the document are discarded; the

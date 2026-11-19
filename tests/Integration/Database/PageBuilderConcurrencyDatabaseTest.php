@@ -27,6 +27,7 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
+use function array_column;
 use function assert;
 use function file_exists;
 use function getenv;
@@ -170,6 +171,71 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         $values = $this->storedStructure('fields')['fieldValues']['en'] ?? [];
         self::assertSame('First editor', $values['title'] ?? null, 'the first editor\'s value survives');
         self::assertSame('Second editor', $values['lead'] ?? null);
+    }
+
+    /**
+     * The content form of one locale (editor A, en) posted while editor B's inline save of another locale (es) holds
+     * the lock (two processes): A's values are merged onto what B committed, so B's es value survives (audit UW-1).
+     */
+    #[DataProvider('databases')]
+    public function testTheContentFormOfOneLocaleKeepsAnotherEditorsValueOfAnotherLocale(string $env): void
+    {
+        $url  = $this->boot($env, lockWait: 8);
+        $page = $this->documents->createPage('form', 'Form', 'en');
+        $this->documents->saveDocument($page, $this->grapes('<p>f</p>', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'flag', 'type' => 'bool', 'label' => 'Flag']]), []);
+        $documentId                                 = $this->documentId('form');
+        $structure                                  = $this->storedStructure('form');
+        $structure['fieldValues']['es']['headline'] = 'Titular de B';
+        $this->em->clear();
+
+        $child = $this->startHolder($url, [
+            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
+            [$this->sql('UPDATE {document} SET {document.structure} = ? WHERE id = ?'), [json_encode($structure, JSON_THROW_ON_ERROR), $documentId]],
+        ], 800);
+        $response = $this->handle(Request::create(self::ADMIN . '/pages/form/content?locale=en', 'POST', [
+            'action'      => 'save_values',
+            '_csrf_token' => 't',
+            'fieldValues' => ['en' => ['headline' => 'Headline of A']],
+            'fieldLabels' => ['en' => ['headline' => 'Main headline']],
+        ]));
+        $this->finish($child);
+
+        self::assertSame(302, $response->getStatusCode());
+        $stored = $this->storedStructure('form');
+        self::assertSame('Titular de B', $stored['fieldValues']['es']['headline'] ?? null, 'the other editor\'s value survives');
+        self::assertSame('Headline of A', $stored['fieldValues']['en']['headline'] ?? null);
+        self::assertFalse((bool) ($stored['fieldValues']['en']['flag'] ?? true), 'an unchecked bool of the posted locale is false');
+        self::assertSame('Main headline', $stored['fields'][0]['labels']['en'] ?? null, 'the label edit is applied');
+    }
+
+    /**
+     * A schema change (add a field) posted while another editor's save adds a field inline (two processes): both
+     * fields are in the schema (audit UW-1).
+     */
+    #[DataProvider('databases')]
+    public function testASchemaAddKeepsAFieldAnotherEditorAddedAtTheSameTime(string $env): void
+    {
+        $url  = $this->boot($env, lockWait: 8);
+        $page = $this->documents->createPage('schema', 'Schema', 'en');
+        $this->documents->saveDocument($page, $this->grapes('<p>s</p>', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline']]), []);
+        $documentId            = $this->documentId('schema');
+        $structure             = $this->storedStructure('schema');
+        $structure['fields'][] = ['key' => 'inline', 'type' => 'string', 'label' => 'Inline'];
+        $this->em->clear();
+
+        $child = $this->startHolder($url, [
+            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
+            [$this->sql('UPDATE {document} SET {document.structure} = ? WHERE id = ?'), [json_encode($structure, JSON_THROW_ON_ERROR), $documentId]],
+        ], 800);
+        $response = $this->handle(Request::create(self::ADMIN . '/pages/schema/content/schema', 'POST', ['_csrf_token' => 't', 'schema_action' => 'add', 'key' => 'added', 'type' => 'string', 'label' => 'Added']));
+        $this->finish($child);
+        self::assertSame(302, $response->getStatusCode());
+
+        $keys = array_column($this->storedStructure('schema')['fields'] ?? [], 'key');
+        self::assertSame(['headline', 'inline', 'added'], $keys);
+
+        $this->handle(Request::create(self::ADMIN . '/pages/schema/content/schema', 'POST', ['_csrf_token' => 't', 'schema_action' => 'remove', 'key' => 'headline']));
+        self::assertSame(['inline', 'added'], array_column($this->storedStructure('schema')['fields'] ?? [], 'key'));
     }
 
     /**

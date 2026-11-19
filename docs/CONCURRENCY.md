@@ -55,13 +55,15 @@ the residual risks. Worker mode (FrankenPHP, kernel reset off) is covered in
 | --- | --- | --- | --- |
 | Save the editor document (`POST /pages/{pageKey}/document`, `DocumentService::saveDocument()`, also `saveDocumentByKey()`) | One unit: revision snapshot, pruning and document | Page row lock, document read again (the snapshot records what this save replaces) | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
 | Content field from the canvas (`POST /pages/{pageKey}/fields/{fieldKey}`, `ContentFieldsService::saveFieldValue()`) | One unit | Page row lock, structure read again: two editors saving different fields keep both values | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
-| Content form and schema (`PageContentController`, `ContentFieldsService::saveValues()` / `saveSchema()`) | One unit | Page row lock, structure read again before the submitted values are applied | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
-| Classic sections editor (`PageSectionsController`) | One unit (`saveDocument()`) | As the document save | 409 (your error page) |
+| Content form (`PageContentController`, `ContentFieldsService::mergeValues()`) | One unit | Page row lock; only the editor's intent (the posted locales and keys, unchecked bools of those locales, label edits of the active locale) is merged onto the values and schema read under the lock, so another editor's other locale or field survives | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
+| Content schema (`PageContentController`, `ContentFieldsService::saveSchemaWithField()` / `saveSchemaWithoutField()`) | One unit | Page row lock; one add or remove applied to the schema read under the lock (a field another editor added meanwhile stays) | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
+| Your code: `saveValues()` / `saveSchema()` | One unit | Page row lock; they replace the values / schema with what you pass (whole replacement: build it from a fresh read, or use the intent methods above) | `TransientStorageFailure` |
+| Classic sections editor (legacy, `PageSectionsController`) | One unit (`saveDocument()`) | As the document save, but the editor posts the whole document built from its earlier read (see residual risks) | 409 (your error page) |
 | Publish / unpublish (`POST /pages/{pageKey}/publish`, `/unpublish`, `publishByKey()`, `unpublishByKey()`) | One unit | Page row lock: the required-field check and the publish revision read the content being published | 409 (JSON when asked, else your error page) |
 | Create a page (`PageListController`, `createPage()`, `createPageByKey()`) | One unit | Unique `page_key`: two editors creating the same key get one page; the second gets "Page key … already exists" | Domain error (form error / flash, 400 in JSON) |
 | Duplicate a page (`POST /pages/{pageKey}/duplicate`) | One unit: create, copy, translations | Unique `page_key` as above | 409 `CONFLICT_*`, or the domain error |
 | Import a page (`POST /pages/import`, `DocumentImportExportService::import()`) | One unit: create or load, document, translations, publish | Page row lock through the save; unique `page_key` | 409 `CONFLICT_*`, or the domain error |
-| SEO and translations (`PageSeoController`, `DocumentService::flushPage()`) | One ORM flush (the form changed the entities before the call) | Doctrine writes the changed columns only; unique `(page, locale)` translation key | 409 `CONFLICT_*`; a duplicate translation answers 409 `PAGE_BUILDER_CONCURRENT_EDIT` |
+| SEO and translations (`PageSeoController`, `DocumentService::flushPage()`) | One ORM flush (the form changed the entities before the call). A failed flush closes the manager; `flushPage()` replaces a closed one through the registry before rethrowing, so a kept-alive worker keeps writing | Doctrine writes the changed columns only; unique `(page, locale)` translation key | 409 `CONFLICT_*`; a duplicate translation answers 409 `PAGE_BUILDER_CONCURRENT_EDIT` |
 | Revisions: create, restore (`PageRevisionsController`, `PageRevisionService`) | One unit: the "Before restore" snapshot and the restore together | Page row lock | 409 (your error page) |
 | Templates: save from page, create a page from a template, delete, import (`PageTemplatesController`, `PageTemplateService`) | One unit each; an import of several templates is one unit | Unique `template_key`: the second editor saving the same new key gets "Template … was created by another editor at the same time" | Domain error, or 409 `CONFLICT_*` |
 
@@ -92,6 +94,8 @@ error handling):
   The domain conflict answers `{"error": "concurrent_edit", "code": "PAGE_BUILDER_CONCURRENT_EDIT", "message": "…"}`.
 - **Admin pages** are rendered by your error page: the answer is an `HttpException` with a fixed, client-safe message.
   The storage error stays the previous exception for your logs; no SQL, parameter or value reaches the client.
+- The listener runs at `kernel.exception` priority 64, before the framework's error listener logs the exception, so
+  an expected conflict is not logged as a critical error.
 - If your admin is served cross-origin, list `X-Conflict-Code` and `Retry-After` in `Access-Control-Expose-Headers`.
 - The codes are `Nowo\TransactionDoctrine\ConflictCode` values.
 
@@ -125,7 +129,10 @@ nowo_page_builder_kit:
 - `status: 503` is for proxies or monitors that treat 503 as retryable. The codes and the `Retry-After` rule stay the
   same.
 - `doctrine.entity_manager`: give the bundle its own manager (see [CONFIGURATION](CONFIGURATION.md#doctrine)) if your
-  requests may hold unflushed changes when they call the bundle (the host runner refuses them).
+  requests may hold unflushed changes when they call the bundle (the host runner refuses them). **Required** when a
+  listener of your manager changes entities after loading them (a `postLoad` decryption such as
+  nowo-tech/doctrine-encrypt-bundle, or any `postLoad` mutation): the loaded entities then look changed, and every
+  bundle write on your manager fails with `LogicException` before it starts.
 - `doctrine.transaction: host`: your use case owns the transaction. Open it before you call the bundle if you want the
   page lock.
 - doctrine/dbal 3 (DoctrineBundle 2): set `doctrine.dbal.use_savepoints: true`, so a unit that runs inside your
@@ -155,13 +162,17 @@ nowo_page_builder_kit:
   - two editors saving different content fields at once (two processes): the second waits, reads again and both values
     are stored;
   - a field save from a stale read keeps the value another editor committed;
+  - the content form of one locale posted while another editor's save of another locale holds the lock (two
+    processes): both values are kept, the unchecked bool is false and the label edit applied;
+  - a schema add posted while another editor's save adds a field inline (two processes): both fields are kept, and a
+    remove leaves the others;
   - two creates of one page key at once (two processes): one page, the second gets the domain error, the manager is
     usable afterwards;
   - a lock conflict after a committed unit of the same request answers `CONFLICT_002` without `Retry-After`. The commit
     is counted by the real commit-tracking middleware.
 - `tests/Integration/Persistence/PageBuilderWriteUnitTest.php` covers the unit itself on SQLite: one commit, events after
   it, a nested unit joining the outer one, a failed unit storing nothing, the host runner refusing unflushed changes,
-  the lock re-read, and the page-key and template-key races.
+  the lock re-read, the page-key and template-key races, and a failed SEO flush leaving an open manager.
 - `tests/Unit/EventListener/PageBuilderConflictListenerTest.php` maps every case:
   - `CONFLICT_001` for each vendor code;
   - `CONFLICT_002` (own ledger, transaction-doctrine's mark, a committed `ConcurrencyConflict`, a lost savepoint);
@@ -182,6 +193,10 @@ make down-db
   document they loaded before editor A's save, B's document replaces A's, without a warning (no version token in the
   editor). A's content is not lost: the revision snapshot of B's save (when `revisions.on_save` is on) records it.
   This is an admin-only path. A version column needs a schema change and is left for a later minor.
+- **The classic sections editor (legacy) posts the whole document.** It builds the props of every locale from the
+  page it read when the form was shown; a save of another locale by another editor in the meantime is overwritten
+  (the revision snapshot of the save keeps it when `revisions.on_save` is on). Use the canvas and the content form,
+  which merge under the lock.
 - **SEO and translation forms: last write wins per field.** Doctrine writes only the changed columns, so two editors
   changing different fields both keep them. The same field: the later save wins.
 - **Commit detection covers the bundle's connection** (and every connection when transaction-doctrine's

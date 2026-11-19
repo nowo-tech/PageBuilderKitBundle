@@ -38,7 +38,8 @@ final class ConflictResponseWiringTest extends TestCase
         self::assertSame(ConflictResponsePolicy::class, (string) $policy);
         self::assertEquals(new Reference(NowoPageBuilderKitExtension::COMMIT_LEDGER_SERVICE), $listener->getArgument(1));
         self::assertTrue($container->hasDefinition(NowoPageBuilderKitExtension::COMMIT_TRACKING_MIDDLEWARE));
-        self::assertSame([['event' => 'kernel.request', 'method' => 'onRequest', 'priority' => PageBuilderConflictListener::REQUEST_PRIORITY], ['event' => 'kernel.exception', 'method' => 'onException', 'priority' => PageBuilderConflictListener::PRIORITY]], $listener->getTag('kernel.event_listener'));
+        // Audit UW-4: above 0, before the framework's error listener logs the exception.
+        self::assertSame([['event' => 'kernel.request', 'method' => 'onRequest', 'priority' => PageBuilderConflictListener::REQUEST_PRIORITY], ['event' => 'kernel.exception', 'method' => 'onException', 'priority' => 64]], $listener->getTag('kernel.event_listener'));
         self::assertNull($container->getDefinition(PageBuilderTransaction::class)->getArgument('$managerName'));
     }
 

@@ -28,9 +28,7 @@ use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 use function array_filter;
-use function array_key_exists;
 use function array_map;
-use function array_merge;
 use function array_values;
 use function explode;
 use function in_array;
@@ -86,46 +84,29 @@ final class PageContentController extends AbstractController
                 return $this->redirectToRoute('admin_page_builder_content', ['pageKey' => $pageKey, 'locale' => $active]);
             }
 
+            // 1.17 (REQ-RUNTIME-003): only the editor's intent goes to the service, which merges it onto the values
+            // and schema read under the page lock (another editor's save in the meantime is kept).
             /** @var array<string, mixed> $postedRaw */
             $postedRaw = $request->request->all('fieldValues');
-            $merged    = $values;
+            $posted    = [];
             foreach ($postedRaw as $locale => $bag) {
-                if (!is_string($locale) || !in_array($locale, $locales, true) || !is_array($bag)) {
-                    continue;
+                if (is_string($locale) && in_array($locale, $locales, true) && is_array($bag)) {
+                    /* @var array<string, mixed> $bag */
+                    $posted[$locale] = $bag;
                 }
-                /* @var array<string, mixed> $bag */
-                // Unchecked Symfony checkboxes omit the key; treat missing bools as false.
-                foreach ($schema as $fieldDef) {
-                    if (($fieldDef['type'] ?? '') === ContentFieldType::Bool->value
-                        && !array_key_exists($fieldDef['key'], $bag)) {
-                        $bag[$fieldDef['key']] = '0';
-                    }
-                }
-                $merged[$locale] = array_merge($merged[$locale] ?? [], $bag);
             }
 
             /** @var array<string, mixed> $postedLabels */
-            $postedLabels  = $request->request->all('fieldLabels');
-            $labelsChanged = false;
-            foreach ($schema as $index => $field) {
-                $labelText = null;
-                if (is_array($postedLabels[$active] ?? null)
-                    && is_string($postedLabels[$active][$field['key']] ?? null)) {
-                    $labelText = trim((string) $postedLabels[$active][$field['key']]);
+            $postedLabels = $request->request->all('fieldLabels');
+            $labels       = [];
+            foreach (is_array($postedLabels[$active] ?? null) ? $postedLabels[$active] : [] as $key => $text) {
+                if (is_string($key) && is_string($text)) {
+                    $labels[$key] = $text;
                 }
-                if ($labelText === null || $labelText === '') {
-                    continue;
-                }
-                $schema[$index] = $this->contentFieldsNormalizer->mergeLabels(
-                    $field,
-                    ['labels' => [$active => $labelText], 'label' => $labelText],
-                    $active,
-                );
-                $labelsChanged = true;
             }
 
             try {
-                $this->contentFieldsService->saveValues($page, $merged, $labelsChanged ? $schema : null);
+                $this->contentFieldsService->mergeValues($page, $posted, $active, $labels);
                 $this->addFlash('success', 'admin.content.saved');
             } catch (InvalidArgumentException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
@@ -235,10 +216,8 @@ final class PageContentController extends AbstractController
             return $this->redirectToRoute('admin_page_builder_content', ['pageKey' => $pageKey]);
         }
 
-        $structure = $this->documentNormalizer->normalize($page->getDocument()?->getStructure() ?? []);
-        $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
-
         $action        = (string) $request->request->get('schema_action', '');
+        $fieldDef      = null;
         $defaultLocale = $this->builderLocales->getDefault();
         if ($action === 'add') {
             $label    = trim((string) $request->request->get('label', ''));
@@ -273,17 +252,18 @@ final class PageContentController extends AbstractController
                 }
             }
 
-            $schema[] = $fieldDef;
-        } elseif ($action === 'remove') {
-            $removeKey = (string) $request->request->get('key', '');
-            $schema    = array_values(array_filter(
-                $schema,
-                static fn (array $field): bool => $field['key'] !== $removeKey,
-            ));
+        } elseif ($action !== 'remove') {
+            // Unknown action: nothing to change.
+            return $this->redirectToRoute('admin_page_builder_content', ['pageKey' => $pageKey]);
         }
 
         try {
-            $this->contentFieldsService->saveSchema($page, $schema);
+            // 1.17 (REQ-RUNTIME-003): one operation applied to the schema read under the page lock.
+            if ($fieldDef !== null) {
+                $this->contentFieldsService->saveSchemaWithField($page, $fieldDef);
+            } else {
+                $this->contentFieldsService->saveSchemaWithoutField($page, (string) $request->request->get('key', ''));
+            }
             $this->addFlash('success', 'admin.content.schema_saved');
         } catch (InvalidArgumentException $exception) {
             $this->addFlash('danger', $exception->getMessage());

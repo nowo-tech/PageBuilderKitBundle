@@ -26,6 +26,7 @@ use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 use function in_array;
 use function is_array;
@@ -275,7 +276,16 @@ final readonly class DocumentService implements PagePublisherInterface
     public function flushPage(BuilderPage $page): void
     {
         $this->entityManager->persist($page);
-        $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+
+        try {
+            $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+        } catch (Throwable $e) {
+            // 1.17: one flush (the caller's form changed the entities), not a runner unit: a failed flush closes the
+            // manager, which is replaced (closed only) so a kept-alive worker keeps writing.
+            $this->transaction?->replaceClosedManager();
+
+            throw $e;
+        }
     }
 
     public function createPageByKey(string $pageKey, string $title, string $locale): string

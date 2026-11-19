@@ -51,8 +51,12 @@ use function str_starts_with;
  */
 final readonly class PageBuilderConflictListener
 {
-    /** kernel.exception priority: after the application's own listeners, before the framework's error listener (-128). */
-    public const int PRIORITY = -64;
+    /**
+     * kernel.exception priority: above 0, before the framework's error listener logs the exception (`logKernelException`,
+     * priority 0, CRITICAL for a 500), so an expected conflict answer is not logged as a critical error. Host routes
+     * are never touched.
+     */
+    public const int PRIORITY = 64;
 
     /** kernel.request priority: before the router (32) and the firewall (8), so no controller wrote yet. */
     public const int REQUEST_PRIORITY = 2048;
