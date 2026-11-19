@@ -37,10 +37,11 @@ final class AdminHttpKernel extends Kernel
 
     /**
      * @param array<string, mixed> $bundle `nowo_page_builder_kit` configuration merged over the test defaults
+     * @param string|null $databaseUrl A real database (REQ-RUNTIME-003 tests) instead of the SQLite file
      */
-    public function __construct(private readonly array $bundle = [], private readonly string $name = 'default')
+    public function __construct(private readonly array $bundle = [], private readonly string $name = 'default', private readonly ?string $databaseUrl = null)
     {
-        $this->key = md5(serialize([$bundle, $name]));
+        $this->key = md5(serialize([$bundle, $name, $databaseUrl]));
         parent::__construct('test', false);
     }
 
@@ -107,7 +108,7 @@ final class AdminHttpKernel extends Kernel
         ]);
         $container->extension('security', ['firewalls' => ['main' => ['security' => false]]]);
         $container->extension('doctrine', [
-            'dbal' => ['url' => 'sqlite:///' . $this->databaseFile()],
+            'dbal' => ['url' => $this->databaseUrl ?? 'sqlite:///' . $this->databaseFile()],
             'orm'  => ['auto_mapping' => true],
         ]);
         $container->services()->set('logger', NullLogger::class);

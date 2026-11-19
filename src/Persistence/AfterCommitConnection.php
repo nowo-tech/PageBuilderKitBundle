@@ -84,9 +84,10 @@ final class AfterCommitConnection extends AbstractConnectionMiddleware
     /**
      * Executes the statement; a successful savepoint statement is reported to the observers.
      */
-    public function exec(string $sql): int|string
+    public function exec(string $sql): int
     {
-        $result = parent::exec($sql);
+        // `int` is valid against DBAL 3 (`int`) and DBAL 4 (`int|string`) (1.17: the bundle ran on DBAL 4 only).
+        $result = (int) parent::exec($sql);
         if (preg_match(self::SAVEPOINT_PATTERN, $sql, $match) === 1) {
             $verb = strtoupper($match[1]);
             $name = $match[2];

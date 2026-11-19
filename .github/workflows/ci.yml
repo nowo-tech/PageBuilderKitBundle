@@ -141,6 +141,109 @@ jobs:
           echo \"✅ Coverage threshold confirmed (≥99%)\n\";
           "
 
+  database:
+    name: Real databases (MySQL 8.4, MariaDB 11.4, PostgreSQL 16) - DBAL ${{ matrix.dbal }}
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: pbk
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=5s --health-timeout=5s --health-retries=30
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: pbk
+        ports: ['3307:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=30
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: pbk
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=5s --health-timeout=5s --health-retries=30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dbal: ['3', '4']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: json, pdo_mysql, pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # DoctrineBundle 3 requires DBAL 4: the DBAL 3 cell runs DoctrineBundle 2 (Symfony 7.4), whose ORM 3 proxies need
+      # symfony/var-exporter 7 (LazyGhost) when native lazy objects are not enabled.
+      - name: Use DBAL 3
+        if: ${{ matrix.dbal == '3' }}
+        run: |
+          composer require --no-update --no-interaction "doctrine/dbal:^3.8.2" "doctrine/doctrine-bundle:^2.13"
+          composer require --no-update --no-interaction --dev "symfony/var-exporter:^7.4"
+          composer update --with-all-dependencies --no-interaction --no-progress
+          composer show | grep -E '^(doctrine/dbal|doctrine/doctrine-bundle|doctrine/orm|symfony/framework-bundle) '
+
+      - name: Concurrency tests on real servers (REQ-RUNTIME-003; none may be skipped)
+        timeout-minutes: 10
+        env:
+          PBK_MYSQL_URL: mysql://root@127.0.0.1:3306/pbk?serverVersion=8.4.0&charset=utf8mb4
+          PBK_MARIADB_URL: mysql://root@127.0.0.1:3307/pbk?serverVersion=11.4.0-MariaDB&charset=utf8mb4
+          PBK_POSTGRES_URL: pgsql://postgres@127.0.0.1:5432/pbk?serverVersion=16
+        run: php -d memory_limit=1G vendor/bin/phpunit --group database --no-coverage --fail-on-skipped
+
+  # Dependency floor: the code must work with the LOWEST nowo-tech/transaction-* versions composer.json allows (a host
+  # can run `composer update nowo-tech/page-builder-kit-bundle` without updating them), and the demo lock must install
+  # what the bundle requires (the demo installs from its lock, so a requirement added later is never installed).
+  deps-floor:
+    name: Dependency floor (nowo-tech/transaction-* lowest, demo lock)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Demo lock satisfies the bundle's nowo-tech requirements
+        run: python3 .scripts/check-demo-lock.py . --only 'nowo-tech/*'
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Downgrade nowo-tech/transaction-* to the lowest allowed versions
+        run: |
+          composer update 'nowo-tech/transaction-*' --prefer-lowest --prefer-dist --no-progress --no-interaction
+          composer show 'nowo-tech/transaction-*'
+
+      - name: PHPStan at the floor
+        run: composer phpstan
+
+      - name: Unit and integration suites at the floor
+        timeout-minutes: 15
+        run: php -d memory_limit=1G vendor/bin/phpunit --no-coverage
+
   code-style:
     name: Code Style
     runs-on: ubuntu-latest

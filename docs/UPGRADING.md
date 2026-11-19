@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Concurrency (REQ-RUNTIME-003)](#concurrency-req-runtime-003)
 - [To 1.16.1](#to-1161)
 - [To 1.16.0](#to-1160)
 - [To 1.15.2](#to-1152)
@@ -50,6 +51,67 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+### Concurrency (REQ-RUNTIME-003)
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+This also installs `nowo-tech/transaction-doctrine` `^1.6` and `nowo-tech/transaction-contract` `^1.0`. Registering
+transaction-doctrine's Symfony bundle is optional; when it is registered, the bundle follows its `conflict_response`
+and its request commit mark. No schema change.
+
+- **Lock conflicts answer 409.** A deadlock, lock wait timeout or serialization failure on the admin routes answered a
+  500. It now answers 409 with `X-Conflict-Code: CONFLICT_001` and `Retry-After` (nothing committed, retry is safe),
+  or 409 with `CONFLICT_002` and no `Retry-After` (part of the request may be committed: reload first). JSON calls keep
+  `{"error": …}` with `"error": "conflict"` and the new `code` and `message` keys. Keep 503 if your proxy or monitor
+  expects it:
+
+  ```yaml
+  nowo_page_builder_kit:
+      conflict_response:
+          status: 503
+  ```
+
+- **Duplicate translation.** Two editors adding the same missing page translation at once answered a 500. The second
+  one now gets 409 with `X-Error-Code: PAGE_BUILDER_CONCURRENT_EDIT` (no `X-Conflict-Code`).
+- **Duplicate page or template key.** Two editors creating the same page key, or saving the same new template key, at
+  once: the second gets the domain error ("already exists", 400 / form error) instead of a 500.
+- **Unflushed changes of yours (host entity manager).** Without `doctrine.entity_manager`, the bundle's writes run
+  through `DoctrineTransactionRunner::forHostEntityManager()` on your manager. A write unit now throws a
+  `LogicException` before it opens its transaction when your manager holds unflushed changes (it would otherwise carry
+  them into a transaction that may roll back). The admin routes start clean. If you call `PagePublisherInterface`,
+  `DocumentService`, `ContentFieldsService`, `PageRevisionService` or `PageTemplateService` from your own code with
+  pending changes, flush them first, or give the bundle its own manager (`doctrine.entity_manager`).
+  `DocumentService::flushPage()` (your form changed the entities) is unchanged: one flush.
+- **`postLoad` listeners on your manager (for example nowo-tech/doctrine-encrypt-bundle).** A listener that changes
+  entities after loading them (decryption) makes them look changed, so the host runner sees pending changes and every
+  bundle write fails with `LogicException`. Set `nowo_page_builder_kit.doctrine.entity_manager` to a manager of the
+  bundle's own (mapping only the bundle entities, without that listener).
+- **Content form and schema.** The admin content form now sends only the editor's intent. It posts
+  `fieldOriginals[<locale>][<key>]` (a fingerprint of each value shown) and `labelOriginals[<locale>][<key>]` (each
+  label shown); `ContentFieldsService::mergeValues()` writes under the page lock only the values and labels that
+  differ from what was shown. `saveSchemaWithField()` / `saveSchemaWithoutField()` apply one schema change to what is
+  stored, and adding a key that exists is refused. If you override the content template, keep rendering the hidden
+  `fieldOriginals` and `labelOriginals` children (without them every posted value is written, as before). `saveValues()` and `saveSchema()` are unchanged
+  for your code (whole replacement, now one unit under the lock).
+- **Conflict listener priority.** `PageBuilderConflictListener` runs at `kernel.exception` priority 64, before the
+  framework's error listener logs the exception; it still acts on the bundle's routes only.
+- **A closed manager is replaced.** After a write unit whose flush closed your manager, the runner replaces it through
+  the registry (an open manager is never cleared or reset). The SEO save (`DocumentService::flushPage()`, one flush)
+  does the same before it rethrows the failure. Before, it stayed closed until your code or the kernel reset
+  it.
+- **Events after the unit.** The write events of a unit are dispatched once, right after its commit (before, after each
+  of its flushes). A unit inside your own transaction still waits for your outermost commit.
+- **doctrine/dbal 3.** The bundle now loads on doctrine/dbal 3 (DoctrineBundle 2): since 1.14 its after-commit
+  middleware declared `exec(): int|string`, which DBAL 3 refuses with a fatal error. Two middlewares of the bundle
+  (the after-commit outbox and transaction-doctrine's commit tracking) wrap the connection of its entities (usually
+  your default connection). On doctrine/dbal 3, `Connection::commit()` then returns `null` instead of `true`. Do not
+  rely on that return value. `conflict_response.commit_tracking: off` removes the commit-tracking middleware;
+  `CONFLICT_002` then relies on transaction-doctrine's request mark only. doctrine/dbal 4's `commit()` returns `void`,
+  so nothing changes there.
+- See [CONCURRENCY.md](CONCURRENCY.md).
 
 ## To 1.16.1
 

@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Persistence;
 
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
+use Doctrine\Persistence\ManagerRegistry;
+use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\TransactionContract\TransactionRunnerInterface;
+use Nowo\TransactionContract\TransientStorageFailure;
+use Nowo\TransactionDoctrine\DoctrineTransactionRunner;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -47,6 +54,14 @@ use function str_starts_with;
  * state lives in `UnitOfWorkBoundaries`, which the services resetter does not touch). The start of an outermost main
  * request is a safety net for a runtime that never called `kernel.terminate`.
  *
+ * Write units (1.17, REQ-RUNTIME-003 rule 1): a bundle write that reads before it writes, or writes several rows,
+ * goes through {@see run()}: one transaction of nowo-tech/transaction-doctrine's runner on the bundle's manager, its
+ * flushes inside it, nothing pending after a failure. {@see lockPage()} takes the page's row lock and reads the
+ * document again under it (rule 4), so two editors never overwrite each other's read-modify-write. On the host's
+ * manager the runner is `forHostEntityManager()` (an open manager is never closed, cleared or reset; a closed one is
+ * replaced through the registry; it refuses to start while the manager holds unflushed changes); on the bundle's own
+ * manager (`doctrine.entity_manager` other than the default) it is `forEntityManager()`.
+ *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
 #[AsDoctrineListener(event: Events::postFlush)]
@@ -62,6 +77,17 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     // @igor-ignore - Request-scoped outbox: handed to the transaction outbox on flush, discarded at every boundary and reset().
     private array $unflushed = [];
 
+    /** Depth of the {@see run()} calls in progress: a nested unit joins the outer one (always back to 0 when they end). */
+    // @igor-ignore - Call-stack counter: incremented and decremented in the same call (finally), zeroed by reset().
+    private int $runDepth = 0;
+
+    /**
+     * @param ManagerRegistry|null $registry Replaces a closed manager after a failed write unit
+     * @param string|null $managerName Name of the bundle's manager in the registry (null: the default manager)
+     * @param bool $ownsEntityManager Whether the manager is the bundle's own (`doctrine.entity_manager` other than the
+     *                                host's default): a failed unit may then close and reset it
+     * @param TransactionRunnerInterface|null $runner Runner of the write units (null: transaction-doctrine's, see above)
+     */
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
@@ -70,6 +96,10 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly ?RequestStack $requestStack = null,
         private readonly PageBuilderOutbox $outbox = new PageBuilderOutbox(),
         private readonly UnitOfWorkBoundaries $boundaries = new UnitOfWorkBoundaries(),
+        private readonly ?ManagerRegistry $registry = null,
+        private readonly ?string $managerName = null,
+        private readonly bool $ownsEntityManager = false,
+        private readonly ?TransactionRunnerInterface $runner = null,
     ) {
     }
 
@@ -146,6 +176,100 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         }
 
         $this->record($flush, ...$events);
+    }
+
+    /**
+     * Runs one write unit (1.17): one transaction of the bundle's connection, the bundle manager flushed before the
+     * commit, the unit's events dispatched after it. A unit started inside another one joins it. When the host
+     * controls the transaction ({@see flushesItself()} false) the operation runs as is: the host's use case owns it.
+     *
+     * @template T
+     *
+     * @param callable(): T $operation Loads (or {@see lockPage()}s) what it changes; one attempt, no replay
+     *
+     * @throws TransientStorageFailure When the storage failed transiently (deadlock, lock wait timeout, serialization
+     *                                 failure): nothing of the unit is committed
+     *
+     * @return T
+     */
+    public function run(callable $operation): mixed
+    {
+        if ($this->runDepth > 0 || !$this->flushesItself()) {
+            return $operation();
+        }
+
+        ++$this->runDepth;
+
+        try {
+            $result = ($this->runner ?? $this->defaultRunner())->run($operation);
+        } finally {
+            --$this->runDepth;
+        }
+
+        // The unit's events were committed with it: dispatch them now, as a single flush outside a transaction did.
+        $this->dispatchPending();
+
+        return $result;
+    }
+
+    /**
+     * After a failed write outside {@see run()} (the single flush of `DocumentService::flushPage()`): a manager the
+     * failed flush closed is replaced through the registry, so the next request of a kept-alive worker can write
+     * (1.17, REQ-RUNTIME-003 rule 2). An open manager is never touched. Inside a unit, or while a transaction is still
+     * open on the connection, it does nothing: the runner (or the host that owns the transaction) recovers after its
+     * rollback. It never throws: the caller rethrows the original failure.
+     */
+    public function replaceClosedManager(): void
+    {
+        if ($this->entityManager->isOpen() || !$this->registry instanceof ManagerRegistry || $this->runDepth > 0) {
+            return;
+        }
+
+        try {
+            if ($this->entityManager->getConnection()->isTransactionActive()) {
+                return;
+            }
+
+            $this->logger->notice('Page builder: replacing the entity manager a failed write closed.', [
+                'bundle'  => 'NowoPageBuilderKitBundle',
+                'manager' => $this->managerName,
+            ]);
+            $this->registry->resetManager($this->managerName);
+        } catch (Throwable $e) {
+            $this->logger->error('Page builder: the entity manager a failed write closed could not be replaced.', [
+                'bundle'    => 'NowoPageBuilderKitBundle',
+                'manager'   => $this->managerName,
+                'exception' => $e::class,
+            ]);
+        }
+    }
+
+    /**
+     * Inside a transaction: locks the page's document row (`SELECT … FOR UPDATE`; the page row when it has no
+     * document yet) and reads the document and its locales again under the lock (1.17, REQ-RUNTIME-003 rule 4), so a
+     * read-modify-write starts from the last committed content. Unsaved changes of the document are discarded; the
+     * page's own fields and translations are not read again. Outside a transaction (host-controlled writes with no
+     * open transaction), or for a page not stored yet, it does nothing.
+     */
+    public function lockPage(BuilderPage $page): void
+    {
+        if ($page->getId() === null || !$this->entityManager->getConnection()->isTransactionActive() || !$this->entityManager->contains($page)) {
+            return;
+        }
+
+        $document = $page->getDocument();
+        if (!$document instanceof BuilderDocument || $document->getId() === null || !$this->entityManager->contains($document)) {
+            $this->entityManager->lock($page, LockMode::PESSIMISTIC_WRITE);
+
+            return;
+        }
+
+        $this->entityManager->refresh($document, LockMode::PESSIMISTIC_WRITE);
+        foreach ($document->getLocales() as $locale) {
+            if ($locale->getId() !== null && $this->entityManager->contains($locale)) {
+                $this->entityManager->refresh($locale);
+            }
+        }
     }
 
     /**
@@ -265,6 +389,17 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     public function reset(): void
     {
         $this->unflushed = [];
+        $this->runDepth  = 0;
         $this->outbox->reset();
+    }
+
+    /**
+     * No Retry-After hint of its own: the conflict answer uses `conflict_response.retry_after`.
+     */
+    private function defaultRunner(): TransactionRunnerInterface
+    {
+        return $this->ownsEntityManager
+            ? DoctrineTransactionRunner::forEntityManager($this->entityManager, $this->registry, $this->managerName, null, $this->logger)
+            : DoctrineTransactionRunner::forHostEntityManager($this->entityManager, $this->registry, $this->managerName, null, $this->logger);
     }
 }

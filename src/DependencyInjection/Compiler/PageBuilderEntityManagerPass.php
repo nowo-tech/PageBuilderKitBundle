@@ -7,6 +7,7 @@ namespace Nowo\PageBuilderKitBundle\DependencyInjection\Compiler;
 use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Persistence\ExcludedEntityNamespaceDriver;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
+use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -70,6 +71,10 @@ final readonly class PageBuilderEntityManagerPass implements CompilerPassInterfa
         $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
         if ($name === $default) {
             $container->removeDefinition(OwnEntityManagerSubscriber::class);
+        } elseif ($container->hasDefinition(PageBuilderTransaction::class)) {
+            // 1.17 (REQ-RUNTIME-003 rule 2): the bundle's own manager may be closed and reset after a failed write
+            // unit (forEntityManager()); the host's never is (forHostEntityManager(), the default).
+            $container->getDefinition(PageBuilderTransaction::class)->setArgument('$ownsEntityManager', true);
         }
 
         foreach (array_keys($managers) as $manager) {

@@ -16,7 +16,8 @@ use function sprintf;
 
 /**
  * Attaches {@see AfterCommitMiddleware} only to the connection of the bundle's entity manager (1.14): transactions
- * on other connections never delay or drop the bundle's events. Runs before DoctrineBundle's MiddlewaresPass. Without
+ * on other connections never delay or drop the bundle's events. 1.17: the same for the commit-tracking middleware of
+ * the conflict answer (REQ-RUNTIME-003 rule 6). Runs before DoctrineBundle's MiddlewaresPass. Without
  * a resolvable entity manager it falls back to the default connection.
  */
 final class AfterCommitMiddlewarePass implements CompilerPassInterface
@@ -48,5 +49,12 @@ final class AfterCommitMiddlewarePass implements CompilerPassInterface
         $container->getDefinition(AfterCommitMiddleware::class)
             ->clearTag('doctrine.middleware')
             ->addTag('doctrine.middleware', ['connection' => $connection]);
+
+        // 1.17: the commit ledger of the conflict answer counts the commits of the same connection only.
+        if ($container->hasDefinition(NowoPageBuilderKitExtension::COMMIT_TRACKING_MIDDLEWARE)) {
+            $container->getDefinition(NowoPageBuilderKitExtension::COMMIT_TRACKING_MIDDLEWARE)
+                ->clearTag('doctrine.middleware')
+                ->addTag('doctrine.middleware', ['connection' => $connection]);
+        }
     }
 }

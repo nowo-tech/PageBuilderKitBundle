@@ -11,6 +11,7 @@ All options live under the root key `nowo_page_builder_kit`.
 - [security](#security)
 - [web_ui](#web_ui)
 - [doctrine](#doctrine)
+- [conflict_response](#conflict_response)
 - [html.sanitize](#htmlsanitize)
 - [grapesjs](#grapesjs)
   - [Official plugins (loaded via esm.sh)](#official-plugins-loaded-via-esmsh)
@@ -50,6 +51,10 @@ nowo_page_builder_kit:
         transaction: bundle     # 1.14: bundle | host (host: the bundle never flushes, DDD hosts)
         mapping_type: attribute # 1.16: attribute | xml (the shipped XML mapping, same tables and columns)
         # connection: default   # deprecated since 1.8, ignored (see below)
+    conflict_response:          # 1.17: lock conflicts on the bundle's routes (see CONCURRENCY.md)
+        status: null            # 409 (default) | 503; null follows nowo-tech/transaction-doctrine
+        retry_after: null       # seconds for CONFLICT_001; null follows transaction-doctrine, else 1
+        commit_tracking: bundle # bundle | off
     html:
         sanitize:
             strategy: allowlist # none | strip | allowlist | service
@@ -290,7 +295,17 @@ nowo_page_builder_kit:
 
 After changing `table_prefix`, generate a new migration (or `doctrine:schema:update` in dev). Existing data is **not** renamed automatically.
 
-## html.sanitize
+## conflict_response
+
+**1.17 (REQ-RUNTIME-003).** Answer of a lock conflict (deadlock, lock wait timeout, serialization failure) on the
+bundle's routes. See [CONCURRENCY.md](CONCURRENCY.md) for the codes and the JSON shape.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `status` | `null` | `409` or `503`. `null` (with `retry_after` also null): follow `nowo_transaction_doctrine.conflict_response` when nowo-tech/transaction-doctrine's Symfony bundle is registered, else 409. |
+| `retry_after` | `null` | Seconds of the `Retry-After` header of a `CONFLICT_001` answer (`CONFLICT_002` never carries it). `null`: follow transaction-doctrine, else 1. |
+| `commit_tracking` | `bundle` | `bundle`: transaction-doctrine's commit-tracking DBAL middleware on the connection of the bundle entities tells `CONFLICT_002` from `CONFLICT_001`. On doctrine/dbal 3 a wrapped `Connection::commit()` returns `null` instead of `true` (the after-commit middleware wraps it too). `off`: no middleware; `CONFLICT_002` then relies on transaction-doctrine's request mark only. |
+
 
 | Key | Default | Description |
 | --- | --- | --- |

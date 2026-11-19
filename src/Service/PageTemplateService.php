@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Service;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
@@ -56,6 +57,43 @@ final readonly class PageTemplateService
 
     public function saveFromPage(BuilderPage $page, string $templateKey, string $label): BuilderPageTemplate
     {
+        return $this->documentService->unit(fn (): BuilderPageTemplate => $this->doSaveFromPage($page, $templateKey, $label));
+    }
+
+    /**
+     * @param array{
+     *     include_field_schema?: bool,
+     *     include_field_values?: bool,
+     *     include_seo?: bool
+     * } $options
+     */
+    public function createPageFromTemplate(
+        string $templateKey,
+        string $pageKey,
+        string $title,
+        string $locale,
+        array $options = [],
+    ): BuilderPage {
+        // 1.17: one write unit (a failure never leaves a page without its template content or SEO).
+        return $this->documentService->unit(fn (): BuilderPage => $this->doCreatePageFromTemplate($templateKey, $pageKey, $title, $locale, $options));
+    }
+
+    public function delete(string $templateKey): void
+    {
+        // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
+        $this->documentService->unit(function () use ($templateKey): void {
+            $template = $this->templateRepository->findOneByTemplateKey($templateKey);
+            if (!$template instanceof BuilderPageTemplate) {
+                throw new InvalidArgumentException(sprintf('Unknown template "%s".', $templateKey));
+            }
+
+            $this->entityManager->remove($template);
+            $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_DELETED));
+        });
+    }
+
+    private function doSaveFromPage(BuilderPage $page, string $templateKey, string $label): BuilderPageTemplate
+    {
         $templateKey = strtolower(trim($templateKey));
         if ($templateKey === '' || !preg_match('/^[a-z0-9_-]+$/', $templateKey)) {
             throw new InvalidArgumentException('Invalid template key.');
@@ -90,7 +128,7 @@ final readonly class PageTemplateService
             ->setWidgetPropsByLocale($props);
 
         $this->entityManager->persist($template);
-        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_SAVED));
+        $this->commitTemplate($templateKey, new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_SAVED));
 
         return $template;
     }
@@ -102,13 +140,8 @@ final readonly class PageTemplateService
      *     include_seo?: bool
      * } $options
      */
-    public function createPageFromTemplate(
-        string $templateKey,
-        string $pageKey,
-        string $title,
-        string $locale,
-        array $options = [],
-    ): BuilderPage {
+    private function doCreatePageFromTemplate(string $templateKey, string $pageKey, string $title, string $locale, array $options): BuilderPage
+    {
         $template = $this->templateRepository->findOneByTemplateKey($templateKey);
         if (!$template instanceof BuilderPageTemplate) {
             throw new InvalidArgumentException(sprintf('Unknown template "%s".', $templateKey));
@@ -148,17 +181,6 @@ final readonly class PageTemplateService
         }
 
         return $page;
-    }
-
-    public function delete(string $templateKey): void
-    {
-        $template = $this->templateRepository->findOneByTemplateKey($templateKey);
-        if (!$template instanceof BuilderPageTemplate) {
-            throw new InvalidArgumentException(sprintf('Unknown template "%s".', $templateKey));
-        }
-
-        $this->entityManager->remove($template);
-        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_DELETED));
     }
 
     /**
@@ -219,6 +241,17 @@ final readonly class PageTemplateService
      * @return list<string> Imported template keys
      */
     public function import(array $payload, bool $overwrite = true): array
+    {
+        // 1.17: one write unit; a bundle of templates is imported whole or not at all.
+        return $this->documentService->unit(fn (): array => $this->doImport($payload, $overwrite));
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return list<string>
+     */
+    private function doImport(array $payload, bool $overwrite): array
     {
         $format = (int) ($payload['formatVersion'] ?? 0);
         if ($format !== self::FORMAT_VERSION) {
@@ -342,7 +375,7 @@ final readonly class PageTemplateService
             ->setWidgetPropsByLocale($props);
 
         $this->entityManager->persist($template);
-        $this->commit(new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_IMPORTED));
+        $this->commitTemplate($templateKey, new PageTemplateChangedEvent($templateKey, PageTemplateChangedEvent::ACTION_IMPORTED));
 
         return $templateKey;
     }
@@ -416,6 +449,19 @@ final readonly class PageTemplateService
         }
 
         $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+    }
+
+    /**
+     * {@see commit()} of a template write. A unique-key violation there is two editors saving the same new template
+     * key at once (1.17, REQ-RUNTIME-003 rule 4): the second gets a domain error, not a 500.
+     */
+    private function commitTemplate(string $templateKey, object $event): void
+    {
+        try {
+            $this->commit($event);
+        } catch (UniqueConstraintViolationException $e) {
+            throw new InvalidArgumentException(sprintf('Template "%s" was created by another editor at the same time. Reload and try again.', $templateKey), 0, $e);
+        }
     }
 
     /**

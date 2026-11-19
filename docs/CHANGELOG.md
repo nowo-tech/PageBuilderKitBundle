@@ -46,6 +46,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Concurrency (REQ-RUNTIME-003): `conflict_response.status` (409 default, or 503), `conflict_response.retry_after` and `conflict_response.commit_tracking` (`bundle` | `off`). A deadlock, lock wait timeout or serialization failure on the bundle's admin routes answers 409 with `X-Conflict-Code: CONFLICT_001` and `Retry-After` when nothing was committed, or `CONFLICT_002` without `Retry-After` when part of the request may be (transaction-doctrine's request mark, and a commit ledger of the bundle's connection). JSON requests keep the `{"error": …}` shape with `code` and `message` added. Unset, the options follow nowo-tech/transaction-doctrine's `conflict_response`.
+- Two editors adding the same missing page translation at once answer 409 with `X-Error-Code: PAGE_BUILDER_CONCURRENT_EDIT` (a domain code, never a `CONFLICT_*` code) instead of a 500.
+- `PageBuilderTransaction::run()` and `lockPage()`: the bundle's write units (one transaction of nowo-tech/transaction-doctrine's runner) and the page row lock; `replaceClosedManager()` after a failed write outside a unit.
+- `ContentFieldsService::mergeValues()`, `saveSchemaWithField()` and `saveSchemaWithoutField()`: the content form's intent, merged onto the values and schema read under the page lock.
+- `docs/CONCURRENCY.md`: write paths, codes, host options, residual risks.
+- CI jobs "Real databases (MySQL 8.4, MariaDB 11.4, PostgreSQL 16)" on DBAL 3 and 4, with two-connection and two-process race tests, and "Dependency floor (nowo-tech/transaction-* lowest, demo lock)"; `make test-with-db` runs the race tests locally.
+
+### Changed
+
+- Every page, content, revision and template write is one write unit of nowo-tech/transaction-doctrine's runner on the bundle's manager (`forHostEntityManager()` on your manager, `forEntityManager()` on a manager of the bundle's own): its revision snapshot, pruning and document flushes commit together or not at all, and its events are dispatched right after the commit.
+- Without `doctrine.entity_manager`, a write unit refuses to start (`LogicException`) while your entity manager holds unflushed changes. A manager closed by a failed write is replaced through the registry; an open one is never cleared or reset.
+- Requires `nowo-tech/transaction-doctrine` `^1.6` and `nowo-tech/transaction-contract` `^1.0`.
+- `PageBuilderConflictListener` runs at `kernel.exception` priority 64 (before the framework's error listener logs the exception).
+- A host whose manager has a `postLoad` listener that changes entities (decryption, e.g. nowo-tech/doctrine-encrypt-bundle) must set `doctrine.entity_manager` to a manager of the bundle's own (see UPGRADING).
+
+### Fixed
+
+- Two editors saving content fields of the same page at the same time lost one editor's value (the second save wrote the structure it had read before the first one committed; since 1.4.0). Content, document, publish and revision writes now lock the page's document row and read it again first.
+- The content form wrote back every locale's values, every field of its locale (unchecked bools as false) and the whole schema it had read when the page was shown: a value saved meanwhile (another locale, another field, a bool turned on, for example inline from the canvas), or a field added meanwhile, was lost (since 1.4.0). The form now posts what it showed and only the editor's changes are written, under the lock; adding a field key another editor added meanwhile is refused.
+- A failed SEO save (a duplicate translation, a deadlock) closed the entity manager and left it closed: in a kept-alive worker every later request failed (since 1.0.0). The closed manager is now replaced through the registry (outside a write unit; inside one the runner recovers).
+- A failure in the middle of a save, duplicate, import or "create from template" left part of it stored (a revision without the document since 1.1.0, a page without its copied content or translations since 1.0.0). Each is now one transaction.
+- Two editors creating the same page key, or saving the same new template key, at once answered a 500 for the second one; it now gets the domain error ("already exists").
+- A lock conflict on the admin routes answered a 500.
+- On doctrine/dbal 3 (DoctrineBundle 2) the bundle failed to load: the after-commit middleware declared `exec(): int|string`, which DBAL 3's driver connection refuses. It now declares `int`, valid on DBAL 3 and 4; the race tests run on both.
+
 ## [1.16.1] - 2026-11-17
 
 ### Added

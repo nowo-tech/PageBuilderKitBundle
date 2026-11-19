@@ -944,8 +944,15 @@ final class PageBuilderPersistenceKernelTest extends TestCase
 
         $request  = Request::create('/t/create/next');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
-        self::assertSame(500, $response->getStatusCode(), 'the host owns its manager: the bundle does not reset it');
-        self::assertFalse($default->isOpen());
+        self::assertSame(500, $response->getStatusCode(), 'the host owns its manager: the bundle does not reset it before its write');
+        // 1.17 (REQ-RUNTIME-003 rule 2): the failed write unit found the host's manager closed and replaced it
+        // through the registry (transaction-doctrine's forHostEntityManager()); an open one is never reset.
+        self::assertTrue($default->isOpen());
+        $kernel->terminate($request, $response);
+
+        $request  = Request::create('/t/create/after');
+        $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
+        self::assertSame(200, $response->getStatusCode(), 'the next request writes again');
     }
 
     /**

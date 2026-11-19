@@ -69,6 +69,14 @@ final class ContentValuesType extends AbstractType
             'label'    => false,
         ]);
 
+        // 1.17 (REQ-RUNTIME-003): what the form shows, posted back so that only the editor's changes are saved.
+        /** @var array<string, string> $originals */
+        $originals            = $options['originals'];
+        $valueOriginals       = $builder->create('fieldOriginals', FormType::class, ['compound' => true, 'label' => false]);
+        $localeOriginals      = $builder->create($locale, FormType::class, ['compound' => true, 'label' => false]);
+        $labelOriginals       = $builder->create('labelOriginals', FormType::class, ['compound' => true, 'label' => false]);
+        $localeLabelOriginals = $builder->create($locale, FormType::class, ['compound' => true, 'label' => false]);
+
         foreach ($schema as $field) {
             $key = is_string($field['key'] ?? null) ? $field['key'] : '';
             if ($key === '') {
@@ -93,12 +101,21 @@ final class ContentValuesType extends AbstractType
 
             $current = $values[$key] ?? ($field['default'] ?? ($type === 'bool' ? false : ''));
             $this->addValueField($localeValues, $key, $type, $field, $current, $referencePages);
+
+            $localeLabelOriginals->add($key, HiddenType::class, ['data' => $currentLabel]);
+            if (isset($originals[$key])) {
+                $localeOriginals->add($key, HiddenType::class, ['data' => $originals[$key]]);
+            }
         }
 
         $labelsForm->add($localeLabels);
         $valuesForm->add($localeValues);
+        $valueOriginals->add($localeOriginals);
+        $labelOriginals->add($localeLabelOriginals);
         $builder->add($labelsForm);
         $builder->add($valuesForm);
+        $builder->add($valueOriginals);
+        $builder->add($labelOriginals);
     }
 
     /**
@@ -273,7 +290,9 @@ final class ContentValuesType extends AbstractType
             'locale'             => 'en',
             'values'             => [],
             'reference_pages'    => [],
+            'originals'          => [],
         ]);
+        $resolver->setAllowedTypes('originals', 'array');
         $resolver->setAllowedTypes('schema', 'array');
         $resolver->setAllowedTypes('locale', 'string');
         $resolver->setAllowedTypes('values', 'array');

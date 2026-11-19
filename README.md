@@ -146,6 +146,7 @@ Demo default URL: `http://localhost:8137`.
 - [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
 - [Use cases matrix](docs/USE-CASES.md)
 - [FrankenPHP worker mode audit](docs/FRANKENPHP-WORKER-AUDIT.md)
+- [Concurrency (write units, conflict codes, REQ-RUNTIME-003)](docs/CONCURRENCY.md)
 
 ## Tests and coverage
 
