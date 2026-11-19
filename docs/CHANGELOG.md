@@ -66,8 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Two editors saving content fields of the same page at the same time lost one editor's value (the second save wrote the structure it had read before the first one committed; since 1.4.0). Content, document, publish and revision writes now lock the page's document row and read it again first.
-- The content form wrote back every locale's values and the whole schema it had read when the page was shown: a value saved meanwhile in another locale (for example inline from the canvas), or a field added meanwhile, was lost. The form now sends only the editor's intent, merged under the lock.
-- A failed SEO save (a duplicate translation, a deadlock) closed the entity manager and left it closed: in a kept-alive worker every later request failed. The closed manager is now replaced through the registry.
+- The content form wrote back every locale's values, every field of its locale (unchecked bools as false) and the whole schema it had read when the page was shown: a value saved meanwhile (another locale, another field, a bool turned on, for example inline from the canvas), or a field added meanwhile, was lost (since 1.4.0). The form now posts what it showed and only the editor's changes are written, under the lock; adding a field key another editor added meanwhile is refused.
+- A failed SEO save (a duplicate translation, a deadlock) closed the entity manager and left it closed: in a kept-alive worker every later request failed (since 1.0.0). The closed manager is now replaced through the registry (outside a write unit; inside one the runner recovers).
 - A failure in the middle of a save, duplicate, import or "create from template" left part of it stored (a revision without the document since 1.1.0, a page without its copied content or translations since 1.0.0). Each is now one transaction.
 - Two editors creating the same page key, or saving the same new template key, at once answered a 500 for the second one; it now gets the domain error ("already exists").
 - A lock conflict on the admin routes answered a 500.

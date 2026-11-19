@@ -16,6 +16,7 @@ use Nowo\PageBuilderKitBundle\Event\PageCreatedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageTemplateRepositoryInterface;
+use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Integration\Http\AbstractHttpTestCase;
 use Nowo\TransactionContract\TransactionRunnerInterface;
@@ -25,6 +26,19 @@ use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 use function assert;
+use function html_entity_decode;
+use function json_decode;
+use function json_encode;
+use function parse_str;
+use function preg_match;
+use function preg_match_all;
+use function rawurlencode;
+use function str_contains;
+
+use const ENT_HTML5;
+use const ENT_QUOTES;
+use const JSON_THROW_ON_ERROR;
+use const PREG_SET_ORDER;
 
 /**
  * 1.17 (REQ-RUNTIME-003 rules 1, 2 and 4): the write units of PageBuilderTransaction on a real (SQLite) manager.
@@ -231,6 +245,85 @@ final class PageBuilderWriteUnitTest extends AbstractHttpTestCase
         self::assertSame(302, $this->request('POST', $content . '?locale=en', ['action' => 'save_values', '_csrf_token' => 'x', 'fieldValues' => ['en' => ['title' => 'x']]])->getStatusCode());
         self::assertSame(302, $this->request('POST', $content . '/schema', ['_csrf_token' => 'x', 'schema_action' => 'remove', 'key' => 'title'])->getStatusCode());
         self::assertSame(0, (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM pb_document'), 'nothing written');
+    }
+
+    /**
+     * Audit UW2-3: inside a unit, or while a transaction is open, the runner (or its owner) recovers; a registry that
+     * fails is logged and never hides the original failure.
+     */
+    public function testAClosedManagerIsReplacedOnlyOutsideAUnitAndNeverThrows(): void
+    {
+        $this->boot();
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->expects(self::once())->method('resetManager')->willThrowException(new RuntimeException('registry down'));
+        $runner = $this->createStub(TransactionRunnerInterface::class);
+        $runner->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $transaction = new PageBuilderTransaction($this->em, registry: $registry, runner: $runner);
+
+        $this->em->getConnection()->beginTransaction();
+        $this->em->close();
+        $transaction->replaceClosedManager();
+        $this->em->getConnection()->rollBack();
+
+        $transaction->run(static function () use ($transaction): void {
+            $transaction->replaceClosedManager();
+        });
+        $transaction->replaceClosedManager();
+        self::assertFalse($this->em->isOpen());
+    }
+
+    public function testAFieldAnotherEditorAddedMeanwhileIsRefused(): void
+    {
+        $container = $this->boot();
+        $fields    = $container->get(ContentFieldsService::class);
+        assert($fields instanceof ContentFieldsService);
+        $page = $this->documents->createPage('fields', 'Fields', 'en');
+        $this->documents->saveDocument($page, self::grapes(), []);
+        $fields->saveSchemaWithField($page, ['key' => 'headline', 'type' => 'string', 'label' => 'Headline']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Field "headline" already exists.');
+        $fields->saveSchemaWithField($page, ['key' => 'headline', 'type' => 'string', 'label' => 'Again']);
+    }
+
+    /**
+     * Audit UW2-1/2: the content form posts what it showed; only what the editor changed is saved (an unchecked
+     * rendered bool counts as a change to false, an untouched field is not written back).
+     */
+    public function testTheContentFormSavesOnlyWhatTheEditorChanged(): void
+    {
+        $container = $this->boot();
+        $fields    = $container->get(ContentFieldsService::class);
+        assert($fields instanceof ContentFieldsService);
+        $page = $this->documents->createPage('intent', 'Intent', 'en');
+        $this->documents->saveDocument($page, self::grapes(), []);
+        $fields->saveSchema($page, [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'flag', 'type' => 'bool', 'label' => 'Flag'], ['key' => 'lead', 'type' => 'string', 'label' => 'Lead']]);
+        $fields->saveValues($page, ['en' => ['headline' => 'Old', 'flag' => true, 'lead' => 'Shown lead']]);
+
+        $html = (string) $this->request('GET', self::ADMIN . '/pages/intent/content?locale=en')->getContent();
+        preg_match_all('/<input\b[^>]*name="([^"]+)"[^>]*>/i', $html, $inputs, PREG_SET_ORDER);
+        $query = '';
+        foreach ($inputs as [$input, $name]) {
+            $name = html_entity_decode($name, ENT_QUOTES | ENT_HTML5);
+            if (str_contains($input, 'type="checkbox"')) {
+                continue; // the editor unchecks "flag"
+            }
+            preg_match('/value="([^"]*)"/', $input, $value);
+            $query .= '&' . rawurlencode($name) . '=' . rawurlencode(html_entity_decode($value[1] ?? '', ENT_QUOTES | ENT_HTML5));
+        }
+        parse_str($query . '&fieldValues%5Ben%5D%5Bheadline%5D=New&fieldOriginals%5Bxx%5D%5Blead%5D=ignored', $parameters);
+        /* @var array<string, mixed> $parameters */
+        self::assertArrayHasKey('fieldOriginals', $parameters, 'the form posts what it showed');
+
+        // Another editor changes the lead after this editor's read: it is not written back.
+        $structure                              = $page->getDocument()?->getStructure() ?? [];
+        $structure['fieldValues']['en']['lead'] = 'Committed lead';
+        $this->em->getConnection()->executeStatement('UPDATE pb_document SET structure = ? WHERE id = ?', [json_encode($structure, JSON_THROW_ON_ERROR), $page->getDocument()?->getId()]);
+
+        self::assertSame(302, $this->request('POST', self::ADMIN . '/pages/intent/content?locale=en', $parameters)->getStatusCode());
+        $stored = json_decode((string) $this->em->getConnection()->fetchOne('SELECT structure FROM pb_document WHERE id = ?', [$page->getDocument()?->getId()]), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($stored);
+        self::assertSame(['headline' => 'New', 'flag' => false, 'lead' => 'Committed lead'], $stored['fieldValues']['en'] ?? null);
     }
 
     public function testKeyBasedWritesOfAnUnknownPageAreRefusedBeforeAnyUnit(): void

@@ -96,17 +96,18 @@ final class PageContentController extends AbstractController
                 }
             }
 
-            /** @var array<string, mixed> $postedLabels */
-            $postedLabels = $request->request->all('fieldLabels');
-            $labels       = [];
-            foreach (is_array($postedLabels[$active] ?? null) ? $postedLabels[$active] : [] as $key => $text) {
-                if (is_string($key) && is_string($text)) {
-                    $labels[$key] = $text;
+            $originals = [];
+            foreach ($request->request->all('fieldOriginals') as $locale => $bag) {
+                if (is_string($locale) && in_array($locale, $locales, true)) {
+                    $originals[$locale] = self::strings($bag);
                 }
             }
 
+            $labels         = self::strings($request->request->all('fieldLabels')[$active] ?? []);
+            $labelOriginals = self::strings($request->request->all('labelOriginals')[$active] ?? []);
+
             try {
-                $this->contentFieldsService->mergeValues($page, $posted, $active, $labels);
+                $this->contentFieldsService->mergeValues($page, $posted, $originals, $active, $labels, $labelOriginals);
                 $this->addFlash('success', 'admin.content.saved');
             } catch (InvalidArgumentException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
@@ -149,6 +150,7 @@ final class PageContentController extends AbstractController
                 'schema'          => $schemaView,
                 'locale'          => $active,
                 'values'          => $values[$active] ?? [],
+                'originals'       => $this->contentFieldsService->valueFingerprints($schema, $values[$active] ?? []),
                 'reference_pages' => $referencePages,
                 'action'          => $this->generateUrl('admin_page_builder_content', [
                     'pageKey' => $pageKey,
@@ -270,6 +272,21 @@ final class PageContentController extends AbstractController
         }
 
         return $this->redirectToRoute('admin_page_builder_content', ['pageKey' => $pageKey]);
+    }
+
+    /**
+     * @return array<string, string> the string entries of a posted bag
+     */
+    private static function strings(mixed $bag): array
+    {
+        $out = [];
+        foreach (is_array($bag) ? $bag : [] as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $out[$key] = $value;
+            }
+        }
+
+        return $out;
     }
 
     private function validCsrf(Request $request): bool

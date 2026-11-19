@@ -13,14 +13,19 @@ use Nowo\PageBuilderKitBundle\Event\PageDocumentSavedEvent;
 use Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 
+use function array_fill_keys;
 use function array_filter;
 use function array_key_exists;
-use function array_merge;
+use function array_keys;
 use function array_values;
+use function hash;
 use function is_array;
 use function is_string;
+use function json_encode;
 use function sprintf;
 use function trim;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * Persist content-field schema and locale values without touching Grapes layout HTML.
@@ -55,36 +60,72 @@ final readonly class ContentFieldsService
     }
 
     /**
-     * Merges an editor's posted values onto the values stored under the page lock (1.17, REQ-RUNTIME-003 rule 4): the
-     * content form of one locale never writes back other locales or fields it read before another editor's save.
+     * Fingerprints of the values a content form shows for one locale (1.17): the form posts them back with the
+     * values, so {@see mergeValues()} applies only what the editor changed. A field without a stored value shows its
+     * default (or false / an empty string), like the form.
      *
-     * - `$postedByLocale`: locale => key => value, only the locales and keys the editor submitted. A `bool` field of
-     *   the stored schema missing from a posted locale is saved as false (unchecked checkboxes are not posted).
-     * - `$labels`: key => label for `$labelLocale` (label edits of the form); unknown keys and blank labels are ignored.
+     * @param list<array{key: string, type: string, ...}> $schema normalised schema
+     * @param array<string, mixed> $localeValues normalised values of the locale
+     *
+     * @return array<string, string> key => fingerprint
+     */
+    public function valueFingerprints(array $schema, array $localeValues): array
+    {
+        $out = [];
+        foreach ($schema as $field) {
+            $key       = $field['key'];
+            $shown     = $localeValues[$key] ?? ($field['default'] ?? (($field['type'] ?? '') === ContentFieldType::Bool->value ? false : ''));
+            $out[$key] = $this->fingerprint($this->contentFieldsNormalizer->normalizeValues(['l' => [$key => $shown]], $schema)['l'][$key] ?? null);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Merges an editor's intent onto the values and schema stored under the page lock (1.17, REQ-RUNTIME-003 rule 4):
+     * a content form never writes back what it only displayed.
+     *
+     * - `$postedByLocale`: locale => key => value as submitted.
+     * - `$originalsByLocale`: locale => key => {@see valueFingerprints()} of the value the form showed. A rendered key
+     *   whose posted value (normalised) equals what was shown is not written, so a value another editor saved
+     *   meanwhile stays. A rendered `bool` missing from the post is false (unchecked checkboxes are not posted); a
+     *   `bool` the form never rendered is left alone. A posted key with no original is written as posted.
+     * - `$labels` / `$labelOriginals`: key => label for `$labelLocale` as submitted / as shown. A label is written only
+     *   when it is not blank and differs from the one shown (no original: written when not blank).
      *
      * @param array<string, array<string, mixed>> $postedByLocale
+     * @param array<string, array<string, string>> $originalsByLocale
      * @param array<string, string> $labels
+     * @param array<string, string> $labelOriginals
      */
-    public function mergeValues(BuilderPage $page, array $postedByLocale, string $labelLocale = '', array $labels = []): void
+    public function mergeValues(BuilderPage $page, array $postedByLocale, array $originalsByLocale = [], string $labelLocale = '', array $labels = [], array $labelOriginals = []): void
     {
-        $this->unit($page, function () use ($page, $postedByLocale, $labelLocale, $labels): void {
+        $this->unit($page, function () use ($page, $postedByLocale, $originalsByLocale, $labelLocale, $labels, $labelOriginals): void {
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
             $values    = $this->contentFieldsNormalizer->normalizeValues($structure['fieldValues'] ?? [], $schema);
 
-            foreach ($postedByLocale as $locale => $bag) {
+            foreach ($postedByLocale + array_fill_keys(array_keys($originalsByLocale), []) as $locale => $bag) {
+                $originals = $originalsByLocale[$locale] ?? [];
                 foreach ($schema as $field) {
-                    if (($field['type'] ?? '') === ContentFieldType::Bool->value && !array_key_exists($field['key'], $bag)) {
+                    if (($field['type'] ?? '') === ContentFieldType::Bool->value && isset($originals[$field['key']]) && !array_key_exists($field['key'], $bag)) {
                         $bag[$field['key']] = '0';
                     }
                 }
-                $values[$locale] = array_merge($values[$locale] ?? [], $bag);
+
+                $normalized = $this->contentFieldsNormalizer->normalizeValues([$locale => $bag], $schema)[$locale] ?? [];
+                foreach ($bag as $key => $value) {
+                    if (isset($originals[$key]) && array_key_exists($key, $normalized) && $this->fingerprint($normalized[$key]) === $originals[$key]) {
+                        continue;
+                    }
+                    $values[$locale][$key] = $value;
+                }
             }
 
             $labelsChanged = false;
             foreach ($schema as $index => $field) {
                 $label = trim($labels[$field['key']] ?? '');
-                if ($labelLocale === '' || $label === '') {
+                if ($labelLocale === '' || $label === '' || (isset($labelOriginals[$field['key']]) && trim($labelOriginals[$field['key']]) === $label)) {
                     continue;
                 }
                 $schema[$index] = $this->contentFieldsNormalizer->mergeLabels($field, ['labels' => [$labelLocale => $label], 'label' => $label], $labelLocale);
@@ -106,7 +147,14 @@ final readonly class ContentFieldsService
         $this->unit($page, function () use ($page, $field): void {
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
-            $schema[]  = $field;
+            $key       = is_string($field['key'] ?? null) ? $field['key'] : '';
+            foreach ($schema as $stored) {
+                if ($key !== '' && $stored['key'] === $key) {
+                    // Another editor added the same key meanwhile: refuse instead of answering "schema saved".
+                    throw new InvalidArgumentException(sprintf('Field "%s" already exists.', $key));
+                }
+            }
+            $schema[] = $field;
             $this->doSaveSchema($page, $schema);
         });
     }
@@ -337,6 +385,11 @@ final readonly class ContentFieldsService
         }
 
         return $document;
+    }
+
+    private function fingerprint(mixed $value): string
+    {
+        return hash('xxh128', json_encode($value, JSON_THROW_ON_ERROR));
     }
 
     /**

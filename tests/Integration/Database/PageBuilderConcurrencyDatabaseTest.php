@@ -31,24 +31,34 @@ use function array_column;
 use function assert;
 use function file_exists;
 use function getenv;
+use function html_entity_decode;
+use function in_array;
 use function is_array;
 use function is_resource;
 use function is_string;
 use function json_decode;
 use function json_encode;
 use function microtime;
+use function parse_str;
+use function preg_match_all;
 use function preg_replace_callback;
 use function proc_close;
 use function proc_get_status;
 use function proc_open;
+use function rawurlencode;
+use function str_contains;
 use function stream_get_contents;
+use function strtolower;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
 use function usleep;
 
+use const ENT_HTML5;
+use const ENT_QUOTES;
 use const JSON_THROW_ON_ERROR;
 use const PHP_BINARY;
+use const PREG_SET_ORDER;
 
 /**
  * REQ-RUNTIME-003: the bundle's write units against real MySQL 8.4, MariaDB 11.4 and PostgreSQL 16, with a second
@@ -174,38 +184,57 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     }
 
     /**
-     * The content form of one locale (editor A, en) posted while editor B's inline save of another locale (es) holds
-     * the lock (two processes): A's values are merged onto what B committed, so B's es value survives (audit UW-1).
+     * The content form of one locale (editor A, en, read before) posted while editor B's save of another locale (es)
+     * holds the lock (two processes): only A's changes are merged onto what B committed (audit UW-1).
      */
     #[DataProvider('databases')]
     public function testTheContentFormOfOneLocaleKeepsAnotherEditorsValueOfAnotherLocale(string $env): void
     {
-        $url  = $this->boot($env, lockWait: 8);
-        $page = $this->documents->createPage('form', 'Form', 'en');
-        $this->documents->saveDocument($page, $this->grapes('<p>f</p>', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'flag', 'type' => 'bool', 'label' => 'Flag']]), []);
-        $documentId                                 = $this->documentId('form');
-        $structure                                  = $this->storedStructure('form');
-        $structure['fieldValues']['es']['headline'] = 'Titular de B';
-        $this->em->clear();
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('form', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'flag', 'type' => 'bool', 'label' => 'Flag']]);
 
-        $child = $this->startHolder($url, [
-            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
-            [$this->sql('UPDATE {document} SET {document.structure} = ? WHERE id = ?'), [json_encode($structure, JSON_THROW_ON_ERROR), $documentId]],
-        ], 800);
-        $response = $this->handle(Request::create(self::ADMIN . '/pages/form/content?locale=en', 'POST', [
-            'action'      => 'save_values',
-            '_csrf_token' => 't',
-            'fieldValues' => ['en' => ['headline' => 'Headline of A']],
-            'fieldLabels' => ['en' => ['headline' => 'Main headline']],
-        ]));
-        $this->finish($child);
+        $stored = $this->postStaleForm('form', ['es' => ['headline' => 'Titular de B']], [
+            'fieldValues[en][headline]' => 'Headline of A',
+            'fieldLabels[en][headline]' => 'Main headline',
+        ]);
 
-        self::assertSame(302, $response->getStatusCode());
-        $stored = $this->storedStructure('form');
         self::assertSame('Titular de B', $stored['fieldValues']['es']['headline'] ?? null, 'the other editor\'s value survives');
         self::assertSame('Headline of A', $stored['fieldValues']['en']['headline'] ?? null);
-        self::assertFalse((bool) ($stored['fieldValues']['en']['flag'] ?? true), 'an unchecked bool of the posted locale is false');
-        self::assertSame('Main headline', $stored['fields'][0]['labels']['en'] ?? null, 'the label edit is applied');
+        self::assertFalse((bool) ($stored['fieldValues']['en']['flag'] ?? false));
+        self::assertSame('Main headline', $stored['fields'][0]['labels']['en'] ?? null, 'the changed label is applied');
+        self::assertSame('Flag', $stored['fields'][1]['label'] ?? null, 'an unchanged label is not written');
+    }
+
+    /**
+     * Audit UW2-1: editor B turns a bool of the same locale on while editor A posts the form read before (the box
+     * shown unchecked, left alone): the bool stays true.
+     */
+    #[DataProvider('databases')]
+    public function testAStaleFormKeepsABoolAnotherEditorTurnedOn(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('bools', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'featured', 'type' => 'bool', 'label' => 'Featured']]);
+
+        $stored = $this->postStaleForm('bools', ['en' => ['featured' => true]], ['fieldValues[en][headline]' => 'Changed by A']);
+
+        self::assertTrue($stored['fieldValues']['en']['featured'] ?? null, 'the other editor\'s bool survives');
+        self::assertSame('Changed by A', $stored['fieldValues']['en']['headline'] ?? null);
+    }
+
+    /**
+     * Audit UW2-2: editor B saves a field of the same locale inline while editor A posts the form read before without
+     * touching that field: B's value is kept (only A's changes are merged).
+     */
+    #[DataProvider('databases')]
+    public function testAStaleFormKeepsAFieldOfTheSameLocaleItDidNotChange(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('lead', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'lead', 'type' => 'string', 'label' => 'Lead']]);
+
+        $stored = $this->postStaleForm('lead', ['en' => ['lead' => 'Inline lead of B']], ['fieldValues[en][headline]' => 'Headline of A']);
+
+        self::assertSame('Inline lead of B', $stored['fieldValues']['en']['lead'] ?? null);
+        self::assertSame('Headline of A', $stored['fieldValues']['en']['headline'] ?? null);
     }
 
     /**
@@ -359,6 +388,84 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         $this->documents = $documents;
 
         return $url;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $fields
+     */
+    private function fieldsPage(string $pageKey, array $fields): void
+    {
+        $page = $this->documents->createPage($pageKey, 'Page ' . $pageKey, 'en');
+        $this->documents->saveDocument($page, $this->grapes('<p>' . $pageKey . '</p>', $fields), []);
+        $this->em->clear();
+    }
+
+    /**
+     * Editor A reads the en content form; editor B (a child process) then commits $otherValues under the lock and
+     * holds it while A posts the form it read, with $changes applied (as a browser would post it).
+     *
+     * @param array<string, array<string, mixed>> $otherValues locale => key => value committed by B
+     * @param array<string, string> $changes field name => new value
+     *
+     * @return array<string, mixed> the stored structure
+     */
+    private function postStaleForm(string $pageKey, array $otherValues, array $changes): array
+    {
+        $form = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/content?locale=en'));
+        self::assertSame(200, $form->getStatusCode());
+        $fields = self::formFields((string) $form->getContent());
+        foreach ($changes as $name => $value) {
+            $fields[] = [$name, $value];
+        }
+
+        $documentId = $this->documentId($pageKey);
+        $structure  = $this->storedStructure($pageKey);
+        foreach ($otherValues as $locale => $bag) {
+            foreach ($bag as $key => $value) {
+                $structure['fieldValues'][$locale][$key] = $value;
+            }
+        }
+
+        $child = $this->startHolder($this->url, [
+            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
+            [$this->sql('UPDATE {document} SET {document.structure} = ? WHERE id = ?'), [json_encode($structure, JSON_THROW_ON_ERROR), $documentId]],
+        ], 800);
+        $query = '';
+        foreach ($fields as [$name, $value]) {
+            $query .= '&' . rawurlencode($name) . '=' . rawurlencode($value);
+        }
+        parse_str($query, $parameters);
+        $response = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/content?locale=en', 'POST', $parameters));
+        $this->finish($child);
+        self::assertSame(302, $response->getStatusCode());
+
+        return $this->storedStructure($pageKey);
+    }
+
+    /**
+     * The inputs a browser posts from the page: hidden and text inputs, checked checkboxes; a later entry for the
+     * same name wins (parse_str).
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private static function formFields(string $html): array
+    {
+        $fields = [];
+        preg_match_all('/<input\b[^>]*>/i', $html, $inputs);
+        foreach ($inputs[0] as $input) {
+            preg_match_all('/([\w-]+)="([^"]*)"/', $input, $attributes, PREG_SET_ORDER);
+            $attr = [];
+            foreach ($attributes as $attribute) {
+                $attr[strtolower($attribute[1])] = html_entity_decode($attribute[2], ENT_QUOTES | ENT_HTML5);
+            }
+            $type = $attr['type'] ?? 'text';
+            if (!isset($attr['name']) || ($type === 'checkbox' && !str_contains($input, 'checked')) || in_array($type, ['submit', 'button', 'file'], true)) {
+                continue;
+            }
+            $fields[] = [$attr['name'], $type === 'checkbox' ? ($attr['value'] ?? '1') : ($attr['value'] ?? '')];
+        }
+
+        return $fields;
     }
 
     private function other(): Connection

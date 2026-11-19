@@ -89,9 +89,12 @@ and its request commit mark. No schema change.
   entities after loading them (decryption) makes them look changed, so the host runner sees pending changes and every
   bundle write fails with `LogicException`. Set `nowo_page_builder_kit.doctrine.entity_manager` to a manager of the
   bundle's own (mapping only the bundle entities, without that listener).
-- **Content form and schema.** The admin content form now sends only the editor's intent:
-  `ContentFieldsService::mergeValues()` (posted locales and keys, unchecked bools, label edits) and `saveSchemaWithField()` /
-  `saveSchemaWithoutField()`, merged onto what is stored, under the page lock. `saveValues()` and `saveSchema()` are unchanged
+- **Content form and schema.** The admin content form now sends only the editor's intent. It posts
+  `fieldOriginals[<locale>][<key>]` (a fingerprint of each value shown) and `labelOriginals[<locale>][<key>]` (each
+  label shown); `ContentFieldsService::mergeValues()` writes under the page lock only the values and labels that
+  differ from what was shown. `saveSchemaWithField()` / `saveSchemaWithoutField()` apply one schema change to what is
+  stored, and adding a key that exists is refused. If you override the content template, keep rendering the hidden
+  `fieldOriginals` and `labelOriginals` children (without them every posted value is written, as before). `saveValues()` and `saveSchema()` are unchanged
   for your code (whole replacement, now one unit under the lock).
 - **Conflict listener priority.** `PageBuilderConflictListener` runs at `kernel.exception` priority 64, before the
   framework's error listener logs the exception; it still acts on the bundle's routes only.

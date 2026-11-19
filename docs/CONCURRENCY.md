@@ -55,8 +55,8 @@ the residual risks. Worker mode (FrankenPHP, kernel reset off) is covered in
 | --- | --- | --- | --- |
 | Save the editor document (`POST /pages/{pageKey}/document`, `DocumentService::saveDocument()`, also `saveDocumentByKey()`) | One unit: revision snapshot, pruning and document | Page row lock, document read again (the snapshot records what this save replaces) | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
 | Content field from the canvas (`POST /pages/{pageKey}/fields/{fieldKey}`, `ContentFieldsService::saveFieldValue()`) | One unit | Page row lock, structure read again: two editors saving different fields keep both values | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
-| Content form (`PageContentController`, `ContentFieldsService::mergeValues()`) | One unit | Page row lock; only the editor's intent (the posted locales and keys, unchecked bools of those locales, label edits of the active locale) is merged onto the values and schema read under the lock, so another editor's other locale or field survives | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
-| Content schema (`PageContentController`, `ContentFieldsService::saveSchemaWithField()` / `saveSchemaWithoutField()`) | One unit | Page row lock; one add or remove applied to the schema read under the lock (a field another editor added meanwhile stays) | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
+| Content form (`PageContentController`, `ContentFieldsService::mergeValues()`) | One unit | Page row lock. The form posts, next to the values, a fingerprint of each value it showed (`fieldOriginals`) and the labels it showed (`labelOriginals`); under the lock only the fields and labels the editor changed are written. An unchecked box counts as a change only for a bool the form rendered. Another editor's other locale, other field or newly turned-on bool survives | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
+| Content schema (`PageContentController`, `ContentFieldsService::saveSchemaWithField()` / `saveSchemaWithoutField()`) | One unit | Page row lock; one add or remove applied to the schema read under the lock (a field another editor added meanwhile stays; adding a key another editor added meanwhile is refused with "Field … already exists") | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
 | Your code: `saveValues()` / `saveSchema()` | One unit | Page row lock; they replace the values / schema with what you pass (whole replacement: build it from a fresh read, or use the intent methods above) | `TransientStorageFailure` |
 | Classic sections editor (legacy, `PageSectionsController`) | One unit (`saveDocument()`) | As the document save, but the editor posts the whole document built from its earlier read (see residual risks) | 409 (your error page) |
 | Publish / unpublish (`POST /pages/{pageKey}/publish`, `/unpublish`, `publishByKey()`, `unpublishByKey()`) | One unit | Page row lock: the required-field check and the publish revision read the content being published | 409 (JSON when asked, else your error page) |
@@ -163,7 +163,10 @@ nowo_page_builder_kit:
     are stored;
   - a field save from a stale read keeps the value another editor committed;
   - the content form of one locale posted while another editor's save of another locale holds the lock (two
-    processes): both values are kept, the unchecked bool is false and the label edit applied;
+    processes): both values are kept and the changed label applied;
+  - a stale content form posted while another editor turns a bool of the same locale on: the bool stays true;
+  - a stale content form posted while another editor saves another field of the same locale inline: that field is
+    kept;
   - a schema add posted while another editor's save adds a field inline (two processes): both fields are kept, and a
     remove leaves the others;
   - two creates of one page key at once (two processes): one page, the second gets the domain error, the manager is
@@ -197,6 +200,9 @@ make down-db
   page it read when the form was shown; a save of another locale by another editor in the meantime is overwritten
   (the revision snapshot of the save keeps it when `revisions.on_save` is on). Use the canvas and the content form,
   which merge under the lock.
+- **Content form: the same field edited by two editors.** The later save of that field wins (the other editor's
+  value of that field is replaced; their other fields stay). The revision snapshot keeps the earlier content when
+  `revisions.on_save` is on.
 - **SEO and translation forms: last write wins per field.** Doctrine writes only the changed columns, so two editors
   changing different fields both keep them. The same field: the later save wins.
 - **Commit detection covers the bundle's connection** (and every connection when transaction-doctrine's
