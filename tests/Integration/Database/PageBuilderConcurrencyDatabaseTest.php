@@ -38,6 +38,7 @@ use function json_encode;
 use function microtime;
 use function preg_replace_callback;
 use function proc_close;
+use function proc_get_status;
 use function proc_open;
 use function stream_get_contents;
 use function sys_get_temp_dir;
@@ -203,8 +204,9 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     {
         $url   = $this->boot($env, lockWait: 8);
         $child = $this->startHolder($url, [[
-            $this->sql('INSERT INTO {page} ({page.uuid}, {page.pageKey}, {page.status}, {page.createdAt}, {page.updatedAt}) VALUES (?, ?, ?, ?, ?)'),
-            ['00000000-0000-4000-8000-0000000000aa', 'race', 'draft', '2026-11-19 10:00:00', '2026-11-19 10:00:00'],
+            // An explicit id: DBAL 3 maps the PostgreSQL id to a sequence with no column default.
+            $this->sql('INSERT INTO {page} (id, {page.uuid}, {page.pageKey}, {page.status}, {page.createdAt}, {page.updatedAt}) VALUES (?, ?, ?, ?, ?, ?)'),
+            [9000, '00000000-0000-4000-8000-0000000000aa', 'race', 'draft', '2026-11-19 10:00:00', '2026-11-19 10:00:00'],
         ]], 800);
 
         try {
@@ -381,8 +383,9 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
 
         $deadline = microtime(true) + 15;
         while (!file_exists($signal)) {
-            if (microtime(true) > $deadline) {
-                self::fail('The second session did not take its lock: ' . stream_get_contents($pipes[2]));
+            $status = proc_get_status($process);
+            if (!$status['running'] || microtime(true) > $deadline) {
+                self::fail('The second session did not take its lock: ' . stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]));
             }
             usleep(20_000);
         }

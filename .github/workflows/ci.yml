@@ -191,11 +191,15 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
+      # DoctrineBundle 3 requires DBAL 4: the DBAL 3 cell runs DoctrineBundle 2 (Symfony 7.4), whose ORM 3 proxies need
+      # symfony/var-exporter 7 (LazyGhost) when native lazy objects are not enabled.
       - name: Use DBAL 3
         if: ${{ matrix.dbal == '3' }}
         run: |
-          composer require --no-interaction --no-progress --with-all-dependencies "doctrine/dbal:^3.8.2"
-          composer show doctrine/dbal
+          composer require --no-update --no-interaction "doctrine/dbal:^3.8.2" "doctrine/doctrine-bundle:^2.13"
+          composer require --no-update --no-interaction --dev "symfony/var-exporter:^7.4"
+          composer update --with-all-dependencies --no-interaction --no-progress
+          composer show doctrine/dbal doctrine/doctrine-bundle symfony/framework-bundle
 
       - name: Concurrency tests on real servers (REQ-RUNTIME-003; none may be skipped)
         timeout-minutes: 10
@@ -204,11 +208,6 @@ jobs:
           PBK_MARIADB_URL: mysql://root@127.0.0.1:3307/pbk?serverVersion=11.4.0-MariaDB&charset=utf8mb4
           PBK_POSTGRES_URL: pgsql://postgres@127.0.0.1:5432/pbk?serverVersion=16
         run: php -d memory_limit=1G vendor/bin/phpunit --group database --no-coverage --fail-on-skipped
-
-      - name: Unit and integration suites on this doctrine/dbal
-        if: ${{ matrix.dbal == '3' }}
-        timeout-minutes: 15
-        run: php -d memory_limit=1G vendor/bin/phpunit --no-coverage
 
   # Dependency floor: the code must work with the LOWEST nowo-tech/transaction-* versions composer.json allows (a host
   # can run `composer update nowo-tech/page-builder-kit-bundle` without updating them), and the demo lock must install

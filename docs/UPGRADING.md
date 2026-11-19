@@ -90,12 +90,13 @@ and its request commit mark. No schema change.
   it.
 - **Events after the unit.** The write events of a unit are dispatched once, right after its commit (before, after each
   of its flushes). A unit inside your own transaction still waits for your outermost commit.
-- **Commit tracking and doctrine/dbal 3.** The bundle registers transaction-doctrine's commit-tracking middleware on the
-  connection of its entities (usually your default connection), so that the conflict answer can tell `CONFLICT_002`.
-  On doctrine/dbal 3, once the middleware wraps the connection, `Connection::commit()` returns `null` instead of
-  `true`. If your code relies on that return value, set
-  `nowo_page_builder_kit.conflict_response.commit_tracking: off` (no middleware; `CONFLICT_002` then relies on
-  transaction-doctrine's request mark only). doctrine/dbal 4's `commit()` returns `void`, so nothing changes there.
+- **doctrine/dbal 3.** The bundle now loads on doctrine/dbal 3 (DoctrineBundle 2): since 1.14 its after-commit
+  middleware declared `exec(): int|string`, which DBAL 3 refuses with a fatal error. Two middlewares of the bundle
+  (the after-commit outbox and transaction-doctrine's commit tracking) wrap the connection of its entities (usually
+  your default connection). On doctrine/dbal 3, `Connection::commit()` then returns `null` instead of `true`. Do not
+  rely on that return value. `conflict_response.commit_tracking: off` removes the commit-tracking middleware;
+  `CONFLICT_002` then relies on transaction-doctrine's request mark only. doctrine/dbal 4's `commit()` returns `void`,
+  so nothing changes there.
 - See [CONCURRENCY.md](CONCURRENCY.md).
 
 ## To 1.16.1

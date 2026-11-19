@@ -54,7 +54,7 @@ nowo_page_builder_kit:
     conflict_response:          # 1.17: lock conflicts on the bundle's routes (see CONCURRENCY.md)
         status: null            # 409 (default) | 503; null follows nowo-tech/transaction-doctrine
         retry_after: null       # seconds for CONFLICT_001; null follows transaction-doctrine, else 1
-        commit_tracking: bundle # bundle | off (doctrine/dbal 3: the wrapped commit() returns null)
+        commit_tracking: bundle # bundle | off
     html:
         sanitize:
             strategy: allowlist # none | strip | allowlist | service
@@ -304,7 +304,7 @@ bundle's routes. See [CONCURRENCY.md](CONCURRENCY.md) for the codes and the JSON
 | --- | --- | --- |
 | `status` | `null` | `409` or `503`. `null` (with `retry_after` also null): follow `nowo_transaction_doctrine.conflict_response` when nowo-tech/transaction-doctrine's Symfony bundle is registered, else 409. |
 | `retry_after` | `null` | Seconds of the `Retry-After` header of a `CONFLICT_001` answer (`CONFLICT_002` never carries it). `null`: follow transaction-doctrine, else 1. |
-| `commit_tracking` | `bundle` | `bundle`: transaction-doctrine's commit-tracking DBAL middleware on the connection of the bundle entities tells `CONFLICT_002` from `CONFLICT_001`. On doctrine/dbal 3 the wrapped `Connection::commit()` returns `null` instead of `true`. `off`: no middleware; `CONFLICT_002` then relies on transaction-doctrine's request mark only. |
+| `commit_tracking` | `bundle` | `bundle`: transaction-doctrine's commit-tracking DBAL middleware on the connection of the bundle entities tells `CONFLICT_002` from `CONFLICT_001`. On doctrine/dbal 3 a wrapped `Connection::commit()` returns `null` instead of `true` (the after-commit middleware wraps it too). `off`: no middleware; `CONFLICT_002` then relies on transaction-doctrine's request mark only. |
 
 
 | Key | Default | Description |

@@ -119,15 +119,18 @@ nowo_page_builder_kit:
 - When both are unset (null), the bundle follows `nowo_transaction_doctrine.conflict_response` if
   nowo-tech/transaction-doctrine's Symfony bundle is registered, so the whole application answers the same. Otherwise
   it answers 409 with `Retry-After: 1`.
-- `commit_tracking: off` removes the bundle's commit-tracking middleware (on doctrine/dbal 3 the wrapped
-  `Connection::commit()` returns `null` instead of `true`). `CONFLICT_002` then relies on transaction-doctrine's
-  request mark only.
+- `commit_tracking: off` removes the bundle's commit-tracking middleware. `CONFLICT_002` then relies on
+  transaction-doctrine's request mark only. On doctrine/dbal 3 a wrapped `Connection::commit()` returns `null`
+  instead of `true` (see [UPGRADING](UPGRADING.md)).
 - `status: 503` is for proxies or monitors that treat 503 as retryable. The codes and the `Retry-After` rule stay the
   same.
 - `doctrine.entity_manager`: give the bundle its own manager (see [CONFIGURATION](CONFIGURATION.md#doctrine)) if your
   requests may hold unflushed changes when they call the bundle (the host runner refuses them).
 - `doctrine.transaction: host`: your use case owns the transaction. Open it before you call the bundle if you want the
   page lock.
+- doctrine/dbal 3 (DoctrineBundle 2): set `doctrine.dbal.use_savepoints: true`, so a unit that runs inside your
+  own transaction is a savepoint (DBAL 4 always nests with savepoints). Without it, a failed nested unit marks your
+  whole transaction rollback-only.
 - Database settings: READ COMMITTED and a short `innodb_lock_wait_timeout` / `lock_timeout` (a few seconds) for HTTP.
   The wait is bounded by the database, not by the bundle.
 

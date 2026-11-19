@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failure in the middle of a save, duplicate, import or "create from template" left part of it stored (a revision without the document, a page without its copied content or translations). Each is now one transaction.
 - Two editors creating the same page key, or saving the same new template key, at once answered a 500 for the second one; it now gets the domain error ("already exists").
 - A lock conflict on the admin routes answered a 500.
+- On doctrine/dbal 3 (DoctrineBundle 2) the bundle failed to load: the after-commit middleware declared `exec(): int|string`, which DBAL 3's driver connection refuses. It now declares `int`, valid on DBAL 3 and 4; the race tests run on both.
 
 ## [1.16.1] - 2026-11-17
 

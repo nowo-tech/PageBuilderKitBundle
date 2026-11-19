@@ -153,7 +153,7 @@ final class Configuration implements ConfigurationInterface
                             ->min(0)
                         ->end()
                         ->enumNode('commit_tracking')
-                            ->info('bundle: transaction-doctrine\'s commit-tracking middleware on the connection of the bundle entities tells CONFLICT_002 (on doctrine/dbal 3 the wrapped Connection::commit() returns null). off: no middleware; CONFLICT_002 relies on transaction-doctrine\'s request mark only.')
+                            ->info('bundle: transaction-doctrine\'s commit-tracking middleware on the connection of the bundle entities tells CONFLICT_002 (on doctrine/dbal 3 a wrapped Connection::commit() returns null). off: no middleware; CONFLICT_002 relies on transaction-doctrine\'s request mark only.')
                             ->values(['bundle', 'off'])
                             ->defaultValue('bundle')
                         ->end()
