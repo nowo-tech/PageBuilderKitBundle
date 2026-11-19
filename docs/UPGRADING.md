@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.17.0](#to-1170)
   - [Concurrency (REQ-RUNTIME-003)](#concurrency-req-runtime-003)
 - [To 1.16.1](#to-1161)
 - [To 1.16.0](#to-1160)
@@ -51,6 +52,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.17.0
+
+From **1.16.1**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 ### Concurrency (REQ-RUNTIME-003)
 
