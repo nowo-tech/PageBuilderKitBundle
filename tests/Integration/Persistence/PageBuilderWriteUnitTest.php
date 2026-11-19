@@ -312,15 +312,18 @@ final class PageBuilderWriteUnitTest extends AbstractHttpTestCase
             $query .= '&' . rawurlencode($name) . '=' . rawurlencode(html_entity_decode($value[1] ?? '', ENT_QUOTES | ENT_HTML5));
         }
         parse_str($query . '&fieldValues%5Ben%5D%5Bheadline%5D=New&fieldOriginals%5Bxx%5D%5Blead%5D=ignored', $parameters);
-        /* @var array<string, mixed> $parameters */
         self::assertArrayHasKey('fieldOriginals', $parameters, 'the form posts what it showed');
+        $post = [];
+        foreach ($parameters as $name => $value) {
+            $post[(string) $name] = $value;
+        }
 
         // Another editor changes the lead after this editor's read: it is not written back.
         $structure                              = $page->getDocument()?->getStructure() ?? [];
         $structure['fieldValues']['en']['lead'] = 'Committed lead';
         $this->em->getConnection()->executeStatement('UPDATE pb_document SET structure = ? WHERE id = ?', [json_encode($structure, JSON_THROW_ON_ERROR), $page->getDocument()?->getId()]);
 
-        self::assertSame(302, $this->request('POST', self::ADMIN . '/pages/intent/content?locale=en', $parameters)->getStatusCode());
+        self::assertSame(302, $this->request('POST', self::ADMIN . '/pages/intent/content?locale=en', $post)->getStatusCode());
         $stored = json_decode((string) $this->em->getConnection()->fetchOne('SELECT structure FROM pb_document WHERE id = ?', [$page->getDocument()?->getId()]), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($stored);
         self::assertSame(['headline' => 'New', 'flag' => false, 'lead' => 'Committed lead'], $stored['fieldValues']['en'] ?? null);
