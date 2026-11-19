@@ -45,7 +45,12 @@ final readonly class PageRevisionService
             throw new InvalidArgumentException('Page revisions are disabled.');
         }
 
-        return $this->store->snapshot($page, $label, skipIfUnchanged: false);
+        // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
+        return $this->documentService->unit(function () use ($page, $label): ?BuilderPageRevision {
+            $this->transaction?->lockPage($page);
+
+            return $this->store->snapshot($page, $label, skipIfUnchanged: false);
+        });
     }
 
     public function restore(BuilderPage $page, int $revisionId): BuilderPageRevision
@@ -54,6 +59,17 @@ final readonly class PageRevisionService
             throw new InvalidArgumentException('Page revisions are disabled.');
         }
 
+        // 1.17: one write unit, under the page lock (the "Before restore" snapshot and the restore see the same content).
+        // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
+        return $this->documentService->unit(function () use ($page, $revisionId): BuilderPageRevision {
+            $this->transaction?->lockPage($page);
+
+            return $this->doRestore($page, $revisionId);
+        });
+    }
+
+    private function doRestore(BuilderPage $page, int $revisionId): BuilderPageRevision
+    {
         $revision = $this->store->findForPage($page, $revisionId);
         if (!$revision instanceof BuilderPageRevision) {
             throw new InvalidArgumentException(sprintf('Revision %d not found for page "%s".', $revisionId, $page->getPageKey()));

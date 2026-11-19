@@ -6,7 +6,7 @@
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **210** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
+**Total production sources:** **211** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
 
 ## Bundle entry
 
@@ -86,12 +86,13 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Locale/BuilderLocales.php` | Config-backed locales | FR-I18N-001, FR-CFG-001, FR-WRK-001 |
 | `Locale/BuilderLocalesLegacyBinding.php` | Legacy static bind helper | FR-WRK-001 |
 
-## Event subscribers
+## Event subscribers and listeners
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
 | `EventSubscriber/PageBuilderKitAdminAccessSubscriber.php` | Admin route access + capabilities | FR-SEC-001, FR-P5-ACL-005, REQ-UI-002 |
 | `EventSubscriber/WorkerStateResetSubscriber.php` | Clears locale bind on terminate | FR-WRK-001 |
+| `EventListener/PageBuilderConflictListener.php` | Lock conflicts on the bundle routes answer 409 / 503 + `CONFLICT_001` / `CONFLICT_002` (1.17) | REQ-RUNTIME-003 |
 
 ## Write events
 
@@ -113,7 +114,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Persistence/ExcludedEntityNamespaceDriver.php` | Maps nothing for the bundle namespace on every other entity manager | FR-ORM-003 |
 | `Persistence/OwnEntityManagerSubscriber.php` | Keeps the bundle's own entity manager usable in a kept-alive kernel | FR-ORM-003, FR-WRK-001 |
 | `Persistence/UnitOfWorkBoundaries.php` | Tracks the outermost request / message / command boundary (REQ-RUNTIME-002) | FR-WRK-001 |
-| `Persistence/PageBuilderTransaction.php` | Unit-of-work boundary of the bundle writes (`doctrine.transaction: bundle|host`) | FR-ORM-004 |
+| `Persistence/PageBuilderTransaction.php` | Unit-of-work boundary of the bundle writes (`doctrine.transaction: bundle|host`); write units and the page row lock (1.17) | FR-ORM-004, REQ-RUNTIME-003 |
 | `Persistence/PageBuilderPendingEventsInterface.php` | Write events recorded and not dispatched yet | FR-ORM-004, FR-EVT-001 |
 | `Persistence/PageBuilderOutbox.php` | Per-transaction outbox: dispatch after the outermost commit, drop on rollback | FR-ORM-004, FR-EVT-001 |
 | `Persistence/TransactionObserverInterface.php` | Observer of the real transactions and savepoints of the bundle connection | FR-ORM-004 |
@@ -362,7 +363,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Dependency injection and compiler | 12 | 12 |
 | Entities | 12 | 12 |
 | Enums and locale | 6 | 6 |
-| Event subscribers | 2 | 2 |
+| Event subscribers and listeners | 3 | 3 |
 | Write events | 7 | 7 |
 | Persistence — entity manager, unit of work and outbox | 11 | 11 |
 | Forms | 13 | 13 |
@@ -381,4 +382,4 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Resources — admin and public Twig | 27 | 27 |
 | Resources — frontend assets | 12 | 12 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **210** | **210** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **211** | **211** |

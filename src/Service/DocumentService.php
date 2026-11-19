@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Service;
 
 use DateTimeImmutable;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
@@ -71,40 +72,41 @@ final readonly class DocumentService implements PagePublisherInterface
     public function saveDocument(BuilderPage $page, array $structure, array $widgetPropsByLocale): void
     {
         $normalizedStructure = $this->documentNormalizer->normalize($structure);
-        if ($this->documentNormalizer->isGrapesStructure($normalizedStructure)) {
+        $isGrapes            = $this->documentNormalizer->isGrapesStructure($normalizedStructure);
+        if ($isGrapes) {
             $normalizedStructure = $this->grapesDocumentSanitizer->sanitizeStructure($normalizedStructure);
         }
         $this->validateStructure($normalizedStructure);
 
-        if ($this->pageRevisionStore?->isOnSave() === true) {
-            $this->pageRevisionStore->snapshot($page, null, skipIfUnchanged: true);
-        }
-
-        $document = $page->getDocument();
-        if (!$document instanceof BuilderDocument) {
-            $document = new BuilderDocument();
-            $document->setPage($page);
-        }
-
-        $document->setStructure($normalizedStructure);
-
+        // Sanitised before the unit: nothing but the write runs under the page lock (rule 9).
+        $propsByLocale = [];
         foreach ($this->builderLocales->getAll() as $locale) {
-            if ($this->documentNormalizer->isGrapesStructure($normalizedStructure)) {
-                $document->upsertLocale($locale, []);
-                continue;
-            }
-
-            $rawProps = $widgetPropsByLocale[$locale] ?? [];
-            if (!is_array($rawProps)) {
-                $rawProps = [];
-            }
-
-            $sanitized = $this->sanitizeWidgetPropsByLocale($normalizedStructure, $rawProps);
-            $document->upsertLocale($locale, $sanitized);
+            $rawProps               = $isGrapes ? [] : ($widgetPropsByLocale[$locale] ?? []);
+            $propsByLocale[$locale] = $isGrapes ? [] : $this->sanitizeWidgetPropsByLocale($normalizedStructure, is_array($rawProps) ? $rawProps : []);
         }
 
-        $this->entityManager->persist($page);
-        $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid()));
+        $this->unit(function () use ($page, $normalizedStructure, $propsByLocale): void {
+            // The revision snapshot below records the content this save replaces: read it under the lock.
+            $this->transaction?->lockPage($page);
+
+            if ($this->pageRevisionStore?->isOnSave() === true) {
+                $this->pageRevisionStore->snapshot($page, null, skipIfUnchanged: true);
+            }
+
+            $document = $page->getDocument();
+            if (!$document instanceof BuilderDocument) {
+                $document = new BuilderDocument();
+                $document->setPage($page);
+            }
+
+            $document->setStructure($normalizedStructure);
+            foreach ($propsByLocale as $locale => $props) {
+                $document->upsertLocale($locale, $props);
+            }
+
+            $this->entityManager->persist($page);
+            $this->commit(new PageDocumentSavedEvent($page->getPageKey(), $page->getUuid()));
+        });
     }
 
     public function createPage(string $pageKey, string $title, string $locale): BuilderPage
@@ -143,16 +145,50 @@ final readonly class DocumentService implements PagePublisherInterface
 
         $page->setDocument($document);
 
-        $this->entityManager->persist($page);
-        $this->commit(new PageCreatedEvent($page->getPageKey(), $page->getUuid()));
+        return $this->unit(function () use ($page, $pageKey): BuilderPage {
+            $this->entityManager->persist($page);
 
-        return $page;
+            try {
+                $this->commit(new PageCreatedEvent($page->getPageKey(), $page->getUuid()));
+            } catch (UniqueConstraintViolationException $e) {
+                // 1.17 (REQ-RUNTIME-003 rule 4): two editors creating the same key at once; the unique key refused
+                // the second one, which gets the answer of the check above (the only unique key of this insert).
+                throw new InvalidArgumentException(sprintf('Page key "%s" already exists.', $pageKey), 0, $e);
+            }
+
+            return $page;
+        });
     }
 
     /**
      * Clone structure, locale props, and translations into a new draft page.
      */
     public function duplicatePage(BuilderPage $source, string $newPageKey, ?string $title = null): BuilderPage
+    {
+        // 1.17: one write unit (a failure never leaves a half-copied page).
+        return $this->unit(fn (): BuilderPage => $this->doDuplicatePage($source, $newPageKey, $title));
+    }
+
+    public function publish(BuilderPage $page): void
+    {
+        $this->unit(function () use ($page): void {
+            // The required-field check and the revision read the content being published: read it under the lock.
+            $this->transaction?->lockPage($page);
+            $this->doPublish($page);
+        });
+    }
+
+    public function unpublish(BuilderPage $page): void
+    {
+        $this->unit(function () use ($page): void {
+            $this->transaction?->lockPage($page);
+            $page->setStatus(PageStatus::Draft);
+            $page->setPublishedAt(null);
+            $this->commit(new PageUnpublishedEvent($page->getPageKey(), $page->getUuid()));
+        });
+    }
+
+    private function doDuplicatePage(BuilderPage $source, string $newPageKey, ?string $title): BuilderPage
     {
         $sourceDocument = $source->getDocument();
         if (!$sourceDocument instanceof BuilderDocument) {
@@ -204,7 +240,7 @@ final readonly class DocumentService implements PagePublisherInterface
         return $page;
     }
 
-    public function publish(BuilderPage $page): void
+    private function doPublish(BuilderPage $page): void
     {
         $document = $page->getDocument();
         if ($document instanceof BuilderDocument && $this->contentFieldsNormalizer instanceof ContentFieldsNormalizer) {
@@ -231,13 +267,6 @@ final readonly class DocumentService implements PagePublisherInterface
         $page->setPublishedAt($publishedAt);
         $this->commit(new PagePublishedEvent($page->getPageKey(), $page->getUuid(), $publishedAt));
         $this->logger->info('Page builder page published.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'publish', 'page_key' => $page->getPageKey()]);
-    }
-
-    public function unpublish(BuilderPage $page): void
-    {
-        $page->setStatus(PageStatus::Draft);
-        $page->setPublishedAt(null);
-        $this->commit(new PageUnpublishedEvent($page->getPageKey(), $page->getUuid()));
     }
 
     /**
@@ -436,6 +465,21 @@ final readonly class DocumentService implements PagePublisherInterface
         }
 
         return $page;
+    }
+
+    /**
+     * Runs one write unit (1.17, REQ-RUNTIME-003 rule 1): {@see PageBuilderTransaction::run()}, or the operation as is
+     * when the service is built without the transaction service.
+     *
+     * @template T
+     *
+     * @param callable(): T $operation
+     *
+     * @return T
+     */
+    public function unit(callable $operation): mixed
+    {
+        return $this->transaction instanceof PageBuilderTransaction ? $this->transaction->run($operation) : $operation();
     }
 
     /**

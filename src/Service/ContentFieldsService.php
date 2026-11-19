@@ -38,6 +38,41 @@ final readonly class ContentFieldsService
      */
     public function saveSchema(BuilderPage $page, array $fields): void
     {
+        $this->unit($page, fn () => $this->doSaveSchema($page, $fields));
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $fieldValues locale => key => value
+     * @param list<array{key: string, type: string, label: string, labels?: array<string, string>, ...}>|null $fields optional schema override (e.g. updated labels)
+     */
+    public function saveValues(BuilderPage $page, array $fieldValues, ?array $fields = null): void
+    {
+        $this->unit($page, fn () => $this->doSaveValues($page, $fieldValues, $fields));
+    }
+
+    /**
+     * Upsert one field definition (from Twig component) and save a locale value.
+     *
+     * Read-modify-write of the page structure: under the page lock (1.17), so two editors saving different fields
+     * at once both keep their value.
+     *
+     * @param array{type?: string, label?: string, labels?: array<string, string>, required?: bool, options?: list<string>, default?: mixed}|null $definition
+     */
+    public function saveFieldValue(
+        BuilderPage $page,
+        string $key,
+        string $locale,
+        mixed $value,
+        ?array $definition = null,
+    ): void {
+        $this->unit($page, fn () => $this->doSaveFieldValue($page, $key, $locale, $value, $definition));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $fields
+     */
+    private function doSaveSchema(BuilderPage $page, array $fields): void
+    {
         $document  = $this->requireDocument($page);
         $structure = $this->documentNormalizer->normalize($document->getStructure());
 
@@ -55,9 +90,9 @@ final readonly class ContentFieldsService
 
     /**
      * @param array<string, array<string, mixed>> $fieldValues locale => key => value
-     * @param list<array{key: string, type: string, label: string, labels?: array<string, string>, ...}>|null $fields optional schema override (e.g. updated labels)
+     * @param list<array{key: string, type: string, label: string, labels?: array<string, string>, ...}>|null $fields
      */
-    public function saveValues(BuilderPage $page, array $fieldValues, ?array $fields = null): void
+    private function doSaveValues(BuilderPage $page, array $fieldValues, ?array $fields): void
     {
         $document  = $this->requireDocument($page);
         $structure = $this->documentNormalizer->normalize($document->getStructure());
@@ -84,17 +119,10 @@ final readonly class ContentFieldsService
     }
 
     /**
-     * Upsert one field definition (from Twig component) and save a locale value.
-     *
      * @param array{type?: string, label?: string, labels?: array<string, string>, required?: bool, options?: list<string>, default?: mixed}|null $definition
      */
-    public function saveFieldValue(
-        BuilderPage $page,
-        string $key,
-        string $locale,
-        mixed $value,
-        ?array $definition = null,
-    ): void {
+    private function doSaveFieldValue(BuilderPage $page, string $key, string $locale, mixed $value, ?array $definition): void
+    {
         $document  = $this->requireDocument($page);
         $structure = $this->documentNormalizer->normalize($document->getStructure());
         $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
@@ -233,6 +261,27 @@ final readonly class ContentFieldsService
         }
 
         return $document;
+    }
+
+    /**
+     * One write unit (1.17, REQ-RUNTIME-003 rules 1 and 4): the page's document is locked and read again first, so the
+     * structure this save changes is the last committed one.
+     *
+     * @param callable(): void $operation
+     */
+    private function unit(BuilderPage $page, callable $operation): void
+    {
+        if (!$this->transaction instanceof PageBuilderTransaction) {
+            $operation();
+
+            return;
+        }
+
+        // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
+        $this->transaction->run(function () use ($page, $operation): void {
+            $this->transaction?->lockPage($page);
+            $operation();
+        });
     }
 
     /**

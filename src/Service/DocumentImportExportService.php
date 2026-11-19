@@ -91,7 +91,8 @@ final readonly class DocumentImportExportService
         $context = ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'import', 'target_page_key' => $targetPageKey, 'publish' => $publish];
         $this->logger->info('Page builder import started.', $context);
         try {
-            $page = $this->doImport($payload, $targetPageKey, $publish);
+            // 1.17: one write unit (a failed import leaves no half-imported page).
+            $page = $this->documentService->unit(fn (): BuilderPage => $this->doImport($payload, $targetPageKey, $publish));
         } catch (Throwable $e) {
             $this->logger->error('Page builder import failed.', $context + ['exception' => $e::class]);
 

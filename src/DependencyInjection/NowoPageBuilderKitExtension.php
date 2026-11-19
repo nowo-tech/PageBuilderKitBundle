@@ -15,6 +15,7 @@ use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
+use Nowo\PageBuilderKitBundle\EventListener\PageBuilderConflictListener;
 use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
 use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
@@ -42,6 +43,9 @@ use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
 use Nowo\PageBuilderKitBundle\Widget\WidgetPackInterface;
+use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
+use Nowo\TransactionDoctrine\WriteUnit\CommitLedger;
+use Nowo\TransactionDoctrine\WriteUnit\Dbal\CommitTrackingMiddleware;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
@@ -52,6 +56,7 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 use function array_key_exists;
 use function is_array;
@@ -71,6 +76,12 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
     /** Entity manager used by every bundle read and write (alias of the configured one, or resolved by entity class). */
     public const string ENTITY_MANAGER_SERVICE = 'nowo_page_builder_kit.entity_manager';
+
+    /** 1.17: real commits of the bundle's connection, counted by {@see self::COMMIT_TRACKING_MIDDLEWARE}, read by the conflict answer. */
+    public const string COMMIT_LEDGER_SERVICE = 'nowo_page_builder_kit.commit_ledger';
+
+    /** 1.17: transaction-doctrine's commit-tracking DBAL middleware on the bundle's connection (AfterCommitMiddlewarePass). */
+    public const string COMMIT_TRACKING_MIDDLEWARE = 'nowo_page_builder_kit.commit_tracking_middleware';
 
     /** FormKit profile (`nowo_form_kit.profiles.page_builder_kit`) of every page form type (REQ-TWIG-005 rule 11). */
     public const string FORM_KIT_PROFILE = 'page_builder_kit';
@@ -252,6 +263,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             throw new LogicException('NowoPageBuilderKitBundle admin UI requires symfony/security-bundle when security.allow_unauthenticated is false.');
         }
 
+        $this->registerConflictAnswer($container, $config['conflict_response']);
         $this->registerAccessChecker($container, $config['security']);
         $this->registerPageBuilderProtection($container, $config);
 
@@ -261,6 +273,37 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             $definition->addTag('doctrine.event_listener', ['event' => Events::loadClassMetadata]);
             $container->setDefinition(TablePrefixListener::class, $definition);
         }
+    }
+
+    /**
+     * 1.17 (REQ-RUNTIME-003 rule 6): 409 (or 503) + CONFLICT_001 / CONFLICT_002 instead of a 500 for lock conflicts on
+     * the bundle's routes. Unset options follow transaction-doctrine's policy service when its bundle is registered.
+     *
+     * @param array{status: int|null, retry_after: int|null, commit_tracking: string} $conflictResponse
+     */
+    private function registerConflictAnswer(ContainerBuilder $container, array $conflictResponse): void
+    {
+        $tracking = $conflictResponse['commit_tracking'] !== 'off';
+        if ($tracking) {
+            $container->setDefinition(self::COMMIT_LEDGER_SERVICE, new Definition(CommitLedger::class));
+            $container->setDefinition(self::COMMIT_TRACKING_MIDDLEWARE, new Definition(CommitTrackingMiddleware::class, [new Reference(self::COMMIT_LEDGER_SERVICE)])
+                ->addTag('doctrine.middleware'));
+        }
+
+        $policy = $conflictResponse['status'] === null && $conflictResponse['retry_after'] === null
+            ? new Reference(ConflictResponsePolicy::class, ContainerInterface::NULL_ON_INVALID_REFERENCE)
+            : new Definition(ConflictResponsePolicy::class, [
+                $conflictResponse['status'] ?? ConflictResponsePolicy::STATUS_CONFLICT,
+                $conflictResponse['retry_after'] ?? ConflictResponsePolicy::DEFAULT_RETRY_AFTER,
+            ]);
+
+        $container->setDefinition(PageBuilderConflictListener::class, new Definition(PageBuilderConflictListener::class, [
+            $policy,
+            $tracking ? new Reference(self::COMMIT_LEDGER_SERVICE) : null,
+            new Reference('request_stack', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+        ])
+            ->addTag('kernel.event_listener', ['event' => KernelEvents::REQUEST, 'method' => 'onRequest', 'priority' => PageBuilderConflictListener::REQUEST_PRIORITY])
+            ->addTag('kernel.event_listener', ['event' => KernelEvents::EXCEPTION, 'method' => 'onException', 'priority' => PageBuilderConflictListener::PRIORITY]));
     }
 
     /**
@@ -286,7 +329,8 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         }
 
         $container->getDefinition(PageBuilderTransaction::class)
-            ->setArgument('$hostControlsTransaction', $hostControlsTransaction);
+            ->setArgument('$hostControlsTransaction', $hostControlsTransaction)
+            ->setArgument('$managerName', $entityManagerName);
     }
 
     /**

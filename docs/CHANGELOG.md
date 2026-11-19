@@ -46,6 +46,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Concurrency (REQ-RUNTIME-003): `conflict_response.status` (409 default, or 503), `conflict_response.retry_after` and `conflict_response.commit_tracking` (`bundle` | `off`). A deadlock, lock wait timeout or serialization failure on the bundle's admin routes answers 409 with `X-Conflict-Code: CONFLICT_001` and `Retry-After` when nothing was committed, or `CONFLICT_002` without `Retry-After` when part of the request may be (transaction-doctrine's request mark, and a commit ledger of the bundle's connection). JSON requests keep the `{"error": …}` shape with `code` and `message` added. Unset, the options follow nowo-tech/transaction-doctrine's `conflict_response`.
+- Two editors adding the same missing page translation at once answer 409 with `X-Error-Code: PAGE_BUILDER_CONCURRENT_EDIT` (a domain code, never a `CONFLICT_*` code) instead of a 500.
+- `PageBuilderTransaction::run()` and `lockPage()`: the bundle's write units (one transaction of nowo-tech/transaction-doctrine's runner) and the page row lock.
+- `docs/CONCURRENCY.md`: write paths, codes, host options, residual risks.
+- CI jobs "Real databases (MySQL 8.4, MariaDB 11.4, PostgreSQL 16)" on DBAL 3 and 4, with two-connection and two-process race tests, and "Dependency floor (nowo-tech/transaction-* lowest, demo lock)"; `make test-with-db` runs the race tests locally.
+
+### Changed
+
+- Every page, content, revision and template write is one write unit of nowo-tech/transaction-doctrine's runner on the bundle's manager (`forHostEntityManager()` on your manager, `forEntityManager()` on a manager of the bundle's own): its revision snapshot, pruning and document flushes commit together or not at all, and its events are dispatched right after the commit.
+- Without `doctrine.entity_manager`, a write unit refuses to start (`LogicException`) while your entity manager holds unflushed changes. A manager closed by a failed write is replaced through the registry; an open one is never cleared or reset.
+- Requires `nowo-tech/transaction-doctrine` `^1.6` and `nowo-tech/transaction-contract` `^1.0`.
+
+### Fixed
+
+- Two editors saving content fields of the same page at the same time lost one editor's value (the second save wrote the structure it had read before the first one committed). Content, document, publish and revision writes now lock the page's document row and read it again first.
+- A failure in the middle of a save, duplicate, import or "create from template" left part of it stored (a revision without the document, a page without its copied content or translations). Each is now one transaction.
+- Two editors creating the same page key, or saving the same new template key, at once answered a 500 for the second one; it now gets the domain error ("already exists").
+- A lock conflict on the admin routes answered a 500.
+
 ## [1.16.1] - 2026-11-17
 
 ### Added

@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle\DependencyInjection;
 
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages;
+use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -14,6 +15,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use function array_diff_key;
 use function array_keys;
 use function implode;
+use function in_array;
 use function is_string;
 use function preg_match;
 use function sprintf;
@@ -130,6 +132,30 @@ final class Configuration implements ConfigurationInterface
                                     throw new InvalidConfigurationException(sprintf('Unknown nowo_page_builder_kit.web_ui.templates page id(s) "%s"; allowed: %s.', implode('", "', array_keys(array_diff_key($v, PageBuilderKitPages::TEMPLATES))), implode(', ', array_keys(PageBuilderKitPages::TEMPLATES))));
                                 })
                             ->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('conflict_response')
+                    ->info('1.17 (REQ-RUNTIME-003): answer of a lock conflict (deadlock, lock wait timeout, serialization failure) on the bundle\'s routes. Unset: nowo-tech/transaction-doctrine\'s conflict_response when that bundle is registered, else 409 with Retry-After 1.')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->integerNode('status')
+                            ->info('409 (default, CONFLICT_001 / CONFLICT_002) or 503. Null: follow transaction-doctrine, else 409.')
+                            ->defaultNull()
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => $v !== null && !in_array($v, ConflictResponsePolicy::STATUSES, true))
+                                ->thenInvalid('nowo_page_builder_kit.conflict_response.status must be 409 or 503, got %s.')
+                            ->end()
+                        ->end()
+                        ->integerNode('retry_after')
+                            ->info('Retry-After seconds of a CONFLICT_001 answer when the failure carries no hint. Null: follow transaction-doctrine, else 1.')
+                            ->defaultNull()
+                            ->min(0)
+                        ->end()
+                        ->enumNode('commit_tracking')
+                            ->info('bundle: transaction-doctrine\'s commit-tracking middleware on the connection of the bundle entities tells CONFLICT_002 (on doctrine/dbal 3 the wrapped Connection::commit() returns null). off: no middleware; CONFLICT_002 relies on transaction-doctrine\'s request mark only.')
+                            ->values(['bundle', 'off'])
+                            ->defaultValue('bundle')
                         ->end()
                     ->end()
                 ->end()
