@@ -11,6 +11,7 @@ use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Controller\Admin\PageDocumentApiController;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\PageBuilderKitBundle\EventListener\PageBuilderConflictListener;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
@@ -360,6 +361,94 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     }
 
     /**
+     * REQ-RUNTIME-003 rule 4: the canvas sends the token of the document it loaded. Another editor's save committed
+     * while this one waited for the lock (two processes): the save is refused with 409 PAGE_BUILDER_STALE_EDIT (no
+     * `X-Conflict-Code`, the current token in the body), nothing is overwritten, and the retry with that token saves.
+     */
+    #[DataProvider('databases')]
+    public function testAStaleCanvasSaveIsRefusedAndTheRetryWithTheCurrentTokenSaves(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->documents->saveDocument($this->documents->createPage('home', 'Home', 'en'), $this->grapes('<p>v1</p>'), []);
+        $this->em->clear();
+        $loaded = $this->decode($this->handle(Request::create(self::ADMIN . '/pages/home/document')));
+        self::assertIsString($loaded['token'] ?? null);
+
+        $documentId        = $this->documentId('home');
+        $structure         = $this->storedStructure('home');
+        $structure['html'] = '<p>Other editor</p>';
+        $child             = $this->startHolder($this->url, [
+            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
+            [$this->sql('UPDATE {document} SET {document.structure} = ? WHERE id = ?'), [json_encode($structure, JSON_THROW_ON_ERROR), $documentId]],
+        ], 800);
+        $stale = $this->handle($this->jsonRequest(self::ADMIN . '/pages/home/document', ['structure' => $this->grapes('<p>Mine</p>'), 'widgetPropsByLocale' => [], 'baseToken' => $loaded['token']]));
+        $this->finish($child);
+
+        self::assertSame(409, $stale->getStatusCode());
+        self::assertNull($stale->headers->get('X-Conflict-Code'), 'a domain conflict is not a CONFLICT_* code');
+        self::assertNull($stale->headers->get('Retry-After'));
+        $body = $this->decode($stale);
+        self::assertSame('PAGE_BUILDER_STALE_EDIT', $body['code'] ?? null);
+        self::assertSame('stale_edit', $body['error'] ?? null);
+        self::assertIsString($body['token'] ?? null);
+        self::assertNotSame($loaded['token'], $body['token']);
+        self::assertStringContainsString('<p>Other editor</p>', $this->storedHtml('home'), 'the committed save is not overwritten');
+
+        $retry = $this->handle($this->jsonRequest(self::ADMIN . '/pages/home/document', ['structure' => $this->grapes('<p>Mine</p>'), 'widgetPropsByLocale' => [], 'baseToken' => $body['token']]));
+        self::assertSame(200, $retry->getStatusCode());
+        self::assertIsString($this->decode($retry)['token'] ?? null);
+        self::assertStringContainsString('<p>Mine</p>', $this->storedHtml('home'));
+    }
+
+    /**
+     * Rule 4, same field: two editors change the same content field to different values. The one who saves second is
+     * refused (flash and redirect, nothing written); the first one's value stays.
+     */
+    #[DataProvider('databases')]
+    public function testTheSameContentFieldChangedByTwoEditorsKeepsTheFirstValue(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('same', [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'lead', 'type' => 'string', 'label' => 'Lead']]);
+
+        $stored = $this->postStaleForm('same', ['en' => ['headline' => 'Headline of B']], ['fieldValues[en][headline]' => 'Headline of A', 'fieldValues[en][lead]' => 'Lead of A']);
+
+        self::assertSame('Headline of B', $stored['fieldValues']['en']['headline'] ?? null, 'the other editor\'s value of the same field is not replaced');
+        self::assertArrayNotHasKey('lead', $stored['fieldValues']['en'] ?? [], 'the refused save writes nothing, not even its other fields');
+    }
+
+    /**
+     * Rule 4, SEO form: editor A changes the title while editor B (two processes) changed the meta title: both are
+     * kept (the form's unchanged fields never write the old values back).
+     */
+    #[DataProvider('databases')]
+    public function testTheSeoFormKeepsAnotherEditorsChangeToAnotherField(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('seo', []);
+
+        $stored = $this->postSeoForm('seo', 'Meta of B', ['builder_page_seo[title]' => 'Title of A']);
+
+        self::assertSame('Title of A', $stored['title']);
+        self::assertSame('Meta of B', $stored['meta_title'], 'the other editor\'s field is kept');
+    }
+
+    /**
+     * Rule 4, SEO form, same field: both editors changed the meta title to different values; the second save is refused
+     * as a whole and the first value stays.
+     */
+    #[DataProvider('databases')]
+    public function testTheSeoFormRefusesTheSameFieldChangedByTwoEditors(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->fieldsPage('seo2', []);
+
+        $stored = $this->postSeoForm('seo2', 'Meta of B', ['builder_page_seo[metaTitle]' => 'Meta of A', 'builder_page_seo[title]' => 'Title of A']);
+
+        self::assertSame('Meta of B', $stored['meta_title']);
+        self::assertSame('Page seo2', $stored['title'], 'nothing of the refused save is written');
+    }
+
+    /**
      * @param array<string, mixed> $bundle
      */
     private function boot(string $env, array $bundle = [], int $lockWait = 1): string
@@ -443,6 +532,45 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     }
 
     /**
+     * Editor A reads the en SEO form; editor B (a child process) then commits a new meta title under the lock and holds
+     * it while A posts the form it read, with $changes applied.
+     *
+     * @param array<string, string> $changes field name => new value
+     *
+     * @return array<string, string|null> the stored translation (title, meta_title)
+     */
+    private function postSeoForm(string $pageKey, string $otherMetaTitle, array $changes): array
+    {
+        $form = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/seo?locale=en'));
+        self::assertSame(200, $form->getStatusCode());
+        $fields = self::formFields((string) $form->getContent());
+        foreach ($changes as $name => $value) {
+            $fields[] = [$name, $value];
+        }
+
+        $documentId = $this->documentId($pageKey);
+        $pageId     = (int) $this->other()->fetchOne($this->sql('SELECT id FROM {page} WHERE {page.pageKey} = ?'), [$pageKey]);
+        $child      = $this->startHolder($this->url, [
+            [$this->sql('SELECT id FROM {document} WHERE id = ? FOR UPDATE'), [$documentId]],
+            [$this->sql('UPDATE {translation} SET {translation.metaTitle} = ? WHERE {translation.page} = ?'), [$otherMetaTitle, $pageId]],
+        ], 800);
+        $query = '';
+        foreach ($fields as [$name, $value]) {
+            $query .= '&' . rawurlencode($name) . '=' . rawurlencode($value);
+        }
+        parse_str($query, $parameters);
+        $response = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/seo?locale=en', 'POST', $parameters));
+        $this->finish($child);
+        self::assertSame(302, $response->getStatusCode());
+
+        $row = $this->other()->fetchAssociative($this->sql('SELECT {translation.title} AS title, {translation.metaTitle} AS meta_title FROM {translation} WHERE {translation.page} = ?'), [$pageId]);
+        assert(is_array($row));
+
+        /* @var array<string, string|null> $row */
+        return $row;
+    }
+
+    /**
      * The inputs a browser posts from the page: hidden and text inputs, checked checkboxes; a later entry for the
      * same name wins (parse_str).
      *
@@ -503,9 +631,9 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      */
     private function sql(string $sql): string
     {
-        $classes = ['page' => BuilderPage::class, 'document' => BuilderDocument::class];
+        $classes = ['page' => BuilderPage::class, 'document' => BuilderDocument::class, 'translation' => BuilderPageTranslation::class];
 
-        return (string) preg_replace_callback('/\{(page|document)(?:\.(\w+))?\}/', function (array $m) use ($classes): string {
+        return (string) preg_replace_callback('/\{(page|document|translation)(?:\.(\w+))?\}/', function (array $m) use ($classes): string {
             $metadata = $this->em->getClassMetadata($classes[$m[1]]);
             if (!isset($m[2])) {
                 return $metadata->getTableName();

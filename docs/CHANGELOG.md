@@ -47,6 +47,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Version token for the document (REQ-RUNTIME-003 rule 4).** `DocumentService::documentToken()` is a hash of the stored
+  structure and widget props (no schema change). `GET /pages/{pageKey}/document` returns it as `token`; the canvas keeps
+  it, sends it back as `baseToken` with each save and takes the new one from the answer. A save whose token is no longer
+  the stored one is refused under the page lock, before anything is written: 409 `{"error": "stale_edit", "code":
+  "PAGE_BUILDER_STALE_EDIT", "message": "…", "token": "<current>"}` (a domain conflict: no `X-Conflict-Code`). A save
+  without `baseToken` (your code, `saveDocument()` without the new argument, imports, revision restores) replaces the
+  document as before. `DocumentService::saveDocument()` takes an optional `$baseToken` and throws
+  `PageStaleEditException`
+- The classic sections editor posts the token of the document it showed (`base_token`). A save from a document another
+  editor changed since is refused, so it no longer overwrites the other locales or fields of that save (flash and
+  redirect back to the editor)
+- Content form, same field: a field the editor changed, which another editor changed to another value meanwhile, is not
+  overwritten. The whole save is refused (flash and redirect, nothing written). The same value on both sides, and fields
+  the editor did not change, are not conflicts
+- SEO form, field by field: the form posts the values it showed (`originals`). Under the page lock only the fields the
+  editor changed are written (`DocumentService::saveTranslation()`); fields another editor changed stay. Both editors
+  changing the same field to different values refuses the save (flash and redirect, nothing written)
+- Translation `admin.stale_edit` (every locale)
+
+### Fixed
+
+- The canvas no longer publishes after a failed save (a stale editor, or any other save error): publish stops with the
+  save message
+- The SEO form no longer writes back the old value of a field it did not change over another editor's committed value
+
 ## [1.17.0] - 2026-11-19
 
 ### Added

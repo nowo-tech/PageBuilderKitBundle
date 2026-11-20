@@ -64,7 +64,10 @@ final class PageDocumentApiCsrfTest extends TestCase
         $response = $controller->saveDocument('home', $request);
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['ok' => true], json_decode((string) $response->getContent(), true));
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertIsArray($body);
+        self::assertTrue($body['ok']);
+        self::assertIsString($body['token'], 'the answer carries the new version token (1.18)');
     }
 
     #[Test]

@@ -156,6 +156,9 @@ export async function boot(importer: ModuleImporter = importDefault): Promise<vo
   const labelDraft = root.getAttribute('data-pbk-label-draft') || 'draft';
   const labelPublished = root.getAttribute('data-pbk-label-published') || 'published';
   const csrf = root.getAttribute('data-pbk-csrf');
+  // 1.18 (REQ-RUNTIME-003 rule 4): version token of the document this editor loaded; sent back with every save and
+  // replaced by the one the server answers, so a stale editor is refused instead of overwriting another editor's save.
+  let documentToken = root.getAttribute('data-pbk-document-token') || '';
   const defaultLocale = root.getAttribute('data-pbk-default-locale') || 'en';
   const config = parseJsonAttr<GrapesFrontendConfig>(root, 'data-pbk-grapes-config', {});
   const allowScripts = !!config.allowScripts;
@@ -1081,28 +1084,34 @@ export async function boot(importer: ModuleImporter = importDefault): Promise<vo
       }).then(function (res) {
         return res.json().then(function (data) {
           if (!res.ok) {
-            throw new Error((data && data.error) || ('HTTP ' + res.status));
+            throw new Error((data && (data.message || data.error)) || ('HTTP ' + res.status));
           }
           return data;
         });
       });
     }
 
-    function saveDocument(): Promise<void> {
+    function saveDocument(): Promise<boolean> {
       if (!saveUrl) {
         setStatus('Save URL missing', true);
-        return Promise.resolve();
+        return Promise.resolve(false);
       }
       captureActiveLocale();
       setStatus('Saving…');
       return postJson(saveUrl, {
         structure: structure,
         widgetPropsByLocale: {},
-      }).then(function () {
+        baseToken: documentToken,
+      }).then(function (data) {
+        if (data && typeof data.token === 'string') {
+          documentToken = data.token;
+        }
         setStatus('Saved.');
+        return true;
       }).catch(function (err: unknown) {
         const message = err instanceof Error ? err.message : 'Save failed';
         setStatus(message, true);
+        return false;
       });
     }
 
@@ -1130,7 +1139,11 @@ export async function boot(importer: ModuleImporter = importDefault): Promise<vo
         setStatus('Publish URL missing', true);
         return Promise.resolve();
       }
-      return saveDocument().then(function () {
+      return saveDocument().then(function (saved) {
+        if (!saved) {
+          // The save failed (for example a stale editor): never publish a document that was not saved.
+          return undefined;
+        }
         setStatus('Publishing…');
         return postJson(publishUrl, {}).then(function (data) {
           const status = typeof data.status === 'string' ? data.status : 'published';

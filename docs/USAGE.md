@@ -71,8 +71,8 @@ Paths below assume default `web_ui.path_prefix: /admin/page-builder`. Change the
 | `admin_page_builder_canvas` | GET | `{prefix}/pages/{pageKey}/canvas` | Visual editor shell (**layout**) |
 | `admin_page_builder_content` | GET, POST | `{prefix}/pages/{pageKey}/content` | Typed content fields (**content** / layout for schema) |
 | `admin_page_builder_content_schema` | POST | `{prefix}/pages/{pageKey}/content/schema` | Add/remove field defs (**layout**) |
-| `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON |
-| `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document |
+| `admin_page_builder_document_get` | GET | `{prefix}/pages/{pageKey}/document` | Load structure + props JSON (and the version `token`) |
+| `admin_page_builder_document_save` | POST | `{prefix}/pages/{pageKey}/document` | Persist document (send `baseToken` for the stale-editor check; 409 `PAGE_BUILDER_STALE_EDIT` when it is stale) |
 | `admin_page_builder_document_publish` | POST | `{prefix}/pages/{pageKey}/publish` | Set page status to published |
 | `admin_page_builder_document_unpublish` | POST | `{prefix}/pages/{pageKey}/unpublish` | Set page status back to draft |
 | `admin_page_builder_document_duplicate` | POST | `{prefix}/pages/{pageKey}/duplicate` | Clone page as a new draft |
@@ -113,6 +113,8 @@ $documentService->unpublish($page); // back to draft — public /p/{pageKey} ret
 
 Key-based alternative (1.14, no entity in the signature): autowire `PagePublisherInterface` and call
 `createPageByKey()`, `saveDocumentByKey()`, `publishByKey()`, `unpublishByKey()`.
+
+`saveDocument()` takes an optional fourth argument, the version token the editor loaded (`$documentService->documentToken($page)`). With it, a save from a document another editor saved since is refused under the page lock with `PageStaleEditException` and nothing is written; without it the document is replaced, as before.
 
 `saveDocument()` normalizes structure through `DocumentNormalizer`. For GrapesJS documents it sanitizes HTML/CSS via `GrapesDocumentSanitizer`. Classic v1 documents still validate widget types and sanitize props per locale.
 

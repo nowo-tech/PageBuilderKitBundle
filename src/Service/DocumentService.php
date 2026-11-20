@@ -28,18 +28,32 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Uid\Uuid;
 use Throwable;
 
+use function array_is_list;
+use function array_key_exists;
+use function hash;
+use function hash_equals;
 use function in_array;
 use function is_array;
 use function is_string;
+use function json_encode;
+use function ksort;
 use function sprintf;
 use function strtolower;
 use function trim;
+use function ucfirst;
+
+use const JSON_THROW_ON_ERROR;
+use const JSON_UNESCAPED_SLASHES;
+use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Page write service of the admin UI (entity-based) and the key-based {@see PagePublisherInterface} port (1.14).
  */
 final readonly class DocumentService implements PagePublisherInterface
 {
+    /** Fields of a translation the SEO form edits (getter and setter `get<Name>` / `set<Name>`). */
+    private const array SEO_FIELDS = ['title', 'slug', 'metaTitle', 'metaDescription', 'ogTitle', 'ogDescription', 'ogImage', 'canonicalUrl', 'robots'];
+
     private DocumentStructureValidator $structureValidator;
 
     public function __construct(
@@ -67,10 +81,35 @@ final readonly class DocumentService implements PagePublisherInterface
     }
 
     /**
+     * The version token of the stored document (1.18, REQ-RUNTIME-003 rule 4): a hash of the normalised structure and of
+     * the widget props of every locale. It changes with any committed save of the document, and needs no column. The
+     * canvas and the classic sections editor send back the token they loaded ({@see saveDocument()} `$baseToken`).
+     */
+    public function documentToken(BuilderPage $page): string
+    {
+        $document = $page->getDocument();
+        $props    = [];
+        foreach ($document?->getLocales() ?? [] as $localeDocument) {
+            $props[$localeDocument->getLocale()] = $localeDocument->getWidgetProps();
+        }
+        ksort($props);
+
+        return hash('sha256', json_encode([
+            $this->documentNormalizer->normalize($document?->getStructure() ?? []),
+            $this->sortKeys($props),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
      * @param array<string, mixed> $structure
      * @param array<string, array<string, mixed>> $widgetPropsByLocale
+     * @param string|null $baseToken the {@see documentToken()} the editor loaded; null = no check (your code, imports,
+     *                               revision restores: the save replaces the document as before)
+     *
+     * @throws PageStaleEditException when `$baseToken` is no longer the stored document's token (nothing is written)
+     * @throws InvalidArgumentException when the structure is not valid
      */
-    public function saveDocument(BuilderPage $page, array $structure, array $widgetPropsByLocale): void
+    public function saveDocument(BuilderPage $page, array $structure, array $widgetPropsByLocale, ?string $baseToken = null): void
     {
         $normalizedStructure = $this->documentNormalizer->normalize($structure);
         $isGrapes            = $this->documentNormalizer->isGrapesStructure($normalizedStructure);
@@ -86,9 +125,17 @@ final readonly class DocumentService implements PagePublisherInterface
             $propsByLocale[$locale] = $isGrapes ? [] : $this->sanitizeWidgetPropsByLocale($normalizedStructure, is_array($rawProps) ? $rawProps : []);
         }
 
-        $this->unit(function () use ($page, $normalizedStructure, $propsByLocale): void {
+        $this->unit(function () use ($page, $normalizedStructure, $propsByLocale, $baseToken): void {
             // The revision snapshot below records the content this save replaces: read it under the lock.
             $this->transaction?->lockPage($page);
+
+            // Rule 4: a stale editor is refused, not merged over the committed save, and nothing is written.
+            if ($baseToken !== null) {
+                $current = $this->documentToken($page);
+                if (!hash_equals($current, $baseToken)) {
+                    throw new PageStaleEditException('document', $current);
+                }
+            }
 
             if ($this->pageRevisionStore?->isOnSave() === true) {
                 $this->pageRevisionStore->snapshot($page, null, skipIfUnchanged: true);
@@ -268,6 +315,80 @@ final readonly class DocumentService implements PagePublisherInterface
         $page->setPublishedAt($publishedAt);
         $this->commit(new PagePublishedEvent($page->getPageKey(), $page->getUuid(), $publishedAt));
         $this->logger->info('Page builder page published.', ['bundle' => 'NowoPageBuilderKitBundle', 'action' => 'publish', 'page_key' => $page->getPageKey()]);
+    }
+
+    /**
+     * Saves the SEO / Open Graph fields of one translation, field by field (1.18, REQ-RUNTIME-003 rule 4).
+     *
+     * `$translation` holds the values the editor posted (the form already changed it). `$originals` are the values the
+     * form showed. Under the page lock the stored row is read again, then per field:
+     * - posted = shown: the editor did not change it, the stored value (maybe another editor's) stays;
+     * - changed, and the stored value is still the shown one or already the posted one: written;
+     * - changed, and another editor stored another value meanwhile: refused for the whole save, nothing is written.
+     *
+     * A new translation (not stored yet, and not added to the page: its `page` is set, the unit adds it) is persisted as posted. A field missing from `$originals` counts as changed.
+     *
+     * @param array<string, string|null> $originals field name => the value the form showed
+     *
+     * @throws PageStaleEditException with the names of the fields another editor changed to another value
+     */
+    public function saveTranslation(BuilderPage $page, BuilderPageTranslation $translation, array $originals = []): void
+    {
+        $posted = [];
+        foreach (self::SEO_FIELDS as $field) {
+            $posted[$field] = $translation->{'get' . ucfirst($field)}();
+        }
+
+        // The form's changes are taken back before the unit: a host manager with pending changes cannot run one. They are
+        // applied again below, field by field, under the lock.
+        $stored = $translation->getId() !== null && $this->entityManager->contains($translation);
+        if ($stored) {
+            $this->entityManager->refresh($translation);
+        }
+
+        try {
+            $this->unit(function () use ($page, $translation, $originals, $posted, $stored): void {
+                $this->transaction?->lockPage($page);
+                if ($stored) {
+                    // Read under the lock: what another editor committed meanwhile.
+                    $this->entityManager->refresh($translation);
+                    $conflicts = [];
+                    foreach (self::SEO_FIELDS as $field) {
+                        $stored = $translation->{'get' . ucfirst($field)}();
+                        if ($posted[$field] === $stored) {
+                            continue;
+                        }
+                        if (!array_key_exists($field, $originals)) {
+                            // What the form showed is unknown: the posted value is the editor's.
+                            $this->setSeoField($translation, $field, $posted[$field]);
+
+                            continue;
+                        }
+                        if ($posted[$field] === $originals[$field]) {
+                            // Not changed by this editor: the stored value (maybe another editor's) stays.
+                            continue;
+                        }
+                        if ($stored !== $originals[$field]) {
+                            $conflicts[] = $field;
+
+                            continue;
+                        }
+                        $this->setSeoField($translation, $field, $posted[$field]);
+                    }
+                    if ($conflicts !== []) {
+                        throw new PageStaleEditException('seo', null, $conflicts);
+                    }
+                } else {
+                    $page->addTranslation($translation);
+                }
+                $this->entityManager->persist($page);
+                $this->commit(new PageMetadataSavedEvent($page->getPageKey(), $page->getUuid()));
+            });
+        } catch (Throwable $e) {
+            $this->transaction?->replaceClosedManager();
+
+            throw $e;
+        }
     }
 
     /**
@@ -504,5 +625,38 @@ final readonly class DocumentService implements PagePublisherInterface
         }
 
         $this->entityManager->flush();
+    }
+
+    /**
+     * Recursively sorts associative keys, so equal content always gives the same token.
+     */
+    private function sortKeys(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->sortKeys($item);
+        }
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
+    }
+
+    private function setSeoField(BuilderPageTranslation $translation, string $field, ?string $value): void
+    {
+        match ($field) {
+            'title'           => $translation->setTitle($value ?? ''),
+            'slug'            => $translation->setSlug($value ?? ''),
+            'metaTitle'       => $translation->setMetaTitle($value),
+            'metaDescription' => $translation->setMetaDescription($value),
+            'ogTitle'         => $translation->setOgTitle($value),
+            'ogDescription'   => $translation->setOgDescription($value),
+            'ogImage'         => $translation->setOgImage($value),
+            'canonicalUrl'    => $translation->setCanonicalUrl($value),
+            default           => $translation->setRobots($value),
+        };
     }
 }

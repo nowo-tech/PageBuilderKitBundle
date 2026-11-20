@@ -17,6 +17,7 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
+use Nowo\PageBuilderKitBundle\Service\PageStaleEditException;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormView;
@@ -109,6 +110,9 @@ final class PageContentController extends AbstractController
             try {
                 $this->contentFieldsService->mergeValues($page, $posted, $originals, $active, $labels, $labelOriginals);
                 $this->addFlash('success', 'admin.content.saved');
+            } catch (PageStaleEditException) {
+                // 1.18 (REQ-RUNTIME-003 rule 4): another editor saved one of these fields to another value; nothing was written.
+                $this->addFlash('danger', 'admin.stale_edit');
             } catch (InvalidArgumentException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
             }

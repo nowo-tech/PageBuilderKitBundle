@@ -9,6 +9,7 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
+use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesJsFrontendConfig;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
@@ -31,6 +32,7 @@ final class PageCanvasController extends AbstractController
         private readonly GrapesJsFrontendConfig $grapesJsFrontendConfig,
         private readonly GrapesDocumentSanitizer $grapesDocumentSanitizer,
         private readonly PageBuilderKitPageFactory $pageFactory,
+        private readonly DocumentService $documentService,
     ) {
     }
 
@@ -69,6 +71,7 @@ final class PageCanvasController extends AbstractController
             'locales'                => $this->builderLocales->getAll(),
             'default_locale'         => $this->builderLocales->getDefault(),
             'structure'              => $structure,
+            'document_token'         => $this->documentService->documentToken($page),
             'grapesjs_config'        => $grapesConfig,
             'grapesjs_cdn_version'   => $grapesConfig['cdnVersion'],
             'csrf_token'             => $this->csrfTokenManager->getToken('page_builder_document')->getValue(),
