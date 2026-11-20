@@ -13,7 +13,9 @@ use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceBoundarySubscriber;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\AssetStoragePortsPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderPrivateEntityManagerPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration as BundleConfiguration;
+use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\EventListener\PageBuilderConflictListener;
 use Nowo\PageBuilderKitBundle\Grapes\GrapesBlockPackInterface;
@@ -43,6 +45,10 @@ use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
 use Nowo\PageBuilderKitBundle\Widget\WidgetPackInterface;
+use Nowo\TransactionDoctrine\HostFlushProbe;
+use Nowo\TransactionDoctrine\PrivateManager\PrivateEntityManager;
+use Nowo\TransactionDoctrine\PrivateManager\PrivateEntityManagerMiddleware;
+use Nowo\TransactionDoctrine\PrivateManager\PrivateManagerRegistry;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
 use Nowo\TransactionDoctrine\WriteUnit\CommitLedger;
 use Nowo\TransactionDoctrine\WriteUnit\Dbal\CommitTrackingMiddleware;
@@ -62,6 +68,9 @@ use function array_key_exists;
 use function is_array;
 use function is_string;
 use function sprintf;
+use function str_ends_with;
+use function str_starts_with;
+use function trigger_deprecation;
 
 final class NowoPageBuilderKitExtension extends Extension implements PrependExtensionInterface
 {
@@ -73,6 +82,30 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
     /** Directory of the XML mapping of the six bundle entities (1.16, same tables and columns as the attributes). */
     public const string XML_MAPPING_DIR = __DIR__ . '/../Resources/config/doctrine-xml';
+
+    /** 1.19: container parameter holding `doctrine.private_entity_manager === true`. */
+    public const string PRIVATE_ENTITY_MANAGER_PARAMETER = 'nowo_page_builder_kit.doctrine.private_entity_manager';
+
+    /** 1.19: name of the application's manager the private one is created on (the default entity manager). */
+    public const string PRIVATE_SOURCE_MANAGER_PARAMETER = 'nowo_page_builder_kit.private_entity_manager.source_manager';
+
+    /** 1.19: the bundle's private entity manager (`doctrine.private_entity_manager: true`). */
+    public const string PRIVATE_ENTITY_MANAGER_SERVICE = 'nowo_page_builder_kit.private_entity_manager';
+
+    /** 1.19: the registry the bundle's repositories and runner get in private mode (bundle entities → the private manager). */
+    public const string PRIVATE_REGISTRY_SERVICE = 'nowo_page_builder_kit.private_manager_registry';
+
+    /** 1.19: tells the private manager how the connection's transactions end (PageBuilderPrivateEntityManagerPass). */
+    public const string PRIVATE_MIDDLEWARE_SERVICE = 'nowo_page_builder_kit.private_entity_manager_middleware';
+
+    /** 1.19: transaction-doctrine's shared host-flush probe when its bundle is registered, else the bundle's own instance. */
+    public const string HOST_FLUSH_PROBE_SERVICE = 'nowo_page_builder_kit.host_flush_probe';
+
+    /** 1.19: the notice of a host that sets neither `doctrine.private_entity_manager` nor `doctrine.entity_manager`. */
+    public const string PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION = 'Not setting "nowo_page_builder_kit.doctrine.private_entity_manager" is deprecated: page builder writes (doctrine.transaction: bundle) flush the application\'s default entity manager, including its own pending changes. 2.0 defaults to true: a private entity manager on the same connection and tables that never flushes them. Opt in now with "nowo_page_builder_kit: { doctrine: { private_entity_manager: true } }" (see UPGRADING.md "To 1.19.0"; "false" is removed in 2.0).';
+
+    /** 1.19: the notice of a host that sets `doctrine.private_entity_manager: false` (removed in 2.0) without `doctrine.entity_manager`. */
+    public const string PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION = 'Setting "nowo_page_builder_kit.doctrine.private_entity_manager" to false is deprecated and removed in 2.0: page builder writes (doctrine.transaction: bundle) flush the application\'s default entity manager, including its own pending changes; 2.0 always writes through a private entity manager on the same connection and tables. Set it to true now, or set "nowo_page_builder_kit.doctrine.entity_manager" to a dedicated entity manager (see UPGRADING.md "To 1.19.0").';
 
     /** Entity manager used by every bundle read and write (alias of the configured one, or resolved by entity class). */
     public const string ENTITY_MANAGER_SERVICE = 'nowo_page_builder_kit.entity_manager';
@@ -155,7 +188,7 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->setParameter(self::ENTITY_MANAGER_PARAMETER, $config['doctrine']['entity_manager']);
         $container->setParameter(self::MAPPING_TYPE_PARAMETER, $config['doctrine']['mapping_type']);
         $container->setParameter('nowo_page_builder_kit.doctrine.transaction', $config['doctrine']['transaction']);
-        $this->registerEntityManager($container, $config['doctrine']['entity_manager'], $config['doctrine']['transaction'] === 'host');
+        $this->registerEntityManager($container, $config['doctrine']['entity_manager'], $config['doctrine']['transaction'] === 'host', $config['doctrine']['private_entity_manager']);
         $container->setParameter('nowo_page_builder_kit.security.access_roles', $config['security']['access_roles']);
         $container->setParameter('nowo_page_builder_kit.security.layout_roles', $config['security']['layout_roles']);
         $container->setParameter('nowo_page_builder_kit.security.content_roles', $config['security']['content_roles']);
@@ -308,9 +341,37 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
 
     /**
      * Wires the entity manager of the bundle entities (rule 6, 1.14): never the autowired default by accident.
+     *
+     * 1.19 (REQ-ARCH-001 rule 6 deprecation layer), `doctrine.private_entity_manager`:
+     * - true: every bundle read and write goes through transaction-doctrine's {@see PrivateEntityManager}, created on
+     *   the connection, configuration and event manager of the default entity manager (same tables, no host
+     *   configuration). It is dropped at every outermost unit-of-work boundary ({@see OwnEntityManagerSubscriber};
+     *   also by transaction-doctrine's bundle through {@see PrivateEntityManager::TAG}, and at `kernel.reset`) and
+     *   replaced when closed. The configuration rejects it with `entity_manager` or `transaction: host`.
+     * - null (unset) or false, with `transaction: bundle` and no `entity_manager`: the 1.x behaviour (the default
+     *   manager is flushed) plus a deprecation notice ({@see self::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION}, or
+     *   {@see self::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION}: `false` is removed in 2.0) and the host-flush probe
+     *   before every bundle flush. `entity_manager: <name>` (a dedicated manager) and `transaction: host` (DDD hosts)
+     *   stay in 2.0: no notice, no probe.
      */
-    private function registerEntityManager(ContainerBuilder $container, ?string $entityManagerName, bool $hostControlsTransaction): void
+    private function registerEntityManager(ContainerBuilder $container, ?string $entityManagerName, bool $hostControlsTransaction, ?bool $private = null): void
     {
+        $container->setParameter(self::PRIVATE_ENTITY_MANAGER_PARAMETER, $private === true);
+        $transaction = $container->getDefinition(PageBuilderTransaction::class);
+
+        if ($private === true) {
+            $this->registerPrivateEntityManager($container);
+            $transaction
+                ->setArgument('$hostControlsTransaction', false)
+                // The registry routes the source manager's name to the private manager: a failed unit drops it, never
+                // the application's manager (PrivateManagerRegistry::resetManager()).
+                ->setArgument('$registry', new Reference(self::PRIVATE_REGISTRY_SERVICE))
+                ->setArgument('$managerName', '%' . self::PRIVATE_SOURCE_MANAGER_PARAMETER . '%')
+                ->setArgument('$ownsEntityManager', true);
+
+            return;
+        }
+
         if ($entityManagerName === null) {
             $container->register(self::ENTITY_MANAGER_SERVICE, EntityManagerInterface::class)
                 ->setFactory([PageBuilderEntityManagerFactory::class, 'create'])
@@ -328,9 +389,72 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
                 ->addTag('kernel.event_subscriber');
         }
 
-        $container->getDefinition(PageBuilderTransaction::class)
+        $transaction
             ->setArgument('$hostControlsTransaction', $hostControlsTransaction)
             ->setArgument('$managerName', $entityManagerName);
+
+        // The flip of 2.0 concerns the default only: transaction: bundle without entity_manager (the default manager).
+        if ($entityManagerName === null && !$hostControlsTransaction) {
+            trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.19', $private === false ? self::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION : self::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION);
+            // Read-only report of the application's pending changes each bundle flush writes. The bundle's own probe is
+            // replaced by transaction-doctrine's shared one when its bundle is registered (PageBuilderPrivateEntityManagerPass).
+            $container->register(self::HOST_FLUSH_PROBE_SERVICE, HostFlushProbe::class)
+                ->addTag('kernel.reset', ['method' => 'reset']);
+            $transaction->setArgument('$hostFlushProbe', new Reference(self::HOST_FLUSH_PROBE_SERVICE));
+        }
+    }
+
+    /**
+     * 1.19: the private entity manager, the registry the bundle's repositories and its runner get, and the DBAL
+     * middleware telling the private manager how the connection's transactions end (tagged for the source manager's
+     * connection by {@see PageBuilderPrivateEntityManagerPass}).
+     */
+    private function registerPrivateEntityManager(ContainerBuilder $container): void
+    {
+        // Resolved to the default entity manager's name by PageBuilderPrivateEntityManagerPass.
+        $container->setParameter(self::PRIVATE_SOURCE_MANAGER_PARAMETER, '');
+        $source = '%' . self::PRIVATE_SOURCE_MANAGER_PARAMETER . '%';
+
+        $container->register(self::PRIVATE_ENTITY_MANAGER_SERVICE, PrivateEntityManager::class)
+            ->setArguments([
+                new Reference('doctrine'),
+                $source,
+                BuilderPage::class,
+                PageBuilderTransaction::BUNDLE_NAME,
+                new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
+            ->addTag(PrivateEntityManager::TAG)
+            ->addTag('kernel.reset', ['method' => 'reset']);
+        $container->register(self::PRIVATE_REGISTRY_SERVICE, PrivateManagerRegistry::class)
+            ->setArguments([
+                new Reference('doctrine'),
+                new Reference(self::PRIVATE_ENTITY_MANAGER_SERVICE),
+                PageBuilderTransaction::OWN_NAMESPACES,
+                $source,
+            ]);
+        $container->register(self::PRIVATE_MIDDLEWARE_SERVICE, PrivateEntityManagerMiddleware::class)
+            ->setArguments([new Reference(self::PRIVATE_ENTITY_MANAGER_SERVICE), 'nowo_page_builder_kit_']);
+
+        $container->setAlias(self::ENTITY_MANAGER_SERVICE, self::PRIVATE_ENTITY_MANAGER_SERVICE);
+
+        // The service repositories (also what the application's manager's getRepository() returns for the bundle
+        // entities) resolve the bundle entities to the private manager.
+        foreach ($container->getDefinitions() as $id => $definition) {
+            $class = $definition->getClass() ?? $id;
+            if (str_starts_with($class, 'Nowo\\PageBuilderKitBundle\\Repository\\') && str_ends_with($class, 'Repository') && !$definition->isAbstract()) {
+                $definition->setArgument('$registry', new Reference(self::PRIVATE_REGISTRY_SERVICE));
+            }
+        }
+
+        // Dropped at every outermost boundary, also without transaction-doctrine's bundle (worker mode, kernel reset off).
+        $container->register(OwnEntityManagerSubscriber::class, OwnEntityManagerSubscriber::class)
+            ->setArguments([
+                new Reference(UnitOfWorkBoundaries::class),
+                new IteratorArgument([new Reference(self::PRIVATE_ENTITY_MANAGER_SERVICE, ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE)]),
+                new Reference(self::PRIVATE_REGISTRY_SERVICE),
+                $source,
+            ])
+            ->addTag('kernel.event_subscriber');
     }
 
     /**

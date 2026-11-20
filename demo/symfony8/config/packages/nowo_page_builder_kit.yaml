@@ -10,6 +10,9 @@ nowo_page_builder_kit:
         layout_template: null
     doctrine:
         table_prefix: ''
+        # 1.19 (the 2.0 default): page builder writes go through a private entity manager on the same connection and
+        # tables, never flushing the application's pending changes (see docs/UPGRADING.md "To 1.19.0").
+        private_entity_manager: true
     html:
         sanitize:
             strategy: allowlist

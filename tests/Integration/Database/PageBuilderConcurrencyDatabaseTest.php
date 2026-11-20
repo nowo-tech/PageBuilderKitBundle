@@ -48,8 +48,11 @@ use function proc_get_status;
 use function proc_open;
 use function rawurlencode;
 use function str_contains;
+use function str_ends_with;
 use function stream_get_contents;
+use function strlen;
 use function strtolower;
+use function substr;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
@@ -73,6 +76,9 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
 {
     private const string ADMIN = '/admin/page-builder';
 
+    /** Suffix of a data set run with `doctrine.private_entity_manager: true` (1.19). */
+    private const string PRIVATE = '|private';
+
     private ?AdminHttpKernel $kernel = null;
 
     private ?Connection $other = null;
@@ -93,6 +99,10 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         yield 'MySQL 8.4' => ['PBK_MYSQL_URL'];
         yield 'MariaDB 11.4' => ['PBK_MARIADB_URL'];
         yield 'PostgreSQL 16' => ['PBK_POSTGRES_URL'];
+        // 1.19: the same rule 1 / 4 / 6 suite with doctrine.private_entity_manager: true.
+        yield 'MySQL 8.4, private manager' => ['PBK_MYSQL_URL' . self::PRIVATE];
+        yield 'MariaDB 11.4, private manager' => ['PBK_MARIADB_URL' . self::PRIVATE];
+        yield 'PostgreSQL 16, private manager' => ['PBK_POSTGRES_URL' . self::PRIVATE];
     }
 
     protected function tearDown(): void
@@ -481,18 +491,25 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      */
     private function boot(string $env, array $bundle = [], int $lockWait = 1): string
     {
+        $private = str_ends_with($env, self::PRIVATE);
+        $env     = $private ? substr($env, 0, -strlen(self::PRIVATE)) : $env;
+        if ($private) {
+            $bundle['doctrine'] = ['private_entity_manager' => true];
+        }
+
         $url = getenv($env);
         if (!is_string($url) || $url === '') {
             self::markTestSkipped($env . ' is not set (make test-with-db).');
         }
 
         $this->url    = $url;
-        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env, $url);
+        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env . ($private ? self::PRIVATE : ''), $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);
         $this->container = $container;
-        $em              = $container->get('doctrine.orm.entity_manager');
+        // The bundle's manager: the default one, or the private one (same connection and tables).
+        $em = $container->get('nowo_page_builder_kit.entity_manager');
         assert($em instanceof EntityManagerInterface);
         $this->em = $em;
         $schema   = new SchemaTool($em);
@@ -530,7 +547,7 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     {
         $form = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/content?locale=en'));
         self::assertSame(200, $form->getStatusCode());
-        $fields = self::formFields((string) $form->getContent());
+        $fields = $this->formFields((string) $form->getContent());
         foreach ($changes as $name => $value) {
             $fields[] = [$name, $value];
         }
@@ -571,7 +588,7 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     {
         $form = $this->handle(Request::create(self::ADMIN . '/pages/' . $pageKey . '/seo?locale=en'));
         self::assertSame(200, $form->getStatusCode());
-        $fields = self::formFields((string) $form->getContent());
+        $fields = $this->formFields((string) $form->getContent());
         foreach ($changes as $name => $value) {
             $fields[] = [$name, $value];
         }
@@ -604,7 +621,7 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      *
      * @return list<array{0: string, 1: string}>
      */
-    private static function formFields(string $html): array
+    private function formFields(string $html): array
     {
         $fields = [];
         preg_match_all('/<input\b[^>]*>/i', $html, $inputs);

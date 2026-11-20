@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Demo;
 
-use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
-use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\PageContext;
 
 /**
- * Demo host variables available inside GrapesJS Twig HTML (scalars + product lists).
+ * Demo host variables available inside GrapesJS Twig HTML (scalars + product lists). Entity-free provider
+ * (GrapesTwigPageContextProviderInterface): the entity-based interface is removed in 2.0.
  */
-final class DemoGrapesTwigContextProvider implements GrapesTwigContextProviderInterface
+final class DemoGrapesTwigContextProvider implements GrapesTwigPageContextProviderInterface
 {
-    public function getContext(BuilderPage $page, string $locale): array
+    public function getPageContext(PageContext $page, string $locale): array
     {
         $es = $locale === 'es';
 

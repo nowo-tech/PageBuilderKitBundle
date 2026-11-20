@@ -15,6 +15,7 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\TransactionContract\TransactionRunnerInterface;
 use Nowo\TransactionContract\TransientStorageFailure;
 use Nowo\TransactionDoctrine\DoctrineTransactionRunner;
+use Nowo\TransactionDoctrine\HostFlushProbe;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -62,12 +63,23 @@ use function str_starts_with;
  * replaced through the registry; it refuses to start while the manager holds unflushed changes); on the bundle's own
  * manager (`doctrine.entity_manager` other than the default) it is `forEntityManager()`.
  *
+ * 1.19 (REQ-ARCH-001 rule 6 deprecation layer): with `doctrine.private_entity_manager: true` the manager is the
+ * bundle's private one (transaction-doctrine `PrivateEntityManager`) and the runner `forEntityManager()` with a
+ * `PrivateManagerRegistry`, so a failed unit drops only the private manager. While the option is unset or `false` on the
+ * default manager, {@see probeHostFlush()} reports the application's pending changes before every flush of it.
+ *
  * @internal Use {@see PageBuilderPendingEventsInterface}
  */
 #[AsDoctrineListener(event: Events::postFlush)]
 final class PageBuilderTransaction implements PageBuilderPendingEventsInterface, EventSubscriberInterface, ResetInterface
 {
     private const string BUNDLE_CONTROLLER_NAMESPACE = 'Nowo\\PageBuilderKitBundle\\Controller\\';
+
+    /** 1.19: the bundle name in the host-flush probe's messages and the private manager's logs. */
+    public const string BUNDLE_NAME = 'NowoPageBuilderKitBundle';
+
+    /** 1.19: the bundle's entity namespaces (never reported by the probe; routed to the private manager). */
+    public const array OWN_NAMESPACES = ['Nowo\\PageBuilderKitBundle\\Entity'];
 
     /**
      * Events of writes not flushed yet (host-controlled transaction only).
@@ -87,6 +99,9 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      * @param bool $ownsEntityManager Whether the manager is the bundle's own (`doctrine.entity_manager` other than the
      *                                host's default): a failed unit may then close and reset it
      * @param TransactionRunnerInterface|null $runner Runner of the write units (null: transaction-doctrine's, see above)
+     * @param HostFlushProbe|null $hostFlushProbe 1.19: set only while `doctrine.private_entity_manager` is unset on the
+     *                                            default (host) manager: reports the application's pending changes
+     *                                            right before each bundle flush of that manager (read-only)
      */
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -100,6 +115,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly ?string $managerName = null,
         private readonly bool $ownsEntityManager = false,
         private readonly ?TransactionRunnerInterface $runner = null,
+        private readonly ?HostFlushProbe $hostFlushProbe = null,
     ) {
     }
 
@@ -172,6 +188,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
     {
         $flush = $this->flushesItself();
         if ($flush) {
+            $this->probeHostFlush();
             $this->entityManager->flush();
         }
 
@@ -201,7 +218,13 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         ++$this->runDepth;
 
         try {
-            $result = ($this->runner ?? $this->defaultRunner())->run($operation);
+            $result = ($this->runner ?? $this->defaultRunner())->run(function () use ($operation): mixed {
+                $result = $operation();
+                // The runner flushes the manager once more before its commit: report what that flush writes.
+                $this->probeHostFlush();
+
+                return $result;
+            });
         } finally {
             --$this->runDepth;
         }
@@ -365,6 +388,8 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         } finally {
             if ($outermost) {
                 $this->discardUnflushed();
+                // 1.19: a new unit of work reports its classes again (also without transaction-doctrine's bundle).
+                $this->hostFlushProbe?->reset();
             }
         }
     }
@@ -391,6 +416,29 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         $this->unflushed = [];
         $this->runDepth  = 0;
         $this->outbox->reset();
+        $this->hostFlushProbe?->reset();
+    }
+
+    /**
+     * 1.19 (REQ-ARCH-001 rule 6 deprecation layer): right before the bundle flushes the host's manager, one
+     * `E_USER_DEPRECATED` per application entity class with pending changes per unit of work ("Your pending changes to
+     * App\X were flushed by NowoPageBuilderKitBundle; 2.0 no longer does."). Read-only, and it never breaks a write: a
+     * probe failure is logged and the flush goes on.
+     */
+    private function probeHostFlush(): void
+    {
+        if (!$this->hostFlushProbe instanceof HostFlushProbe) {
+            return;
+        }
+
+        try {
+            $this->hostFlushProbe->beforeHostFlush($this->entityManager, self::BUNDLE_NAME, self::OWN_NAMESPACES);
+        } catch (Throwable $e) {
+            $this->logger->warning('Page builder: the host-flush probe failed; the write goes on.', [
+                'bundle'    => self::BUNDLE_NAME,
+                'exception' => $e::class,
+            ]);
+        }
     }
 
     /**
