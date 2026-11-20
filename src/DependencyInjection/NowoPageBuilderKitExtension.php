@@ -102,6 +102,14 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
     public const string HOST_FLUSH_PROBE_SERVICE = 'nowo_page_builder_kit.host_flush_probe';
 
     /** 1.19: the notice of a host that sets neither `doctrine.private_entity_manager` nor `doctrine.entity_manager`. */
+    /**
+     * 1.19 (audit XD-4): the notice to trigger when `doctrine.entity_manager` turns out to name the application's default
+     * manager (null when no notice applies: private mode, `transaction: host`, or `entity_manager` unset, whose notice
+     * the extension triggers itself). {@see PageBuilderPrivateEntityManagerPass} compares it with
+     * `doctrine.default_entity_manager`, which the extension cannot know.
+     */
+    public const string NAMED_DEFAULT_MANAGER_NOTICE_PARAMETER = 'nowo_page_builder_kit.private_entity_manager.named_default_manager_notice';
+
     public const string PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION = 'Not setting "nowo_page_builder_kit.doctrine.private_entity_manager" is deprecated: page builder writes (doctrine.transaction: bundle) flush the application\'s default entity manager, including its own pending changes. 2.0 defaults to true: a private entity manager on the same connection and tables that never flushes them. Opt in now with "nowo_page_builder_kit: { doctrine: { private_entity_manager: true } }" (see UPGRADING.md "To 1.19.0"; "false" is removed in 2.0).';
 
     /** 1.19: the notice of a host that sets `doctrine.private_entity_manager: false` (removed in 2.0) without `doctrine.entity_manager`. */
@@ -351,8 +359,9 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
      * - null (unset) or false, with `transaction: bundle` and no `entity_manager`: the 1.x behaviour (the default
      *   manager is flushed) plus a deprecation notice ({@see self::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION}, or
      *   {@see self::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION}: `false` is removed in 2.0) and the host-flush probe
-     *   before every bundle flush. `entity_manager: <name>` (a dedicated manager) and `transaction: host` (DDD hosts)
-     *   stay in 2.0: no notice, no probe.
+     *   before every bundle flush. The same with `entity_manager` naming the default manager (audit XD-4), triggered
+     *   and wired by {@see PageBuilderPrivateEntityManagerPass}. `entity_manager: <name>` (a dedicated manager) and
+     *   `transaction: host` (DDD hosts) stay in 2.0: no notice, no probe.
      */
     private function registerEntityManager(ContainerBuilder $container, ?string $entityManagerName, bool $hostControlsTransaction, ?bool $private = null): void
     {
@@ -393,15 +402,28 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
             ->setArgument('$hostControlsTransaction', $hostControlsTransaction)
             ->setArgument('$managerName', $entityManagerName);
 
-        // The flip of 2.0 concerns the default only: transaction: bundle without entity_manager (the default manager).
+        // The flip of 2.0 concerns the default manager only: transaction: bundle without entity_manager, or with
+        // entity_manager naming the default manager (audit XD-4: notice and probe from PageBuilderPrivateEntityManagerPass).
+        $notice = $private === false ? self::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION : self::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION;
+        $container->setParameter(self::NAMED_DEFAULT_MANAGER_NOTICE_PARAMETER, $entityManagerName !== null && !$hostControlsTransaction ? $notice : null);
         if ($entityManagerName === null && !$hostControlsTransaction) {
-            trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.19', $private === false ? self::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION : self::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION);
-            // Read-only report of the application's pending changes each bundle flush writes. The bundle's own probe is
-            // replaced by transaction-doctrine's shared one when its bundle is registered (PageBuilderPrivateEntityManagerPass).
-            $container->register(self::HOST_FLUSH_PROBE_SERVICE, HostFlushProbe::class)
-                ->addTag('kernel.reset', ['method' => 'reset']);
-            $transaction->setArgument('$hostFlushProbe', new Reference(self::HOST_FLUSH_PROBE_SERVICE));
+            trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.19', $notice);
+            self::registerHostFlushProbe($container);
         }
+    }
+
+    /**
+     * 1.19: read-only report of the application's pending changes each bundle flush of the default manager writes.
+     * The bundle's own probe is replaced by transaction-doctrine's shared one when its bundle is registered
+     * ({@see PageBuilderPrivateEntityManagerPass}).
+     *
+     * @internal also called by {@see PageBuilderPrivateEntityManagerPass} (`entity_manager` naming the default manager)
+     */
+    public static function registerHostFlushProbe(ContainerBuilder $container): void
+    {
+        $container->register(self::HOST_FLUSH_PROBE_SERVICE, HostFlushProbe::class)
+            ->addTag('kernel.reset', ['method' => 'reset']);
+        $container->getDefinition(PageBuilderTransaction::class)->setArgument('$hostFlushProbe', new Reference(self::HOST_FLUSH_PROBE_SERVICE));
     }
 
     /**

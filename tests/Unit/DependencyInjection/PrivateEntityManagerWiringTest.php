@@ -160,6 +160,99 @@ final class PrivateEntityManagerWiringTest extends TestCase
         self::assertTrue($probe->hasTag('kernel.reset'));
     }
 
+    /**
+     * Audit XD-4: `entity_manager` naming the default manager flushes it as when unset: the pass triggers the same
+     * notice and wires the probe (the extension cannot know the default manager's name).
+     */
+    public function testTheDefaultManagerNamedAsEntityManagerTriggersTheNoticeAndWiresTheProbe(): void
+    {
+        [$container, $notices] = $this->load(['entity_manager' => 'main']);
+        self::assertSame([], $notices);
+        $container->setParameter('doctrine.default_entity_manager', 'main');
+
+        self::assertSame([sprintf('Since nowo-tech/page-builder-kit-bundle 1.19: %s', NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION)], $this->process($container));
+        $this->assertProbeWired($container);
+    }
+
+    public function testTheDefaultManagerNamedWithExplicitFalseTriggersTheRemovalNotice(): void
+    {
+        [$container] = $this->load(['entity_manager' => 'default', 'private_entity_manager' => false]);
+
+        // No doctrine.default_entity_manager parameter: "default".
+        self::assertSame([sprintf('Since nowo-tech/page-builder-kit-bundle 1.19: %s', NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION)], $this->process($container));
+        $this->assertProbeWired($container);
+    }
+
+    /**
+     * @param array<string, mixed> $doctrine
+     */
+    #[DataProvider('namedManagersWithoutNotice')]
+    public function testTheDefaultManagerCheckLeavesTheOptionsThatStayIn20Alone(array $doctrine): void
+    {
+        [$container] = $this->load($doctrine);
+        $container->setParameter('doctrine.default_entity_manager', 'main');
+
+        self::assertSame([], $this->process($container));
+        self::assertFalse($container->hasDefinition(NowoPageBuilderKitExtension::HOST_FLUSH_PROBE_SERVICE));
+        self::assertArrayNotHasKey('$hostFlushProbe', $container->getDefinition(PageBuilderTransaction::class)->getArguments());
+    }
+
+    /**
+     * @return iterable<string, array{0: array<string, mixed>}>
+     */
+    public static function namedManagersWithoutNotice(): iterable
+    {
+        yield 'dedicated manager' => [['entity_manager' => 'page_builder']];
+        yield 'default manager, host transaction (DDD)' => [['entity_manager' => 'main', 'transaction' => 'host']];
+        yield 'host transaction (DDD)' => [['transaction' => 'host']];
+    }
+
+    /**
+     * Audit XD-8: the shared probe is left to transaction-doctrine's boundary listener when it is registered.
+     */
+    public function testTheSharedProbeIsResetByTransactionDoctrineOnlyWhenItsBoundaryListenerIsRegistered(): void
+    {
+        [$container] = $this->load([]);
+        $container->register(HostFlushProbe::SERVICE_ID, HostFlushProbe::class);
+        new PageBuilderPrivateEntityManagerPass()->process($container);
+        self::assertArrayNotHasKey('$resetsHostFlushProbe', $container->getDefinition(PageBuilderTransaction::class)->getArguments(), 'unit_of_work_boundaries: false');
+
+        [$container] = $this->load([]);
+        $container->register(HostFlushProbe::SERVICE_ID, HostFlushProbe::class);
+        $container->register(PageBuilderPrivateEntityManagerPass::SHARED_BOUNDARY_LISTENER, 'stdClass');
+        new PageBuilderPrivateEntityManagerPass()->process($container);
+        self::assertFalse($container->getDefinition(PageBuilderTransaction::class)->getArgument('$resetsHostFlushProbe'));
+
+        [$container] = $this->load([]);
+        $container->register(PageBuilderPrivateEntityManagerPass::SHARED_BOUNDARY_LISTENER, 'stdClass');
+        new PageBuilderPrivateEntityManagerPass()->process($container);
+        self::assertArrayNotHasKey('$resetsHostFlushProbe', $container->getDefinition(PageBuilderTransaction::class)->getArguments(), 'the bundle\'s own probe');
+    }
+
+    /**
+     * @return list<string> the private-manager notices the pass triggered
+     */
+    private function process(ContainerBuilder $container): array
+    {
+        $notices = [];
+        // @phpstan-ignore frankenphp.worker.noSetErrorExceptionHandler (test only: restored right after)
+        set_error_handler(static function (int $type, string $message) use (&$notices): bool {
+            if (str_contains($message, 'private_entity_manager')) {
+                $notices[] = $message;
+            }
+
+            return true;
+        }, E_USER_DEPRECATED);
+
+        try {
+            new PageBuilderPrivateEntityManagerPass()->process($container);
+        } finally {
+            restore_error_handler();
+        }
+
+        return $notices;
+    }
+
     private function assertProbeWired(ContainerBuilder $container): void
     {
         self::assertTrue($container->hasDefinition(NowoPageBuilderKitExtension::HOST_FLUSH_PROBE_SERVICE));

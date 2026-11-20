@@ -206,6 +206,37 @@ final class PrivateEntityManagerKernelTest extends TestCase
         self::assertSame([self::NOTICE, self::NOTICE], $this->probeNotices());
     }
 
+    /**
+     * Audit XD-4: `doctrine.entity_manager` naming the default manager is the default path under another spelling: the
+     * build notice is triggered and every bundle flush of that manager (here `flushPage()`) runs the probe.
+     */
+    public function testEntityManagerNamingTheDefaultManagerGetsTheNoticeAndTheProbe(): void
+    {
+        $container = $this->boot(['entity_manager' => 'default', 'table_prefix' => 'named_' . md5((string) microtime(true)) . '_'], true);
+        $build     = [];
+        foreach ($this->deprecations as $message) {
+            if (str_contains($message, NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION)) {
+                $build[] = $message;
+            }
+        }
+        self::assertCount(1, $build, 'the build notice of an unset option');
+        $this->deprecations = [];
+
+        $default = $this->defaultManager($container);
+        self::assertSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
+        $this->publisher($container)->createPageByKey('named', 'Named', 'en');
+        $documents = $container->get(DocumentService::class);
+        self::assertInstanceOf(DocumentService::class, $documents);
+        $page = $documents->loadPageByKey('named');
+        self::assertInstanceOf(BuilderPage::class, $page);
+
+        $default->persist(new HostNote('flushed by flushPage'));
+        $documents->flushPage($page);
+
+        self::assertSame([self::NOTICE], $this->probeNotices());
+        self::assertSame(['flushed by flushPage'], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note ORDER BY id'), '1.x behaviour unchanged');
+    }
+
     public function testDefaultPathWithoutApplicationChangesReportsNothing(): void
     {
         $container = $this->boot([]);
@@ -285,8 +316,9 @@ final class PrivateEntityManagerKernelTest extends TestCase
 
     /**
      * @param array<string, mixed> $bundleDoctrine
+     * @param bool $keepBuildDeprecations keep the deprecations of the container build (a fresh cache directory only)
      */
-    private function boot(array $bundleDoctrine): ContainerInterface
+    private function boot(array $bundleDoctrine, bool $keepBuildDeprecations = false): ContainerInterface
     {
         $this->kernel = new PersistenceTestKernel($this->doctrine(), $bundleDoctrine);
         $this->kernel->boot();
@@ -296,7 +328,9 @@ final class PrivateEntityManagerKernelTest extends TestCase
         $tool    = new SchemaTool($default);
         $tool->dropDatabase();
         $tool->createSchema($default->getMetadataFactory()->getAllMetadata());
-        $this->deprecations = [];
+        if (!$keepBuildDeprecations) {
+            $this->deprecations = [];
+        }
 
         return $container;
     }
