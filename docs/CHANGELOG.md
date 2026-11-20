@@ -48,10 +48,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `doctrine.private_entity_manager` (REQ-ARCH-001 rule 6, zero-config): `true` makes the bundle read and write its
+  entities through a private entity manager of its own, created on the connection, mapping and event manager of the
+  default entity manager. Same tables, no other configuration. A page builder write (the admin, `PagePublisherInterface`,
+  `DocumentService`, revisions, templates, content fields) then never flushes the application's pending changes, and a
+  failed bundle write closes only the private manager (replaced on the next use). The private manager is dropped at
+  every request, Messenger message and console command boundary (FrankenPHP worker mode with the kernel reset off
+  included, with or without NowoTransactionDoctrineBundle) and at `kernel.reset`. Built on the private entity manager
+  kit of `nowo-tech/transaction-doctrine` 1.9. It requires `transaction: bundle` and no `entity_manager` (the build
+  fails otherwise). The demo opts in.
+- Host-flush probe: with `transaction: bundle`, no `entity_manager` and `private_entity_manager` unset or `false`, each
+  bundle flush of the default entity manager first reports every application entity class with pending changes, once
+  per class and request / message / command: *"Your pending changes to App\X were flushed by NowoPageBuilderKitBundle;
+  2.0 no longer does."* (`E_USER_DEPRECATED`). Read-only: nothing is flushed, cleared or reset by it, and a probe failure
+  never breaks the write. NowoTransactionDoctrineBundle's shared probe is used when that bundle is registered; the
+  bundle then leaves its reset to that bundle's unit-of-work boundaries, so it never clears what other bundles reported
+  in the same request, message or command. The probe also runs when `entity_manager` names the default entity manager.
+
+### Deprecated
+
+- Leaving `doctrine.private_entity_manager` unset (with `transaction: bundle` and no `entity_manager`) triggers a
+  deprecation notice when the container is built: 2.0 always uses the private manager. Setting it to `false` triggers
+  its own notice: `false` is removed in 2.0. Both notices are also triggered when `entity_manager` names the default
+  entity manager (the bundle then flushes that manager exactly as when it is unset). A dedicated `entity_manager:
+  <name>` and `transaction: host` stay in 2.0 and get no notice. See UPGRADING "To 1.19.0".
+- A Twig context provider that implements only `GrapesTwigContextProviderInterface` (deprecated since 1.15, removed in
+  2.0) now triggers a runtime notice, once per provider class when the render service is built: implement
+  `GrapesTwigPageContextProviderInterface`. The deprecated `PageBuilderAssetStorageInterface::store(UploadedFile)` keeps
+  its 1.15 notice.
+
 ### Changed
 
-- Demo: aligned with UiKit (`demo-nav-*` test ids on the shared `demo-masthead`, `· Symfony 8` brand and title suffix). The `pbk-*` classes on the demo pages are the bundle's own hooks (styled by `page-builder.css`), not demo CSS.
-- Requires `nowo-tech/transaction-doctrine` ^1.8.1 (fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g).
+- Demo: aligned with UiKit (`demo-nav-*` test ids on the shared `demo-masthead`, `· Symfony 8` brand and title suffix).
+- Requires `nowo-tech/transaction-doctrine` ^1.9.1 (host-flush probe and private entity manager kit; 1.9.1 guards
+  the probe and fixes its false positives on backed-enum columns; 1.8.1 fixed GHSA-9wh3-m3m5-jffx and
+  GHSA-65w2-9r4h-848g).
 
 ### Fixed
 

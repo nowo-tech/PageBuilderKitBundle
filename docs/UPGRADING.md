@@ -5,6 +5,12 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.19.0](#to-1190)
+  - [The private entity manager notice](#the-private-entity-manager-notice)
+  - [Reading the host-flush probe](#reading-the-host-flush-probe)
+  - [Opting in: what changes](#opting-in-what-changes)
+  - [The Twig context provider notice](#the-twig-context-provider-notice)
+  - [Preparing for 2.0](#preparing-for-20)
 - [To 1.18.0](#to-1180)
 - [To 1.17.0](#to-1170)
   - [Concurrency (REQ-RUNTIME-003)](#concurrency-req-runtime-003)
@@ -53,6 +59,153 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.19.0
+
+From **1.18.x**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle nowo-tech/transaction-doctrine
+```
+
+1.19.0 is the last 1.x minor before 2.0. Without configuration it behaves as 1.18. It adds the
+`doctrine.private_entity_manager` opt-in, deprecation notices for what 2.0 changes, and a host-flush probe that lists
+what the 2.0 change would mean for your application. It requires `nowo-tech/transaction-doctrine` ^1.9.1. No schema
+change.
+
+### The private entity manager notice
+
+With `doctrine.transaction: bundle` (the default) and neither `doctrine.private_entity_manager` nor
+`doctrine.entity_manager` set, building the container now logs:
+
+> Not setting "nowo_page_builder_kit.doctrine.private_entity_manager" is deprecated: page builder writes
+> (doctrine.transaction: bundle) flush the application's default entity manager, including its own pending changes.
+> 2.0 defaults to true: a private entity manager on the same connection and tables that never flushes them. Opt in now
+> with "nowo_page_builder_kit: { doctrine: { private_entity_manager: true } }" (see UPGRADING.md "To 1.19.0"; "false"
+> is removed in 2.0).
+
+With `private_entity_manager: false` it logs instead:
+
+> Setting "nowo_page_builder_kit.doctrine.private_entity_manager" to false is deprecated and removed in 2.0: page
+> builder writes (doctrine.transaction: bundle) flush the application's default entity manager, including its own
+> pending changes; 2.0 always writes through a private entity manager on the same connection and tables. Set it to true
+> now, or set "nowo_page_builder_kit.doctrine.entity_manager" to a dedicated entity manager (see UPGRADING.md "To
+> 1.19.0").
+
+The same notices are triggered when `doctrine.entity_manager` names your default entity manager (for example
+`entity_manager: default`): the bundle then flushes that manager exactly as when the option is unset, and the
+host-flush probe runs too.
+
+What it means: today every page builder write flushes your default entity manager (the admin, `PagePublisherInterface`,
+`DocumentService`, revisions, templates, content fields). Anything your code had left pending there is written by that
+flush too. In 2.0 the bundle writes its rows through a private manager and never flushes your pending changes.
+
+To opt in now (the tables, the connection and the mapping do not change; no migration):
+
+```yaml
+nowo_page_builder_kit:
+    doctrine:
+        private_entity_manager: true
+```
+
+`false` keeps the 1.x behaviour for now, with its own notice: it is removed in 2.0. Two settings stay in 2.0 and get
+neither notice nor probe:
+
+- `doctrine.entity_manager: <name>` naming a dedicated manager other than the default one (the DDD option): the
+  bundle already never flushes your default manager.
+- `doctrine.transaction: host` (DDD hosts): your use case owns the flush.
+
+`private_entity_manager: true` cannot be combined with either of them; the build fails with a message saying so.
+
+### Reading the host-flush probe
+
+While `private_entity_manager` is unset or `false` (with `transaction: bundle` and no `entity_manager`, or one naming
+the default manager), the bundle calls
+the host-flush probe of nowo-tech/transaction-doctrine right before each of its flushes of your default manager. Every
+entity class outside `Nowo\PageBuilderKitBundle\Entity` with pending changes in that manager (a scheduled insert or
+delete, a changed field, association or collection) triggers one deprecation per request, message or command:
+
+> Your pending changes to App\Entity\Order were flushed by NowoPageBuilderKitBundle; 2.0 no longer does.
+
+The bundle never changes your entities itself, so every class listed is your application's own work that relies on a
+page builder write to reach the database. Read the collected messages as your migration list:
+
+1. Run your usual traffic and test suite on 1.19 with deprecations logged (the Symfony profiler, the `deprecation` log
+   channel, or your test runner's deprecation report).
+2. For each class listed, find the code that changes it without flushing: typically a listener of a page builder event
+   (`PageCreatedEvent`, `PagePublishedEvent`, ...), a Twig context provider, an asset storage of yours, or code that calls
+   `flushPage()` or the revision and template services in the middle of its own changes. Make it flush its own changes
+   (or run it in your own transaction).
+3. When no message is left, set `private_entity_manager: true`. The probe is silent in that mode.
+
+Write units (since 1.17) already refuse to start while your manager holds unflushed changes (`LogicException`, see
+[To 1.17.0](#to-1170)); the probe also covers the single flushes (`DocumentService::flushPage()`, the revision store,
+templates) and the changes made during a unit by code the bundle calls. It is read-only: it flushes, clears, closes or
+resets nothing, and a failure of the probe is logged and never breaks the write. It is NowoTransactionDoctrineBundle's
+shared `nowo_transaction_doctrine.host_flush_probe` when you register that bundle, otherwise one of the bundle's own;
+both are reset at every request, message and command boundary (FrankenPHP worker mode with the kernel reset off
+included). The shared probe is reset by NowoTransactionDoctrineBundle's own boundary listener; the bundle resets it
+itself only when you turn that listener off (`unit_of_work_boundaries: false`).
+
+### Opting in: what changes
+
+With `private_entity_manager: true`:
+
+- The bundle's repositories, `nowo_page_builder_kit.entity_manager` (which its controllers and services get) and its
+  write units use the private manager. It is created on the connection, configuration (mapping, metadata cache) and
+  event manager (your Doctrine listeners) of your default entity manager. The SQL filters enabled on that manager are
+  mirrored.
+- A bundle flush writes only the bundle's entities; your pending changes stay pending. A failed bundle write (a
+  deadlock, a lock wait timeout, a unique violation) closes only the private manager, which is replaced on the next use;
+  your manager stays open and untouched. The lock-conflict answer is unchanged (409 + `CONFLICT_001` + `Retry-After`
+  when nothing was committed, `CONFLICT_002` without it when part was).
+- The private manager is dropped at every request, message and command boundary (and at `kernel.reset`): the bundle's
+  entities never stay managed from one unit to the next. Changes the bundle left unflushed then are discarded and logged
+  as a warning (classes and counts only).
+- `getRepository(BuilderPage::class)` on your own manager (or the `BuilderPageRepository` service) returns the
+  bundle's repository, which reads through the private manager: pages you load that way belong to the private manager.
+  Do not `persist()` or `flush()` them, or bundle entities linked to them (a `BuilderPageRevision`), through your
+  manager; change them through the bundle's services, or persist and flush them through
+  `nowo_page_builder_kit.entity_manager` (the demo's seeder does so).
+- An entity of yours that points at a bundle entity (a many-to-one or one-to-one to `BuilderPage`, for example) must
+  get it from your own manager with `$yourManager->getReference(BuilderPage::class, $id)`, not from the bundle's
+  repository: a page loaded through the private manager is unknown to your manager, and your flush would refuse it as
+  a new entity found through a relationship.
+- The connection is shared: a transaction you open around a bundle call includes the bundle's rows (the private flush
+  then uses a savepoint), and your rollback undoes them. The write events are still dispatched after the real commit.
+- DBAL 3 with `use_savepoints` off: a failed private flush inside your transaction marks your transaction rollback-only.
+  Turn savepoints on (always on in DBAL 4).
+
+### The Twig context provider notice
+
+A service tagged `nowo_page_builder_kit.grapes_twig_context` that implements only the deprecated
+`GrapesTwigContextProviderInterface` (`getContext(BuilderPage $page, string $locale)`) now triggers, once per provider
+class when the render service is built:
+
+> The Twig context provider "App\Twig\MyProvider" implements only
+> "Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface", which 2.0 removes. Implement
+> "Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface" (getPageContext(PageContext $page,
+> string $locale)) instead; see UPGRADING.md "To 1.19.0".
+
+Implement `getPageContext(PageContext $page, string $locale): array` instead (see [To 1.15.0](#to-1150)); `PageContext`
+carries the page id, uuid, key, status, publication date, and the title and slug of the rendered locale. A provider
+that implements both interfaces gets no notice (the new one is used). The deprecated asset storage port
+(`PageBuilderAssetStorageInterface::store(UploadedFile)`) keeps the notice it has had since 1.15.
+
+### Preparing for 2.0
+
+2.0 contains only the deprecations announced in 1.x:
+
+- The bundle always writes through the private entity manager with `transaction: bundle` and no `entity_manager`:
+  `doctrine.private_entity_manager` is removed (`true` is the only behaviour; `false` is gone). `doctrine.entity_manager`
+  (a dedicated manager) and `transaction: host` stay.
+- `GrapesTwigContextProviderInterface`, `PageBuilderAssetStorageInterface` (with its service alias) and the built-in
+  storages' `store(UploadedFile)` are removed (see [To 1.15.0](#to-1150)).
+- The other deprecated items of 1.x are removed with them: the legacy admin layout bridge (see To 1.12.0) and the
+  ignored `doctrine.connection` and `web_ui.css_framework` keys.
+
+After 2.0.0 is tagged, the 1.x line gets security fixes for 6 months: Moderate and higher are backported to the last
+1.x minor; Low ones are fixed in 2.x only, with the advice to upgrade.
 
 ## To 1.18.0
 

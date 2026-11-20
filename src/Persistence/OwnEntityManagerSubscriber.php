@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle\Persistence;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\TransactionDoctrine\PrivateManager\PrivateEntityManager;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
@@ -14,6 +15,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
 /**
  * Keeps the bundle's OWN entity manager (`doctrine.entity_manager`) usable in a kept-alive kernel (1.14; outermost
  * boundaries since 1.15.1).
+ *
+ * 1.19: also registered with `doctrine.private_entity_manager: true`, for the bundle's private manager
+ * (transaction-doctrine's {@see PrivateEntityManager}): dropped at the same outermost boundaries, so it never survives
+ * into the next request, message or command in worker mode with the kernel reset off, also when the host does not
+ * register NowoTransactionDoctrineBundle (which resets it too).
  *
  * Registered only when `doctrine.entity_manager` is set and is not the host's default manager: that manager maps the
  * bundle entities only, so the bundle recreates it when a failed flush closed it and clears it at every OUTERMOST
@@ -42,7 +48,7 @@ final readonly class OwnEntityManagerSubscriber implements EventSubscriberInterf
     /**
      * @param iterable<EntityManagerInterface> $entityManagers the bundle-owned manager (skipped while uninitialized)
      * @param ManagerRegistry $registry the Doctrine registry, to recreate a closed manager
-     * @param string $managerName `doctrine.entity_manager`
+     * @param string $managerName `doctrine.entity_manager` (1.19: the private manager's source manager)
      */
     public function __construct(
         private UnitOfWorkBoundaries $boundaries,
@@ -104,6 +110,13 @@ final readonly class OwnEntityManagerSubscriber implements EventSubscriberInterf
     public function clearState(): void
     {
         foreach ($this->entityManagers as $entityManager) {
+            if ($entityManager instanceof PrivateEntityManager) {
+                // 1.19: the private manager is dropped (a fresh one next time; pending changes logged), never built here.
+                $entityManager->reset();
+
+                continue;
+            }
+
             if ($entityManager->isOpen()) {
                 // @igor-ignore - This IS the unit-of-work boundary reset of the bundle's own manager (no state kept).
                 $entityManager->clear();

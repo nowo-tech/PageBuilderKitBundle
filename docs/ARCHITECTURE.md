@@ -468,8 +468,16 @@ Tracked in [UPGRADING.md](UPGRADING.md#to-1160):
   default to a bundle-owned manager or to `host` mode in 1.x would move the tables to another manager or stop
   persisting the writes of existing hosts, so it waits for a major. Until then: set `doctrine.entity_manager` (and,
   for DDD hosts, `transaction: host`).
+  **1.19** adds the 2.0 behaviour as an opt-in, `doctrine.private_entity_manager: true`: a private entity manager
+  (nowo-tech/transaction-doctrine's `PrivateManager\PrivateEntityManager`) on the default manager's connection,
+  mapping and event manager, the same tables, no host configuration. The bundle's repositories get a
+  `PrivateManagerRegistry`, its write units run `forEntityManager()` on the private manager (a failure drops it, never
+  the host's manager), and `OwnEntityManagerSubscriber` drops it at every outermost boundary (also tagged for
+  transaction-doctrine's boundary listener and `kernel.reset`). Unset or `false` triggers a deprecation notice and the
+  host-flush probe before every flush of the default manager (UPGRADING "To 1.19.0"). In 2.0 the private manager is
+  the only behaviour of `transaction: bundle` without `entity_manager`.
 - **Removal of the deprecated SPI.** `PageBuilderAssetStorageInterface::store(UploadedFile)` and
-  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)`.
+  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)` (runtime notices since 1.15 and 1.19).
 
 ## Related docs
 

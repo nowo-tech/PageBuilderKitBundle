@@ -25,9 +25,13 @@ use function is_string;
 use function iterator_to_array;
 use function round;
 use function sprintf;
+use function trigger_deprecation;
 
 final readonly class PageRenderProvider implements PageRenderProviderInterface
 {
+    /** 1.19: a Twig context provider that implements only the deprecated entity-based interface. */
+    public const string CONTEXT_PROVIDER_DEPRECATION = 'The Twig context provider "%s" implements only "%s", which 2.0 removes. Implement "%s" (getPageContext(PageContext $page, string $locale)) instead; see UPGRADING.md "To 1.19.0".';
+
     /** @var list<GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface> */
     private array $twigContextProviders;
 
@@ -64,7 +68,15 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         $providers = $twigContextProviders instanceof Traversable
             ? iterator_to_array($twigContextProviders, false)
             : $twigContextProviders;
-        $this->twigContextProviders     = array_values($providers);
+        $this->twigContextProviders = array_values($providers);
+        // 1.19: the 2.0 removal of the entity-based SPI, once per provider class and container (never per page).
+        $deprecated = [];
+        foreach ($this->twigContextProviders as $provider) {
+            if (!$provider instanceof GrapesTwigPageContextProviderInterface && !isset($deprecated[$provider::class])) {
+                $deprecated[$provider::class] = true;
+                trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.19', self::CONTEXT_PROVIDER_DEPRECATION, $provider::class, GrapesTwigContextProviderInterface::class, GrapesTwigPageContextProviderInterface::class);
+            }
+        }
         $this->trace                    = $trace ?? new NullPageBuilderKitTrace();
         $this->contentFieldsNormalizer  = $contentFieldsNormalizer ?? new ContentFieldsNormalizer();
         $this->contentFieldSlotReplacer = $contentFieldSlotReplacer ?? new ContentFieldSlotReplacer();
