@@ -422,7 +422,7 @@ List registered types in Twig:
 
 ## GrapesJS Style and Advanced
 
-The admin canvas is **GrapesJS** (CDN). Style Manager, Layer Manager, and trait panels provide Elementor-like Style/Advanced editing on free-form HTML. Locale tabs load/save `localeContent[locale]`.
+The admin canvas is **GrapesJS** (CDN). Style Manager, Layer Manager, and trait panels provide visual Style and Advanced (id, classes, attributes) editing on free-form HTML. Locale tabs load/save `localeContent[locale]`.
 
 Optional blocks: Custom HTML (`grapesjs.allow_custom_code`), Script (`grapesjs.allow_scripts`), and **Twig** insert helpers (`grapesjs.twig.canvas_helpers`).
 
@@ -627,7 +627,7 @@ editor.BlockManager.add('app-pricing-trio', {
 
 The document splits **layout** from **translatable content**:
 
-1. **`structure`** (JSON on `BuilderDocument`): version, sections, columns, widget ids/types, and **Elementor-like appearance** (`settings`: style, cssId, cssClasses, attributes). Shared across locales.
+1. **`structure`** (JSON on `BuilderDocument`): version, sections, columns, widget ids/types, and **per-element appearance** (`settings`: style, cssId, cssClasses, attributes). Shared across locales.
 2. **`widgetPropsByLocale`**: map `locale → { widgetId → content props }`. Stored in `BuilderDocumentLocale`.
 
 Example:
