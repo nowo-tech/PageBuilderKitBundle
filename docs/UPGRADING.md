@@ -70,7 +70,7 @@ composer update nowo-tech/page-builder-kit-bundle nowo-tech/transaction-doctrine
 
 1.19.0 is the last 1.x minor before 2.0. Without configuration it behaves as 1.18. It adds the
 `doctrine.private_entity_manager` opt-in, deprecation notices for what 2.0 changes, and a host-flush probe that lists
-what the 2.0 change would mean for your application. It requires `nowo-tech/transaction-doctrine` ^1.9. No schema
+what the 2.0 change would mean for your application. It requires `nowo-tech/transaction-doctrine` ^1.9.1. No schema
 change.
 
 ### The private entity manager notice
@@ -92,6 +92,10 @@ With `private_entity_manager: false` it logs instead:
 > now, or set "nowo_page_builder_kit.doctrine.entity_manager" to a dedicated entity manager (see UPGRADING.md "To
 > 1.19.0").
 
+The same notices are triggered when `doctrine.entity_manager` names your default entity manager (for example
+`entity_manager: default`): the bundle then flushes that manager exactly as when the option is unset, and the
+host-flush probe runs too.
+
 What it means: today every page builder write flushes your default entity manager (the admin, `PagePublisherInterface`,
 `DocumentService`, revisions, templates, content fields). Anything your code had left pending there is written by that
 flush too. In 2.0 the bundle writes its rows through a private manager and never flushes your pending changes.
@@ -107,15 +111,16 @@ nowo_page_builder_kit:
 `false` keeps the 1.x behaviour for now, with its own notice: it is removed in 2.0. Two settings stay in 2.0 and get
 neither notice nor probe:
 
-- `doctrine.entity_manager: <name>` (a dedicated manager of yours, the DDD option): the bundle already never flushes
-  your default manager.
+- `doctrine.entity_manager: <name>` naming a dedicated manager other than the default one (the DDD option): the
+  bundle already never flushes your default manager.
 - `doctrine.transaction: host` (DDD hosts): your use case owns the flush.
 
 `private_entity_manager: true` cannot be combined with either of them; the build fails with a message saying so.
 
 ### Reading the host-flush probe
 
-While `private_entity_manager` is unset or `false` (with `transaction: bundle` and no `entity_manager`), the bundle calls
+While `private_entity_manager` is unset or `false` (with `transaction: bundle` and no `entity_manager`, or one naming
+the default manager), the bundle calls
 the host-flush probe of nowo-tech/transaction-doctrine right before each of its flushes of your default manager. Every
 entity class outside `Nowo\PageBuilderKitBundle\Entity` with pending changes in that manager (a scheduled insert or
 delete, a changed field, association or collection) triggers one deprecation per request, message or command:
@@ -139,7 +144,8 @@ templates) and the changes made during a unit by code the bundle calls. It is re
 resets nothing, and a failure of the probe is logged and never breaks the write. It is NowoTransactionDoctrineBundle's
 shared `nowo_transaction_doctrine.host_flush_probe` when you register that bundle, otherwise one of the bundle's own;
 both are reset at every request, message and command boundary (FrankenPHP worker mode with the kernel reset off
-included).
+included). The shared probe is reset by NowoTransactionDoctrineBundle's own boundary listener; the bundle resets it
+itself only when you turn that listener off (`unit_of_work_boundaries: false`).
 
 ### Opting in: what changes
 
@@ -161,6 +167,10 @@ With `private_entity_manager: true`:
   Do not `persist()` or `flush()` them, or bundle entities linked to them (a `BuilderPageRevision`), through your
   manager; change them through the bundle's services, or persist and flush them through
   `nowo_page_builder_kit.entity_manager` (the demo's seeder does so).
+- An entity of yours that points at a bundle entity (a many-to-one or one-to-one to `BuilderPage`, for example) must
+  get it from your own manager with `$yourManager->getReference(BuilderPage::class, $id)`, not from the bundle's
+  repository: a page loaded through the private manager is unknown to your manager, and your flush would refuse it as
+  a new entity found through a relationship.
 - The connection is shared: a transaction you open around a bundle call includes the bundle's rows (the private flush
   then uses a savepoint), and your rollback undoes them. The write events are still dispatched after the real commit.
 - DBAL 3 with `use_savepoints` off: a failed private flush inside your transaction marks your transaction rollback-only.
