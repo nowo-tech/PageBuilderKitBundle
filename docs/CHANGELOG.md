@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Demo: aligned with UiKit (`demo-nav-*` test ids on the shared `demo-masthead`, `· Symfony 8` brand and title suffix). The `pbk-*` classes on the demo pages are the bundle's own hooks (styled by `page-builder.css`), not demo CSS.
 - Requires `nowo-tech/transaction-doctrine` ^1.8.1 (fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g).
 
 ## [1.18.0] - 2026-11-20

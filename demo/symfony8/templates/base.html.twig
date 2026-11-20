@@ -4,7 +4,7 @@
 #}
 {% extends '@NowoUiKit/layout/admin.html.twig' %}
 
-{% block nowo_ui_document_title %}{% block title %}Page Builder Kit Demo{% endblock %}{% endblock %}
+{% block nowo_ui_document_title %}{% block title %}Page Builder Kit Demo{% endblock %} — Symfony 8{% endblock %}
 
 {% block nowo_ui_head %}
     {{ parent() }}
@@ -24,10 +24,10 @@
     {% set _route = app.request.attributes.get('_route') %}
     {% set _params = app.request.attributes.get('_route_params')|default({}) %}
     <header class="nowo-ui-header" data-testid="demo-masthead">
-        <a class="nowo-ui-brand" href="{{ path('showcase') }}">Page Builder Kit</a>
+        <a class="nowo-ui-brand" href="{{ path('showcase') }}">Page Builder Kit · Symfony 8</a>
         <nav class="nowo-ui-menu" aria-label="Page Builder Kit">
             {% for route, label in {showcase: 'Use cases', home: 'Home', compounds: 'Compounds', classic: 'Classic v1', draft: 'Draft', i18n: 'i18n', multi_render: 'Multi-render', admin_page_builder_list: 'Admin'} %}
-                <a class="nowo-ui-link" href="{{ path(route) }}"{% if _route == route %} aria-current="page"{% endif %}>{{ label }}</a>
+                <a class="nowo-ui-link" href="{{ path(route) }}"{% if _route == route %} aria-current="page"{% endif %} data-testid="demo-nav-{{ route }}">{{ label }}</a>
             {% endfor %}
         </nav>
         <div class="nowo-ui-header__end">
