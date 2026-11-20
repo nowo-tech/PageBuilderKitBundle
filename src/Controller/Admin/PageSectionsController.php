@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Locale\BuilderLocales;
 use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepository;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Service\PageStaleEditException;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPageFactory;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -72,7 +73,8 @@ final class PageSectionsController extends AbstractController
         $sectionsTree  = $this->buildSectionsTree($structure, $propsByLocale[$locale] ?? []);
 
         $form = $this->createForm(SectionsEditType::class, null, [
-            'sections_tree' => $sectionsTree,
+            'sections_tree'  => $sectionsTree,
+            'document_token' => $this->documentService->documentToken($page),
         ]);
         $form->handleRequest($request);
 
@@ -82,9 +84,15 @@ final class PageSectionsController extends AbstractController
             $submitted              = is_array($data['widgets'] ?? null) ? $data['widgets'] : [];
             $propsByLocale[$locale] = $this->normalizeSubmittedProps($submitted);
 
+            // 1.18 (REQ-RUNTIME-003 rule 4): the form carries the token of the document it was built from; a document
+            // another editor saved since is refused (the other locales and fields of that save are not overwritten).
+            $baseToken = is_string($data['base_token'] ?? null) && $data['base_token'] !== '' ? $data['base_token'] : null;
+
             try {
-                $this->documentService->saveDocument($page, $structure, $propsByLocale);
+                $this->documentService->saveDocument($page, $structure, $propsByLocale, $baseToken);
                 $this->addFlash('success', 'admin.sections.saved');
+            } catch (PageStaleEditException) {
+                $this->addFlash('error', 'admin.stale_edit');
             } catch (InvalidArgumentException $exception) {
                 $this->addFlash('error', $exception->getMessage());
             }

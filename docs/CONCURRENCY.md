@@ -53,17 +53,17 @@ the residual risks. Worker mode (FrankenPHP, kernel reset off) is covered in
 
 | Write path | Transaction | Control | Conflict answer |
 | --- | --- | --- | --- |
-| Save the editor document (`POST /pages/{pageKey}/document`, `DocumentService::saveDocument()`, also `saveDocumentByKey()`) | One unit: revision snapshot, pruning and document | Page row lock, document read again (the snapshot records what this save replaces) | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
+| Save the editor document (`POST /pages/{pageKey}/document`, `DocumentService::saveDocument()`, also `saveDocumentByKey()`) | One unit: revision snapshot, pruning and document | Page row lock, document read again (the snapshot records what this save replaces). Version token (1.18): the canvas sends the `baseToken` it loaded; under the lock a save whose token is no longer the stored document's is refused, nothing written | JSON 409 `CONFLICT_001` / `CONFLICT_002`; stale: 409 `PAGE_BUILDER_STALE_EDIT` |
 | Content field from the canvas (`POST /pages/{pageKey}/fields/{fieldKey}`, `ContentFieldsService::saveFieldValue()`) | One unit | Page row lock, structure read again: two editors saving different fields keep both values | JSON 409 `CONFLICT_001` / `CONFLICT_002` |
-| Content form (`PageContentController`, `ContentFieldsService::mergeValues()`) | One unit | Page row lock. The form posts, next to the values, a fingerprint of each value it showed (`fieldOriginals`) and the labels it showed (`labelOriginals`); under the lock only the fields and labels the editor changed are written. An unchecked box counts as a change only for a bool the form rendered. Another editor's other locale, other field or newly turned-on bool survives | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
+| Content form (`PageContentController`, `ContentFieldsService::mergeValues()`) | One unit | Page row lock. The form posts, next to the values, a fingerprint of each value it showed (`fieldOriginals`) and the labels it showed (`labelOriginals`); under the lock only the fields and labels the editor changed are written. An unchecked box counts as a change only for a bool the form rendered. Another editor's other locale, other field or newly turned-on bool survives. Same field (1.18): a field the editor changed, which another editor changed to another value meanwhile, refuses the whole save | 409 `CONFLICT_001` / `CONFLICT_002` (your error page); same field: flash and redirect, nothing written |
 | Content schema (`PageContentController`, `ContentFieldsService::saveSchemaWithField()` / `saveSchemaWithoutField()`) | One unit | Page row lock; one add or remove applied to the schema read under the lock (a field another editor added meanwhile stays; adding a key another editor added meanwhile is refused with "Field … already exists") | 409 `CONFLICT_001` / `CONFLICT_002` (your error page) |
 | Your code: `saveValues()` / `saveSchema()` | One unit | Page row lock; they replace the values / schema with what you pass (whole replacement: build it from a fresh read, or use the intent methods above) | `TransientStorageFailure` |
-| Classic sections editor (legacy, `PageSectionsController`) | One unit (`saveDocument()`) | As the document save, but the editor posts the whole document built from its earlier read (see residual risks) | 409 (your error page) |
+| Classic sections editor (legacy, `PageSectionsController`) | One unit (`saveDocument()`) | As the document save: the form carries the token of the document it showed (`base_token`, 1.18), so a document another editor saved since (any locale) is refused, not overwritten | 409 `CONFLICT_*` (your error page); stale: flash and redirect back to the editor |
 | Publish / unpublish (`POST /pages/{pageKey}/publish`, `/unpublish`, `publishByKey()`, `unpublishByKey()`) | One unit | Page row lock: the required-field check and the publish revision read the content being published | 409 (JSON when asked, else your error page) |
 | Create a page (`PageListController`, `createPage()`, `createPageByKey()`) | One unit | Unique `page_key`: two editors creating the same key get one page; the second gets "Page key … already exists" | Domain error (form error / flash, 400 in JSON) |
 | Duplicate a page (`POST /pages/{pageKey}/duplicate`) | One unit: create, copy, translations | Unique `page_key` as above | 409 `CONFLICT_*`, or the domain error |
 | Import a page (`POST /pages/import`, `DocumentImportExportService::import()`) | One unit: create or load, document, translations, publish | Page row lock through the save; unique `page_key` | 409 `CONFLICT_*`, or the domain error |
-| SEO and translations (`PageSeoController`, `DocumentService::flushPage()`) | One ORM flush (the form changed the entities before the call). A failed flush closes the manager; `flushPage()` replaces a closed one through the registry before rethrowing, so a kept-alive worker keeps writing | Doctrine writes the changed columns only; unique `(page, locale)` translation key | 409 `CONFLICT_*`; a duplicate translation answers 409 `PAGE_BUILDER_CONCURRENT_EDIT` |
+| SEO and translations (`PageSeoController`, `DocumentService::flushPage()`) | One unit (`DocumentService::saveTranslation()`, 1.18): the form changed the entity before the call; under the page lock the stored row is read again and each field is applied on its own. A failed flush closes the manager; the service replaces a closed one through the registry before rethrowing, so a kept-alive worker keeps writing | Field by field against the values the form showed (`originals`): a field the editor did not change keeps the stored value; one both editors changed to different values refuses the save, nothing written; unique `(page, locale)` translation key | 409 `CONFLICT_*`; same field: flash and redirect; a duplicate translation answers 409 `PAGE_BUILDER_CONCURRENT_EDIT` |
 | Revisions: create, restore (`PageRevisionsController`, `PageRevisionService`) | One unit: the "Before restore" snapshot and the restore together | Page row lock | 409 (your error page) |
 | Templates: save from page, create a page from a template, delete, import (`PageTemplatesController`, `PageTemplateService`) | One unit each; an import of several templates is one unit | Unique `template_key`: the second editor saving the same new key gets "Template … was created by another editor at the same time" | Domain error, or 409 `CONFLICT_*` |
 
@@ -80,6 +80,7 @@ error handling):
 | --- | --- | --- | --- | --- |
 | `CONFLICT_001` | Deadlock, lock wait timeout or serialization failure (MySQL 1213 / 1205, MariaDB 1020, PostgreSQL 40001 / 40P01 / 55P03; a `TransientStorageFailure` of the runner or a DBAL error anywhere in the chain), and nothing committed since the request started | 409 (`conflict_response.status`) | Yes: `conflict_response.retry_after`, else 1 s | Retry |
 | `CONFLICT_002` | The same after a commit earlier in the request: transaction-doctrine's request mark (`ConflictCode::forRequest()`, when its bundle is registered with commit detection), or the bundle's own mark on a `CommitLedger` of its connection. Also a `ConcurrencyConflict` that committed, or a lost savepoint with no deadlock behind it (outcome unknown) | 409 (`conflict_response.status`) | No | Reload, do not repeat blindly |
+| `PAGE_BUILDER_STALE_EDIT` (1.18, JSON `code`) | The canvas saved with a `baseToken` that is no longer the stored document's: another editor saved first. Domain conflict, not a lock conflict: nothing is written and there is no `X-Conflict-Code` | 409 | No | Reload the page (the answer carries the current `token`) and apply the change again |
 | `PAGE_BUILDER_CONCURRENT_EDIT` (`X-Error-Code`) | Two editors added the same missing translation of a page (or locale row of its document) at once; the unique key refused the second | 409 | No | Reload the page and apply the change again |
 
 - The `CONFLICT_*` code is in the `X-Conflict-Code` header, which only ever holds `CONFLICT_001` or `CONFLICT_002`.
@@ -92,6 +93,8 @@ error handling):
   ```
 
   The domain conflict answers `{"error": "concurrent_edit", "code": "PAGE_BUILDER_CONCURRENT_EDIT", "message": "…"}`.
+- The forms (classic sections editor, content form, SEO form) answer a stale edit with a flash message
+  (`admin.stale_edit`) and a redirect back to the editor, which shows what the other editor saved. Nothing is written.
 - **Admin pages** are rendered by your error page: the answer is an `HttpException` with a fixed, client-safe message.
   The storage error stays the previous exception for your logs; no SQL, parameter or value reaches the client.
 - The listener runs at `kernel.exception` priority 64, before the framework's error listener logs the exception, so
@@ -172,10 +175,18 @@ nowo_page_builder_kit:
   - two creates of one page key at once (two processes): one page, the second gets the domain error, the manager is
     usable afterwards;
   - a lock conflict after a committed unit of the same request answers `CONFLICT_002` without `Retry-After`. The commit
-    is counted by the real commit-tracking middleware.
+    is counted by the real commit-tracking middleware;
+  - a canvas save with a stale token while another process commits a save (1.18): 409 `PAGE_BUILDER_STALE_EDIT` with
+    the current token, no `X-Conflict-Code`, the committed save kept, and the retry with that token saves;
+  - the same content field changed by two editors (1.18): the second save is refused whole and the first value stays;
+  - the SEO form after another process changed another field of the translation: both changes are kept; after it
+    changed the same field: the save is refused whole.
 - `tests/Integration/Persistence/PageBuilderWriteUnitTest.php` covers the unit itself on SQLite: one commit, events after
   it, a nested unit joining the outer one, a failed unit storing nothing, the host runner refusing unflushed changes,
   the lock re-read, the page-key and template-key races, and a failed SEO flush leaving an open manager.
+- `tests/Integration/Http/StaleEditHttpTest.php` covers the same rules through the controllers on SQLite: the token in
+  the canvas and the document API, the classic editor refusing a stale form, the content form, the SEO form (fields
+  kept, same field refused, unknown originals, a new translation).
 - `tests/Unit/EventListener/PageBuilderConflictListenerTest.php` maps every case:
   - `CONFLICT_001` for each vendor code;
   - `CONFLICT_002` (own ledger, transaction-doctrine's mark, a committed `ConcurrencyConflict`, a lost savepoint);
@@ -192,19 +203,14 @@ make down-db
 
 ## Residual risks
 
-- **A stale editor overwrites the document whole.** The canvas sends the whole document. When editor B saves a
-  document they loaded before editor A's save, B's document replaces A's, without a warning (no version token in the
-  editor). A's content is not lost: the revision snapshot of B's save (when `revisions.on_save` is on) records it.
-  This is an admin-only path. A version column needs a schema change and is left for a later minor.
-- **The classic sections editor (legacy) posts the whole document.** It builds the props of every locale from the
-  page it read when the form was shown; a save of another locale by another editor in the meantime is overwritten
-  (the revision snapshot of the save keeps it when `revisions.on_save` is on). Use the canvas and the content form,
-  which merge under the lock.
-- **Content form: the same field edited by two editors.** The later save of that field wins (the other editor's
-  value of that field is replaced; their other fields stay). The revision snapshot keeps the earlier content when
-  `revisions.on_save` is on.
-- **SEO and translation forms: last write wins per field.** Doctrine writes only the changed columns, so two editors
-  changing different fields both keep them. The same field: the later save wins.
+- **A save without `baseToken` replaces the document.** The version check (1.18) is on when the caller sends the token:
+  the canvas, the classic sections editor and the forms do. Your own code that calls `saveDocument()` without the
+  argument, the JSON API called without `baseToken`, imports and revision restores replace the document as before
+  (the revision snapshot of the save keeps the earlier content when `revisions.on_save` is on).
+- **Labels of a content field: the later save wins.** The content form refuses a field *value* another editor changed
+  to another value, but the per-locale label of the same field is still last write wins (the other fields stay).
+- **The stale check is per document.** Two editors working on different widgets of the same canvas page are refused
+  too (the canvas sends the whole document): the second one reloads and applies the change again.
 - **Commit detection covers the bundle's connection** (and every connection when transaction-doctrine's
   `commit_detection` is on). A write of yours on another connection before the bundle's controller fails is not
   counted without transaction-doctrine's bundle.

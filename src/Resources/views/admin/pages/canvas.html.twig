@@ -4,7 +4,7 @@
   PageBuilderKitPageFactory::canvas(): header admin.canvas.title with SEO, Revisions and Preview, back link to the
   list). The save / publish / unpublish buttons are script buttons (page-builder-canvas.js, no inline handlers).
   Also: builder_page, page_key, locales, default_locale, structure, grapesjs_config, csrf_token, document_*_url,
-  page_status, preview_url. The GrapesJS editor scripts are loaded by page-builder-canvas.js from
+  document_token (the version token of the loaded document, optional), page_status, preview_url. The GrapesJS editor scripts are loaded by page-builder-canvas.js from
   grapesjs_config.pluginCdnBase; its stylesheets are local assets — this template prints no CDN asset.
 #}
 {% extends page.layout ?? nowo_ui_layout.admin %}
@@ -36,6 +36,7 @@
          data-pbk-csrf="{{ csrf_token }}"
          data-pbk-default-locale="{{ default_locale }}"
          data-pbk-grapes-config="{{ grapesjs_config|json_encode|e('html_attr') }}"
+         data-pbk-document-token="{{ document_token|default('') }}"
          data-pbk-structure="{{ structure|json_encode|e('html_attr') }}">
 
         <div class="{{ nowo_ui_class('toolbar', _b) }} pbk-canvas__toolbar" data-nowo-ui-region="toolbar">

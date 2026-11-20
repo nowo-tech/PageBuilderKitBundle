@@ -13,6 +13,7 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessGuard;
 use Nowo\PageBuilderKitBundle\Service\DocumentImportExportService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
+use Nowo\PageBuilderKitBundle\Service\PageStaleEditException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -61,6 +62,7 @@ final class PageDocumentApiController extends AbstractController
             'status'              => $page->getStatus()->value,
             'structure'           => $this->documentNormalizer->normalize($document?->getStructure() ?? []),
             'widgetPropsByLocale' => $widgetPropsByLocale,
+            'token'               => $this->documentService->documentToken($page),
         ]);
     }
 
@@ -85,8 +87,18 @@ final class PageDocumentApiController extends AbstractController
             return new JsonResponse(['error' => 'invalid_payload'], Response::HTTP_BAD_REQUEST);
         }
 
+        // 1.18 (REQ-RUNTIME-003 rule 4): the token the editor loaded; a client that sends none keeps the whole-document write.
+        $baseToken = is_string($payload['baseToken'] ?? null) && $payload['baseToken'] !== '' ? $payload['baseToken'] : null;
+
         try {
-            $this->documentService->saveDocument($page, $structure, $widgetPropsByLocale);
+            $this->documentService->saveDocument($page, $structure, $widgetPropsByLocale, $baseToken);
+        } catch (PageStaleEditException $stale) {
+            return new JsonResponse([
+                'error'   => PageStaleEditException::ERROR,
+                'code'    => PageStaleEditException::CODE,
+                'message' => 'Another editor saved this page since it was opened. Reload it before saving again.',
+                'token'   => $stale->current,
+            ], Response::HTTP_CONFLICT);
         } catch (InvalidArgumentException $exception) {
             return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -94,7 +106,7 @@ final class PageDocumentApiController extends AbstractController
         // @igor-ignore - Request-scoped debug trace; ResetInterface clears between worker requests.
         $this->trace->addAdminAction('save', $pageKey);
 
-        return new JsonResponse(['ok' => true]);
+        return new JsonResponse(['ok' => true, 'token' => $this->documentService->documentToken($page)]);
     }
 
     #[Route('/pages/{pageKey}/publish', name: 'admin_page_builder_document_publish', requirements: ['pageKey' => '[a-z0-9_-]+'], methods: ['POST'])]

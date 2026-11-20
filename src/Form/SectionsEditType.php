@@ -9,6 +9,7 @@ use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -19,9 +20,9 @@ use function is_string;
 use function strlen;
 
 /**
- * Classic sections editor: nested widgets[widgetId][field] + CSRF `_token`.
+ * Classic sections editor: nested widgets[widgetId][field] + `base_token` (1.18) + CSRF `_token`.
  *
- * @extends AbstractType<array{widgets?: array<string, array<string, string>>}>
+ * @extends AbstractType<array{widgets?: array<string, array<string, string>>, base_token?: string|null}>
  */
 #[FormKitConfig('page_builder_kit')]
 final class SectionsEditType extends AbstractType
@@ -82,6 +83,8 @@ final class SectionsEditType extends AbstractType
         }
 
         $builder->add($widgets);
+        // 1.18 (REQ-RUNTIME-003 rule 4): the token of the document this form was built from.
+        $this->addWithDefaults($builder, 'base_token', HiddenType::class, ['data' => is_string($options['document_token']) ? $options['document_token'] : '', 'required' => false]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -91,6 +94,7 @@ final class SectionsEditType extends AbstractType
             'csrf_field_name' => '_token',
             'csrf_token_id'   => 'page_builder_sections',
             'sections_tree'   => [],
+            'document_token'  => '',
         ]);
         $resolver->setAllowedTypes('sections_tree', 'array');
     }

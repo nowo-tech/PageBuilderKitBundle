@@ -45,7 +45,7 @@ Other variables passed by the controllers (for host templates set through `web_u
 are kept): `builder_page` (the `BuilderPage` entity — the 1.x `page` variable is now the view model), `pages`,
 `engines`, `current_page`, `total_pages`, `create_form`, `duplicate_forms` (index); `page_key`, `locales`,
 `default_locale`, `structure`, `grapesjs_config`, `grapesjs_cdn_version`, `csrf_token`, `document_*_url`,
-`page_status`, `preview_url` (canvas); `pageKey`, `schema`, `fieldValues`, `active_locale`, `schema_add_form`,
+`document_token` (1.18, the version token of the loaded document; optional in a host template), `page_status`, `preview_url` (canvas); `pageKey`, `schema`, `fieldValues`, `active_locale`, `schema_add_form`,
 `schema_remove_forms`, `values_form`, `can_edit_schema`, `can_edit_values`, `asset_*` (content); `locale`, `form`
 (seo, sections); `sections_tree`, `publish_form`, `unpublish_form` (sections); `revisions`, `engine`, `max_per_page`,
 `create_form`, `restore_forms` (revisions); `revisionId`, `diff` (revision diff); `templates`, `save_forms`,

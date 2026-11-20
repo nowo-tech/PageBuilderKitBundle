@@ -9,6 +9,7 @@ use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
 use Nowo\UiKitBundle\Twig\TranslatableText;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -73,6 +74,12 @@ final class BuilderPageSeoType extends AbstractType
             'attr'        => ['placeholder' => new TranslatableText('index,follow')],
             'constraints' => [new Assert\Length(max: 64)],
         ]);
+        // 1.18 (REQ-RUNTIME-003 rule 4): what the form shows, posted back so that only the editor's changes are saved.
+        $this->addWithDefaults($builder, 'originals', HiddenType::class, [
+            'mapped'   => false,
+            'required' => false,
+            'data'     => $options['originals'],
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -80,6 +87,8 @@ final class BuilderPageSeoType extends AbstractType
         $resolver->setDefaults([
             'data_class'         => BuilderPageTranslation::class,
             'translation_domain' => 'NowoPageBuilderKitBundle',
+            'originals'          => '',
         ]);
+        $resolver->setAllowedTypes('originals', 'string');
     }
 }
