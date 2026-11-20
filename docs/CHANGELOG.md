@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The version token is canonical: nested keys and locale order no longer change it, so the token of a save answer is the one the next save finds under the lock (MySQL re-orders JSON keys)
+- A refused SEO save applies none of its fields (conflicts are decided before any field is applied) and puts the translation back to the stored row
 - The canvas no longer publishes after a failed save (a stale editor, or any other save error): publish stops with the
   save message
 - The SEO form no longer writes back the old value of a field it did not change over another editor's committed value

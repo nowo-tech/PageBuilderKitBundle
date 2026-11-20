@@ -261,6 +261,80 @@ final class DocumentServiceTest extends TestCase
     }
 
     #[Test]
+    public function aRefusedSeoSaveAppliesNoneOfItsOtherFields(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $calls                = 0;
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('isOpen')->willReturn(true);
+        // The two reads (before the unit, under the lock) give the stored row; the safety-net refresh does nothing, so
+        // only the order "decide first, apply after" keeps the title as stored.
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t) use (&$calls): void {
+            if (++$calls <= 2) {
+                $t->setTitle('Title')->setMetaTitle('Meta of B')->setOgTitle(null);
+            }
+        });
+        $em->expects(self::never())->method('flush');
+        $translation->setTitle('Title of A')->setMetaTitle('Meta of A')->setOgTitle('OG of A');
+
+        try {
+            // title (earlier field) is a clean change, metaTitle (later) conflicts, ogTitle (later still) is clean.
+            $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title', 'slug' => 'title', 'metaTitle' => 'Meta', 'ogTitle' => null]);
+            self::fail('A same-field conflict must be refused.');
+        } catch (PageStaleEditException $stale) {
+            self::assertSame(['metaTitle'], $stale->fields);
+        }
+
+        self::assertSame('Title', $translation->getTitle(), 'a refused save applies none of its fields');
+        self::assertNull($translation->getOgTitle());
+        self::assertSame(3, $calls, 'the safety net refreshes the stored row after a failure');
+    }
+
+    #[Test]
+    public function aFailedSeoFlushWithAFailingSafetyRefreshStillReportsTheFlushError(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $calls                = 0;
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('isOpen')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function () use (&$calls): void {
+            if (++$calls > 2) {
+                throw new RuntimeException('refresh failed');
+            }
+        });
+        $em->method('flush')->willThrowException(new RuntimeException('flush failed'));
+
+        $this->expectExceptionMessage('flush failed');
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title']);
+    }
+
+    #[Test]
+    public function documentTokenIgnoresTheKeyOrderOfTheStructure(): void
+    {
+        $service = $this->createService();
+        $make    = static function (array $structure, array $locales): BuilderPage {
+            $page = new BuilderPage()->setPageKey('home');
+            new BuilderDocument()->setPage($page)->setStructure($structure);
+            foreach ($locales as $locale => $props) {
+                $page->getDocument()?->upsertLocale($locale, $props);
+            }
+
+            return $page;
+        };
+        $a = ['version' => 2, 'engine' => 'grapesjs', 'html' => '', 'css' => '', 'grapes' => ['pages' => [['name' => 'x', 'frames' => [1, 2]]], 'assets' => []], 'localeContent' => ['en' => ['html' => 'e', 'css' => ''], 'es' => ['html' => 's', 'css' => '']], 'fields' => [], 'fieldValues' => []];
+        $b = ['fieldValues' => [], 'fields' => [], 'localeContent' => ['es' => ['css' => '', 'html' => 's'], 'en' => ['css' => '', 'html' => 'e']], 'grapes' => ['assets' => [], 'pages' => [['frames' => [1, 2], 'name' => 'x']]], 'css' => '', 'html' => '', 'engine' => 'grapesjs', 'version' => 2];
+
+        self::assertSame($service->documentToken($make($a, [])), $service->documentToken($make($b, [])));
+
+        $c                                 = $b;
+        $c['grapes']['pages'][0]['frames'] = [2, 1];
+        self::assertNotSame($service->documentToken($make($a, [])), $service->documentToken($make($c, [])), 'list order is content');
+    }
+
+    #[Test]
     public function saveTranslationOfANewTranslationIsPersistedAsPosted(): void
     {
         $page        = new BuilderPage()->setPageKey('home');

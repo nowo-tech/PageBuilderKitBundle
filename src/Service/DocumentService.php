@@ -94,10 +94,13 @@ final readonly class DocumentService implements PagePublisherInterface
         }
         ksort($props);
 
-        return hash('sha256', json_encode([
+        // A JSON round trip first: the stored column (MySQL JSON re-orders object keys) and the in-memory array give the same bytes.
+        $canonical = json_decode(json_encode([
             $this->documentNormalizer->normalize($document?->getStructure() ?? []),
-            $this->sortKeys($props),
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $props,
+        ], JSON_THROW_ON_ERROR), true);
+
+        return hash('sha256', json_encode($this->sortKeys($canonical), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -352,7 +355,9 @@ final readonly class DocumentService implements PagePublisherInterface
                 if ($stored) {
                     // Read under the lock: what another editor committed meanwhile.
                     $this->entityManager->refresh($translation);
+                    // Decide first, apply after: a refused save leaves the entity as stored (the host manager stays clean).
                     $conflicts = [];
+                    $apply     = [];
                     foreach (self::SEO_FIELDS as $field) {
                         $stored = $translation->{'get' . ucfirst($field)}();
                         if ($posted[$field] === $stored) {
@@ -360,7 +365,7 @@ final readonly class DocumentService implements PagePublisherInterface
                         }
                         if (!array_key_exists($field, $originals)) {
                             // What the form showed is unknown: the posted value is the editor's.
-                            $this->setSeoField($translation, $field, $posted[$field]);
+                            $apply[$field] = $posted[$field];
 
                             continue;
                         }
@@ -373,10 +378,13 @@ final readonly class DocumentService implements PagePublisherInterface
 
                             continue;
                         }
-                        $this->setSeoField($translation, $field, $posted[$field]);
+                        $apply[$field] = $posted[$field];
                     }
                     if ($conflicts !== []) {
                         throw new PageStaleEditException('seo', null, $conflicts);
+                    }
+                    foreach ($apply as $field => $value) {
+                        $this->setSeoField($translation, $field, $value);
                     }
                 } else {
                     $page->addTranslation($translation);
@@ -386,6 +394,15 @@ final readonly class DocumentService implements PagePublisherInterface
             });
         } catch (Throwable $e) {
             $this->transaction?->replaceClosedManager();
+            if ($stored && $this->entityManager->isOpen() && $this->entityManager->contains($translation)) {
+                // Safety net: whatever failed, the translation goes back to the stored row, so a later flush of the host
+                // manager cannot write half of this save.
+                try {
+                    $this->entityManager->refresh($translation);
+                } catch (Throwable) {
+                    // The original failure is the one to report.
+                }
+            }
 
             throw $e;
         }

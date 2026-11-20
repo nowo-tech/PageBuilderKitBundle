@@ -210,8 +210,7 @@ make down-db
 - **Labels of a content field: the later save wins.** The content form refuses a field *value* another editor changed
   to another value, but the per-locale label of the same field is still last write wins (the other fields stay).
 - **The stale check is per document.** Two editors working on different widgets of the same canvas page are refused
-  too (the canvas sends the whole document): the second one reloads and applies the change again. 
-  snapshot keeps both versions.
+  too (the canvas sends the whole document): the second one reloads and applies the change again.
 - **Commit detection covers the bundle's connection** (and every connection when transaction-doctrine's
   `commit_detection` is on). A write of yours on another connection before the bundle's controller fails is not
   counted without transaction-doctrine's bundle.

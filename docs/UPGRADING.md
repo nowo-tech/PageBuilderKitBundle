@@ -61,6 +61,9 @@ yourself, run `assets:install` again.
   you call `POST /pages/{pageKey}/document` from your own client, send `baseToken` (the `token` of
   `GET /pages/{pageKey}/document`) to get the same protection; without it the save replaces the document as before.
   A client that treats every non-200 answer of the save as failure needs no change.
+- **Classic sections editor template override:** the stale check needs the hidden `base_token` field of the form. If you
+  override `sections.html.twig` and do not render it (`form_rest`, or `{{ form_widget(form.base_token) }}`), the check
+  fails open: the save has no token and replaces the document as before. Render it to get the protection.
 - `DocumentService::saveDocument()` has a new optional fourth argument `?string $baseToken = null`. If you decorate or
   mock the service, add it. `DocumentService::documentToken()` and `saveTranslation()` are new.
 - The SEO form now saves field by field. If you override `seo.html.twig`, keep rendering the unrendered rest of the form

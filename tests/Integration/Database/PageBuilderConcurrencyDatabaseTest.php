@@ -401,6 +401,34 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     }
 
     /**
+     * The token of a save answer is the one the next save finds under the lock, whatever the database does to the stored
+     * JSON (MySQL re-orders object keys): save, then save again with the answer token gives 200 twice.
+     */
+    #[DataProvider('databases')]
+    public function testTheTokenOfASaveAnswerIsTheOneTheNextSaveFinds(string $env): void
+    {
+        $this->boot($env, lockWait: 8);
+        $this->documents->saveDocument($this->documents->createPage('tok', 'Tok', 'en'), $this->grapes('<p>v1</p>'), []);
+        $this->em->clear();
+        $structure = $this->grapes('<p>v2</p>');
+        // Keys in an order MySQL's JSON type does not keep, nested, and locales in reverse order.
+        $structure['grapes']        = ['zeta' => 1, 'pages' => [['name' => 'p', 'frames' => [['z' => 1, 'a' => 2]]]], 'assets' => [], 'alpha' => ['y' => 1, 'b' => 2]];
+        $structure['localeContent'] = ['es' => ['html' => 's', 'css' => '', 'grapes' => ['k' => 1, 'b' => 2]], 'en' => ['html' => 'e', 'css' => '', 'grapes' => []]];
+
+        $token = $this->decode($this->handle(Request::create(self::ADMIN . '/pages/tok/document')))['token'];
+        for ($i = 1; $i <= 3; ++$i) {
+            $structure['html'] = '<p>save ' . $i . '</p>';
+            $response          = $this->handle($this->jsonRequest(self::ADMIN . '/pages/tok/document', ['structure' => $structure, 'widgetPropsByLocale' => [], 'baseToken' => $token]));
+            self::assertSame(200, $response->getStatusCode(), 'save ' . $i . ': ' . $response->getContent());
+            $token = $this->decode($response)['token'];
+            $this->em->clear();
+        }
+
+        $fresh = $this->decode($this->handle(Request::create(self::ADMIN . '/pages/tok/document')))['token'];
+        self::assertSame($fresh, $token, 'the answer token is the stored document\'s token');
+    }
+
+    /**
      * Rule 4, same field: two editors change the same content field to different values. The one who saves second is
      * refused (flash and redirect, nothing written); the first one's value stays.
      */
