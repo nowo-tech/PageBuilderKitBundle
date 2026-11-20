@@ -16,7 +16,6 @@ use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
 use Nowo\TransactionDoctrine\HostFlushProbe;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 use function crc32;
@@ -127,15 +126,47 @@ final class PageBuilderTransactionHostFlushProbeTest extends TestCase
         self::assertSame([], $this->deprecations);
     }
 
-    public function testAFailingProbeIsLoggedAndNeverBreaksTheWrite(): void
+    /**
+     * transaction-doctrine >= 1.9.1 catches its own inspection failures (a broken unit of work): nothing is reported and
+     * the write goes on. The bundle's own guard around the probe call stays for a probe that throws anyway.
+     */
+    public function testABrokenUnitOfWorkIsTheProbesOwnFailureAndTheWriteGoesOn(): void
     {
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getUnitOfWork')->willThrowException(new RuntimeException('broken unit of work'));
         $em->expects(self::once())->method('flush');
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects(self::once())->method('warning')->with('Page builder: the host-flush probe failed; the write goes on.', self::callback(static fn (array $context): bool => $context['exception'] === RuntimeException::class));
 
-        new PageBuilderTransaction($em, logger: $logger, hostFlushProbe: new HostFlushProbe())->commit();
+        new PageBuilderTransaction($em, hostFlushProbe: new HostFlushProbe())->commit();
+
+        self::assertSame([], $this->deprecations);
+    }
+
+    /**
+     * Audit XD-8: with transaction-doctrine's shared probe, reset by that bundle at the same boundaries, the bundle
+     * never resets it (what other bundles reported in the unit of work stays reported).
+     */
+    public function testASharedProbeIsNeverResetByTheBundle(): void
+    {
+        $em          = $this->entityManager();
+        $probe       = new HostFlushProbe();
+        $transaction = new PageBuilderTransaction($em, hostFlushProbe: $probe, resetsHostFlushProbe: false);
+        $em->persist(new HostNote('other bundle'));
+        $probe->beforeHostFlush($em, 'OtherBundle', ['Other\\Entity']);
+        $em->persist(new HostNote('first'));
+        $transaction->commit();
+        self::assertCount(2, $this->deprecations);
+
+        $transaction->onBoundary();
+        $transaction->reset();
+        $em->persist(new HostNote('second'));
+        $transaction->commit();
+        $probe->beforeHostFlush($em, 'OtherBundle', ['Other\\Entity']);
+        self::assertCount(2, $this->deprecations, 'the shared probe was not reset by the bundle');
+
+        $probe->reset(); // transaction-doctrine's boundary
+        $em->persist(new HostNote('third'));
+        $transaction->commit();
+        self::assertCount(3, $this->deprecations);
     }
 
     private function page(string $key): BuilderPage

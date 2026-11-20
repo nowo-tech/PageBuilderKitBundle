@@ -102,6 +102,10 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      * @param HostFlushProbe|null $hostFlushProbe 1.19: set only while `doctrine.private_entity_manager` is unset on the
      *                                            default (host) manager: reports the application's pending changes
      *                                            right before each bundle flush of that manager (read-only)
+     * @param bool $resetsHostFlushProbe 1.19 (audit XD-8): whether this service resets the probe at its outermost
+     *                                   boundaries and on reset(). False when the probe is transaction-doctrine's shared
+     *                                   one and that bundle resets it at the same boundaries: the bundle then never
+     *                                   clears what other bundles reported in the same unit of work
      */
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -116,6 +120,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         private readonly bool $ownsEntityManager = false,
         private readonly ?TransactionRunnerInterface $runner = null,
         private readonly ?HostFlushProbe $hostFlushProbe = null,
+        private readonly bool $resetsHostFlushProbe = true,
     ) {
     }
 
@@ -389,7 +394,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
             if ($outermost) {
                 $this->discardUnflushed();
                 // 1.19: a new unit of work reports its classes again (also without transaction-doctrine's bundle).
-                $this->hostFlushProbe?->reset();
+                $this->resetHostFlushProbe();
             }
         }
     }
@@ -416,7 +421,7 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         $this->unflushed = [];
         $this->runDepth  = 0;
         $this->outbox->reset();
-        $this->hostFlushProbe?->reset();
+        $this->resetHostFlushProbe();
     }
 
     /**
@@ -438,6 +443,14 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
                 'bundle'    => self::BUNDLE_NAME,
                 'exception' => $e::class,
             ]);
+        }
+    }
+
+    /** The bundle's own probe only: transaction-doctrine resets its shared probe itself (audit XD-8). */
+    private function resetHostFlushProbe(): void
+    {
+        if ($this->resetsHostFlushProbe) {
+            $this->hostFlushProbe?->reset();
         }
     }
 
