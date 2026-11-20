@@ -37,9 +37,8 @@ final class PageBuilderPrivateEntityManagerPass implements CompilerPassInterface
             return;
         }
 
-        $source = $container->hasParameter(NowoPageBuilderKitExtension::PRIVATE_SOURCE_MANAGER_PARAMETER)
-            ? $container->getParameter(NowoPageBuilderKitExtension::PRIVATE_SOURCE_MANAGER_PARAMETER)
-            : null;
+        // Set with the middleware by the extension ('' until resolved here).
+        $source = $container->getParameter(NowoPageBuilderKitExtension::PRIVATE_SOURCE_MANAGER_PARAMETER);
         if (!is_string($source) || $source === '') {
             $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
             $container->setParameter(NowoPageBuilderKitExtension::PRIVATE_SOURCE_MANAGER_PARAMETER, is_string($default) && $default !== '' ? $default : 'default');
