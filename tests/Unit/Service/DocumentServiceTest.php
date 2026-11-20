@@ -23,6 +23,7 @@ use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
+use Nowo\PageBuilderKitBundle\Service\PageStaleEditException;
 use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
 use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
 use Nowo\PageBuilderKitBundle\Widget\Type\ContainerWidgetType;
@@ -32,6 +33,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
+use RuntimeException;
 
 #[CoversClass(DocumentService::class)]
 final class DocumentServiceTest extends TestCase
@@ -98,6 +101,267 @@ final class DocumentServiceTest extends TestCase
         $this->expectExceptionMessage('Page key "home" already exists.');
 
         $service->createPage('home', 'Home', 'es');
+    }
+
+    #[Test]
+    public function documentTokenIsStableAndChangesWithTheStoredContent(): void
+    {
+        $service = $this->createService();
+        $page    = new BuilderPage()->setPageKey('home');
+        $empty   = $service->documentToken($page);
+        self::assertSame($empty, $service->documentToken($page), 'a page without a document has a stable token');
+
+        $document = new BuilderDocument()->setPage($page)->setStructure(['version' => 2, 'engine' => 'grapesjs', 'html' => '<p>a</p>', 'css' => '', 'grapes' => [], 'localeContent' => [], 'fields' => [], 'fieldValues' => []]);
+        $document->upsertLocale('es', ['b' => ['z' => 1, 'a' => 2], 'list' => [1, 2]]);
+        $document->upsertLocale('en', []);
+        $token = $service->documentToken($page);
+        self::assertNotSame($empty, $token);
+
+        // Same content, keys in another order: same token.
+        $other = new BuilderPage()->setPageKey('home');
+        $copy  = new BuilderDocument()->setPage($other)->setStructure($document->getStructure());
+        $copy->upsertLocale('en', []);
+        $copy->upsertLocale('es', ['list' => [1, 2], 'b' => ['a' => 2, 'z' => 1]]);
+        self::assertSame($token, $service->documentToken($other));
+
+        $document->setStructure([...$document->getStructure(), 'html' => '<p>b</p>']);
+        self::assertNotSame($token, $service->documentToken($page));
+    }
+
+    #[Test]
+    public function saveDocumentWithAStaleTokenWritesNothing(): void
+    {
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('persist');
+        $em->expects(self::never())->method('flush');
+        $service = $this->createService(null, $em);
+        $page    = new BuilderPage()->setPageKey('home');
+        $current = $service->documentToken($page);
+
+        try {
+            $service->saveDocument($page, $this->grapesStructure(), [], 'not-the-current-token');
+            self::fail('A stale token must be refused.');
+        } catch (PageStaleEditException $stale) {
+            self::assertSame('document', $stale->scope);
+            self::assertSame($current, $stale->current);
+        }
+    }
+
+    #[Test]
+    public function saveDocumentWithTheCurrentTokenSaves(): void
+    {
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
+        $em->expects(self::once())->method('flush');
+        $service = $this->createService(null, $em);
+        $page    = new BuilderPage()->setPageKey('home');
+
+        $service->saveDocument($page, $this->grapesStructure(), [], $service->documentToken($page));
+
+        self::assertInstanceOf(BuilderDocument::class, $page->getDocument());
+    }
+
+    #[Test]
+    public function saveTranslationWritesAChangedFieldAndKeepsAnotherEditorsField(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        // The refresh under the lock reads what another editor stored meanwhile: the meta title.
+        $em->expects(self::exactly(2))->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t): void {
+            $t->setTitle('Title')->setMetaTitle('Meta of B');
+        });
+        $em->expects(self::once())->method('flush');
+        // The form changed the title and posted the old meta title back.
+        $translation->setTitle('Title of A')->setMetaTitle('Meta');
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title', 'metaTitle' => 'Meta', 'slug' => 'title']);
+
+        self::assertSame('Title of A', $translation->getTitle());
+        self::assertSame('Meta of B', $translation->getMetaTitle(), 'the unchanged field keeps the stored value');
+    }
+
+    #[Test]
+    public function saveTranslationRefusesAFieldAnotherEditorChangedToAnotherValue(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t): void {
+            $t->setMetaTitle('Meta of B');
+        });
+        $em->expects(self::never())->method('flush');
+        $translation->setMetaTitle('Meta of A');
+
+        try {
+            $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title', 'metaTitle' => 'Meta', 'slug' => 'title']);
+            self::fail('A same-field conflict must be refused.');
+        } catch (PageStaleEditException $stale) {
+            self::assertSame('seo', $stale->scope);
+            self::assertSame(['metaTitle'], $stale->fields);
+        }
+    }
+
+    #[Test]
+    public function saveTranslationAcceptsAFieldAnotherEditorAlreadySetToTheSameValue(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t): void {
+            $t->setMetaTitle('Same');
+        });
+        $em->expects(self::once())->method('flush');
+        $translation->setMetaTitle('Same');
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title', 'metaTitle' => 'Meta', 'slug' => 'title']);
+
+        self::assertSame('Same', $translation->getMetaTitle());
+    }
+
+    #[Test]
+    public function saveTranslationWritesTheFieldsWhoseOriginalIsUnknown(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t): void {
+            $t->setTitle('Title')->setMetaTitle('Meta of B');
+        });
+        $em->expects(self::once())->method('flush');
+        $translation->setTitle('Title of A')->setMetaTitle('Meta of A');
+
+        // No originals at all (an old form): the posted values are the editor's.
+        $this->createService(null, $em)->saveTranslation($page, $translation);
+
+        self::assertSame('Title of A', $translation->getTitle());
+        self::assertSame('Meta of A', $translation->getMetaTitle());
+    }
+
+    #[Test]
+    public function saveTranslationWritesEveryChangedFieldOfTheForm(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t): void {
+            // The stored row: what the form was built from.
+            $t->setTitle('Title')->setSlug('title')->setMetaTitle('Meta')->setMetaDescription(null)->setOgTitle(null)->setOgDescription(null)->setOgImage(null)->setCanonicalUrl(null)->setRobots(null);
+        });
+        $em->expects(self::once())->method('flush');
+        $translation->setTitle('T')->setSlug('s')->setMetaTitle('M')->setMetaDescription('MD')->setOgTitle('OT')->setOgDescription('OD')->setOgImage('OI')->setCanonicalUrl('CU')->setRobots('R');
+        $shown = ['title' => 'Title', 'slug' => 'title', 'metaTitle' => 'Meta', 'metaDescription' => null, 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null, 'canonicalUrl' => null, 'robots' => null];
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, $shown);
+
+        self::assertSame(['T', 's', 'M', 'MD', 'OT', 'OD', 'OI', 'CU', 'R'], [
+            $translation->getTitle(), $translation->getSlug(), $translation->getMetaTitle(), $translation->getMetaDescription(), $translation->getOgTitle(),
+            $translation->getOgDescription(), $translation->getOgImage(), $translation->getCanonicalUrl(), $translation->getRobots(),
+        ]);
+    }
+
+    #[Test]
+    public function aRefusedSeoSaveAppliesNoneOfItsOtherFields(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $calls                = 0;
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('isOpen')->willReturn(true);
+        // The two reads (before the unit, under the lock) give the stored row; the safety-net refresh does nothing, so
+        // only the order "decide first, apply after" keeps the title as stored.
+        $em->method('refresh')->willReturnCallback(static function (BuilderPageTranslation $t) use (&$calls): void {
+            if (++$calls <= 2) {
+                $t->setTitle('Title')->setMetaTitle('Meta of B')->setOgTitle(null);
+            }
+        });
+        $em->expects(self::never())->method('flush');
+        $translation->setTitle('Title of A')->setMetaTitle('Meta of A')->setOgTitle('OG of A');
+
+        try {
+            // title (earlier field) is a clean change, metaTitle (later) conflicts, ogTitle (later still) is clean.
+            $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title', 'slug' => 'title', 'metaTitle' => 'Meta', 'ogTitle' => null]);
+            self::fail('A same-field conflict must be refused.');
+        } catch (PageStaleEditException $stale) {
+            self::assertSame(['metaTitle'], $stale->fields);
+        }
+
+        self::assertSame('Title', $translation->getTitle(), 'a refused save applies none of its fields');
+        self::assertNull($translation->getOgTitle());
+        self::assertSame(3, $calls, 'the safety net refreshes the stored row after a failure');
+    }
+
+    #[Test]
+    public function aFailedSeoFlushWithAFailingSafetyRefreshStillReportsTheFlushError(): void
+    {
+        [$page, $translation] = $this->pageWithStoredTranslation();
+        $calls                = 0;
+        $em                   = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->method('isOpen')->willReturn(true);
+        $em->method('refresh')->willReturnCallback(static function () use (&$calls): void {
+            if (++$calls > 2) {
+                throw new RuntimeException('refresh failed');
+            }
+        });
+        $em->method('flush')->willThrowException(new RuntimeException('flush failed'));
+
+        $this->expectExceptionMessage('flush failed');
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'Title']);
+    }
+
+    #[Test]
+    public function documentTokenIgnoresTheKeyOrderOfTheStructure(): void
+    {
+        $service = $this->createService();
+        $make    = static function (array $structure, array $locales): BuilderPage {
+            $page = new BuilderPage()->setPageKey('home');
+            new BuilderDocument()->setPage($page)->setStructure($structure);
+            foreach ($locales as $locale => $props) {
+                $page->getDocument()?->upsertLocale($locale, $props);
+            }
+
+            return $page;
+        };
+        $a = ['version' => 2, 'engine' => 'grapesjs', 'html' => '', 'css' => '', 'grapes' => ['pages' => [['name' => 'x', 'frames' => [1, 2]]], 'assets' => []], 'localeContent' => ['en' => ['html' => 'e', 'css' => ''], 'es' => ['html' => 's', 'css' => '']], 'fields' => [], 'fieldValues' => []];
+        $b = ['fieldValues' => [], 'fields' => [], 'localeContent' => ['es' => ['css' => '', 'html' => 's'], 'en' => ['css' => '', 'html' => 'e']], 'grapes' => ['assets' => [], 'pages' => [['frames' => [1, 2], 'name' => 'x']]], 'css' => '', 'html' => '', 'engine' => 'grapesjs', 'version' => 2];
+
+        self::assertSame($service->documentToken($make($a, [])), $service->documentToken($make($b, [])));
+
+        $c                                 = $b;
+        $c['grapes']['pages'][0]['frames'] = [2, 1];
+        self::assertNotSame($service->documentToken($make($a, [])), $service->documentToken($make($c, [])), 'list order is content');
+    }
+
+    #[Test]
+    public function saveTranslationOfANewTranslationIsPersistedAsPosted(): void
+    {
+        $page        = new BuilderPage()->setPageKey('home');
+        $translation = new BuilderPageTranslation()->setLocale('en')->setTitle('New')->setSlug('new')->setPage($page);
+        $em          = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('refresh');
+        $em->expects(self::once())->method('persist')->with($page);
+        $em->expects(self::once())->method('flush');
+
+        $this->createService(null, $em)->saveTranslation($page, $translation, ['title' => 'x']);
+
+        self::assertSame('New', $translation->getTitle());
+        self::assertSame($translation, $page->getTranslation('en'), 'the unit adds the new translation to the page');
+    }
+
+    #[Test]
+    public function saveTranslationRethrowsAFailedFlush(): void
+    {
+        $page        = new BuilderPage()->setPageKey('home');
+        $translation = new BuilderPageTranslation()->setLocale('en')->setTitle('New')->setSlug('new');
+        $page->addTranslation($translation);
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('flush')->willThrowException(new RuntimeException('flush failed'));
+
+        $this->expectException(RuntimeException::class);
+
+        $this->createService(null, $em)->saveTranslation($page, $translation);
     }
 
     #[Test]
@@ -794,6 +1058,27 @@ final class DocumentServiceTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function grapesStructure(): array
+    {
+        return ['version' => 2, 'engine' => 'grapesjs', 'html' => '<p>x</p>', 'css' => '', 'grapes' => [], 'localeContent' => [], 'fields' => [], 'fieldValues' => []];
+    }
+
+    /**
+     * @return array{0: BuilderPage, 1: BuilderPageTranslation}
+     */
+    private function pageWithStoredTranslation(): array
+    {
+        $page        = new BuilderPage()->setPageKey('home');
+        $translation = new BuilderPageTranslation()->setLocale('en')->setTitle('Title')->setSlug('title')->setMetaTitle('Meta');
+        $page->addTranslation($translation);
+        new ReflectionProperty(BuilderPageTranslation::class, 'id')->setValue($translation, 7);
+
+        return [$page, $translation];
     }
 
     private function createService(

@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.18.0](#to-1180)
 - [To 1.17.0](#to-1170)
   - [Concurrency (REQ-RUNTIME-003)](#concurrency-req-runtime-003)
 - [To 1.16.1](#to-1161)
@@ -52,6 +53,33 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.18.0
+
+From **1.17.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
+
+No migration and no new requirement. The page builder assets are rebuilt (`page-builder-canvas.js`): if you publish them
+yourself, run `assets:install` again.
+
+- **Canvas and classic sections editor** now refuse a save from a document another editor saved since it was loaded
+  (409 `PAGE_BUILDER_STALE_EDIT` in JSON; flash and redirect in the classic editor). Nothing to change in your code. If
+  you call `POST /pages/{pageKey}/document` from your own client, send `baseToken` (the `token` of
+  `GET /pages/{pageKey}/document`) to get the same protection; without it the save replaces the document as before.
+  A client that treats every non-200 answer of the save as failure needs no change.
+- **Classic sections editor template override:** the stale check needs the hidden `base_token` field of the form. If you
+  override `sections.html.twig` and do not render it (`form_rest`, or `{{ form_widget(form.base_token) }}`), the check
+  fails open: the save has no token and replaces the document as before. Render it to get the protection.
+- `DocumentService::saveDocument()` has a new optional fourth argument `?string $baseToken = null`. If you decorate or
+  mock the service, add it. `DocumentService::documentToken()` and `saveTranslation()` are new.
+- The SEO form now saves field by field. If you override `seo.html.twig`, keep rendering the unrendered rest of the form
+  (`form_rest` / the parent block) so the hidden `originals` field is posted; without it every field counts as changed
+  (the earlier behaviour).
+- `PageCanvasController` takes `DocumentService` as a new last constructor argument (autowired; only a decorator that
+  builds it by hand is affected).
 
 ## To 1.17.0
 

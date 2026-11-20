@@ -89,7 +89,9 @@ final readonly class ContentFieldsService
      * - `$originalsByLocale`: locale => key => {@see valueFingerprints()} of the value the form showed. A rendered key
      *   whose posted value (normalised) equals what was shown is not written, so a value another editor saved
      *   meanwhile stays. A rendered `bool` missing from the post is false (unchecked checkboxes are not posted); a
-     *   `bool` the form never rendered is left alone. A posted key with no original is written as posted.
+     *   `bool` the form never rendered is left alone. A posted key with no original is written as posted. A key the
+     *   editor changed, whose stored value another editor changed meanwhile to something else than the posted value
+     *   (1.18, same field), is not overwritten: the save is refused as a whole.
      * - `$labels` / `$labelOriginals`: key => label for `$labelLocale` as submitted / as shown. A label is written only
      *   when it is not blank and differs from the one shown (no original: written when not blank).
      *
@@ -97,6 +99,8 @@ final readonly class ContentFieldsService
      * @param array<string, array<string, string>> $originalsByLocale
      * @param array<string, string> $labels
      * @param array<string, string> $labelOriginals
+     *
+     * @throws PageStaleEditException with the `locale.key` of the fields another editor changed to another value
      */
     public function mergeValues(BuilderPage $page, array $postedByLocale, array $originalsByLocale = [], string $labelLocale = '', array $labels = [], array $labelOriginals = []): void
     {
@@ -104,6 +108,7 @@ final readonly class ContentFieldsService
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
             $values    = $this->contentFieldsNormalizer->normalizeValues($structure['fieldValues'] ?? [], $schema);
+            $conflicts = [];
 
             foreach ($postedByLocale + array_fill_keys(array_keys($originalsByLocale), []) as $locale => $bag) {
                 $originals = $originalsByLocale[$locale] ?? [];
@@ -114,12 +119,23 @@ final readonly class ContentFieldsService
                 }
 
                 $normalized = $this->contentFieldsNormalizer->normalizeValues([$locale => $bag], $schema)[$locale] ?? [];
+                $stored     = $this->valueFingerprints($schema, $values[$locale] ?? []);
                 foreach ($bag as $key => $value) {
                     if (isset($originals[$key]) && array_key_exists($key, $normalized) && $this->fingerprint($normalized[$key]) === $originals[$key]) {
                         continue;
                     }
+                    // Rule 4, same field: another editor stored another value than the one this form showed, and not the
+                    // one being posted: refuse the whole save instead of replacing their value.
+                    if (isset($originals[$key], $stored[$key]) && $stored[$key] !== $originals[$key] && (!array_key_exists($key, $normalized) || $this->fingerprint($normalized[$key]) !== $stored[$key])) {
+                        $conflicts[] = $locale . '.' . $key;
+
+                        continue;
+                    }
                     $values[$locale][$key] = $value;
                 }
+            }
+            if ($conflicts !== []) {
+                throw new PageStaleEditException('content', null, $conflicts);
             }
 
             $labelsChanged = false;

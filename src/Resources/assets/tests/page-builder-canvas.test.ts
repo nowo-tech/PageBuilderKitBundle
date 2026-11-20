@@ -396,6 +396,37 @@ describe('boot', () => {
     expect(status.textContent).toBe('Unpublish failed');
   });
 
+  it('sends the document token, takes the new one and never publishes after a refused save', async () => {
+    const { grapesjs } = fakeGrapes();
+    mount({ showDevices: false, twig: { enabled: false } }, { version: 2, engine: 'grapesjs', html: '<p>en</p>', css: '', grapes: {}, localeContent: {} }, 'data-pbk-document-token="t1"');
+    await boot(importerFor(grapesjs));
+    const fetchMock = fetch as any;
+    const respond = (ok: boolean, data: unknown, status = 200): void => {
+      fetchMock.mockResolvedValueOnce({ ok, status, json: () => Promise.resolve(data) });
+    };
+    const status = document.querySelector('[data-pbk-status]') as HTMLElement;
+
+    respond(true, { ok: true, token: 't2' });
+    (document.querySelector('[data-pbk-action="save"]') as HTMLElement).click();
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).baseToken).toBe('t1');
+
+    // The next save carries the token the server answered.
+    respond(true, { ok: true });
+    (document.querySelector('[data-pbk-action="save"]') as HTMLElement).click();
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).baseToken).toBe('t2');
+
+    // Another editor saved first: the message of the answer is shown and publish stops before its own request.
+    respond(false, { error: 'stale_edit', code: 'PAGE_BUILDER_STALE_EDIT', message: 'Reload the page', token: 't9' }, 409);
+    (document.querySelector('[data-pbk-action="publish"]') as HTMLElement).click();
+    await flush();
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(status.textContent).toBe('Reload the page');
+    expect(status.getAttribute('data-pbk-state')).toBe('error');
+  });
+
   it('reports missing URLs and loads empty locales', async () => {
     const { editor, grapesjs } = fakeGrapes();
     editor.stopCommand.mockImplementation(() => { throw new Error('no command'); });

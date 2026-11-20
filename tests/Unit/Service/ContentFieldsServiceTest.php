@@ -16,6 +16,7 @@ use Nowo\PageBuilderKitBundle\Service\ContentFieldsNormalizer;
 use Nowo\PageBuilderKitBundle\Service\ContentFieldsService;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
+use Nowo\PageBuilderKitBundle\Service\PageStaleEditException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -127,6 +128,52 @@ final class ContentFieldsServiceTest extends TestCase
         $structure = $page->getDocument()?->getStructure() ?? [];
         self::assertSame('Go', $structure['fieldValues']['es']['cta']);
         self::assertSame('Llamada', $structure['fields'][0]['labels']['es'] ?? null);
+    }
+
+    #[Test]
+    public function mergeValuesRefusesAFieldAnotherEditorChangedToAnotherValue(): void
+    {
+        $svc   = $this->service();
+        $page  = $this->pageWithDocument(['fields' => [['key' => 'headline', 'type' => 'string', 'label' => 'Headline'], ['key' => 'lead', 'type' => 'string', 'label' => 'Lead']], 'fieldValues' => ['en' => ['headline' => 'Headline of B']]]);
+        $shown = $svc->valueFingerprints([['key' => 'headline', 'type' => 'string'], ['key' => 'lead', 'type' => 'string']], ['headline' => 'Old']);
+
+        try {
+            $svc->mergeValues($page, ['en' => ['headline' => 'Headline of A', 'lead' => 'Lead of A']], ['en' => $shown]);
+            self::fail('A stale same-field save must be refused.');
+        } catch (PageStaleEditException $stale) {
+            self::assertSame('content', $stale->scope);
+            self::assertSame(['en.headline'], $stale->fields);
+        }
+
+        $stored = $page->getDocument()?->getStructure() ?? [];
+        self::assertSame('Headline of B', $stored['fieldValues']['en']['headline']);
+        self::assertArrayNotHasKey('lead', $stored['fieldValues']['en'], 'nothing of the refused save is written');
+    }
+
+    #[Test]
+    public function mergeValuesAcceptsAFieldAnotherEditorAlreadyChangedToTheSameValue(): void
+    {
+        $svc    = $this->service();
+        $schema = [['key' => 'headline', 'type' => 'string', 'label' => 'Headline']];
+        $page   = $this->pageWithDocument(['fields' => $schema, 'fieldValues' => ['en' => ['headline' => 'Same']]]);
+        $shown  = $svc->valueFingerprints($schema, ['headline' => 'Old']);
+
+        $svc->mergeValues($page, ['en' => ['headline' => 'Same']], ['en' => $shown]);
+
+        self::assertSame('Same', ($page->getDocument()?->getStructure() ?? [])['fieldValues']['en']['headline']);
+    }
+
+    #[Test]
+    public function mergeValuesWritesAChangedFieldNobodyElseTouched(): void
+    {
+        $svc    = $this->service();
+        $schema = [['key' => 'headline', 'type' => 'string', 'label' => 'Headline']];
+        $page   = $this->pageWithDocument(['fields' => $schema, 'fieldValues' => ['en' => ['headline' => 'Old']]]);
+        $shown  = $svc->valueFingerprints($schema, ['headline' => 'Old']);
+
+        $svc->mergeValues($page, ['en' => ['headline' => 'New']], ['en' => $shown]);
+
+        self::assertSame('New', ($page->getDocument()?->getStructure() ?? [])['fieldValues']['en']['headline']);
     }
 
     #[Test]
