@@ -6,6 +6,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 
 - [Unreleased](#unreleased)
 - [To 1.19.0](#to-1190)
+- [To 1.19.0](#to-1190-1)
   - [The private entity manager notice](#the-private-entity-manager-notice)
   - [Reading the host-flush probe](#reading-the-host-flush-probe)
   - [Opting in: what changes](#opting-in-what-changes)
@@ -59,6 +60,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.19.0
+
+From **1.18.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 ## To 1.19.0
 
