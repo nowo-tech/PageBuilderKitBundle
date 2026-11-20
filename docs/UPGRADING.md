@@ -103,7 +103,7 @@ and its request commit mark. No schema change.
   label shown); `ContentFieldsService::mergeValues()` writes under the page lock only the values and labels that
   differ from what was shown. `saveSchemaWithField()` / `saveSchemaWithoutField()` apply one schema change to what is
   stored, and adding a key that exists is refused. If you override the content template, keep rendering the hidden
-  `fieldOriginals` and `labelOriginals` children (without them every posted value is written, as before). `saveValues()` and `saveSchema()` are unchanged
+  `fieldOriginals` and `labelOriginals` children (without them every posted non-boolean value is still written, as before, but an unchecked boolean checkbox cannot be told from an untouched field, so the form can no longer clear (uncheck) a boolean). `saveValues()` and `saveSchema()` are unchanged
   for your code (whole replacement, now one unit under the lock).
 - **Conflict listener priority.** `PageBuilderConflictListener` runs at `kernel.exception` priority 64, before the
   framework's error listener logs the exception; it still acts on the bundle's routes only.
