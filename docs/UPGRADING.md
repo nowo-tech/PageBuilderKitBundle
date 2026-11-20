@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.18.0](#to-1180)
 - [To 1.17.0](#to-1170)
   - [Concurrency (REQ-RUNTIME-003)](#concurrency-req-runtime-003)
 - [To 1.16.1](#to-1161)
@@ -52,6 +53,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 1.18.0
+
+From **1.17.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 No migration and no new requirement. The page builder assets are rebuilt (`page-builder-canvas.js`): if you publish them
 yourself, run `assets:install` again.
