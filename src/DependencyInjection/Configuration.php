@@ -44,7 +44,20 @@ final class Configuration implements ConfigurationInterface
         /** @var ArrayNodeDefinition $root */
         $root = $treeBuilder->getRootNode();
 
-        $root
+        $this->addConfigPart($root);
+        $this->addConflictResponseToHtmlSections($root);
+        $this->addRevisionsToDebugSections($root);
+        $this->addGrapesjsSection($root);
+
+        return $treeBuilder;
+    }
+
+    /**
+     * Adds a part of the tree.
+     */
+    private function addConfigPart(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode
             ->children()
                 ->scalarNode('default_locale')->defaultValue('es')->end()
                 ->arrayNode('locales')
@@ -135,6 +148,16 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+            ->end();
+    }
+
+    /**
+     * Adds the `conflict_response` to `html` settings.
+     */
+    private function addConflictResponseToHtmlSections(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode
+            ->children()
                 ->arrayNode('conflict_response')
                     ->info('1.17 (REQ-RUNTIME-003): answer of a lock conflict (deadlock, lock wait timeout, serialization failure) on the bundle\'s routes. Unset: nowo-tech/transaction-doctrine\'s conflict_response when that bundle is registered, else 409 with Retry-After 1.')
                     ->addDefaultsIfNotSet()
@@ -219,6 +242,16 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+            ->end();
+    }
+
+    /**
+     * Adds the `revisions` to `debug` settings.
+     */
+    private function addRevisionsToDebugSections(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode
+            ->children()
                 ->arrayNode('revisions')
                     ->addDefaultsIfNotSet()
                     ->info('Optional document version history (BuilderPageRevision snapshots).')
@@ -252,152 +285,188 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
-                ->arrayNode('grapesjs')
+            ->end();
+    }
+
+    /**
+     * Adds a part of the tree.
+     */
+    private function addGrapesjsPart(ArrayNodeDefinition $grapesjs): void
+    {
+        $grapesjs
+            ->children()
+                ->booleanNode('enabled')->defaultTrue()->end()
+                ->scalarNode('cdn_version')->defaultValue('0.22.9')->end()
+                ->scalarNode('module_base_url')
+                    ->defaultValue('https://esm.sh')
+                    ->info('ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src.')
+                    ->validate()
+                        ->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#^(https://[^/\s\\\\]+|/(?![/\\\\]))[^\s\\\\]*\z#', $v) !== 1)
+                        ->thenInvalid('grapesjs.module_base_url must be an https:// URL or a root-relative path (got %s).')
+                    ->end()
+                ->end()
+                ->scalarNode('height')->defaultValue('calc(100vh - 220px)')->end()
+                ->booleanNode('allow_scripts')
+                    ->defaultFalse()
+                    ->info('When true, GrapesJS custom script blocks may be persisted and rendered. XSS risk — keep false unless editors are fully trusted.')
+                ->end()
+                ->booleanNode('allow_custom_code')
+                    ->defaultTrue()
+                    ->info('Expose Custom HTML / grapesjs-custom-code plugin.')
+                ->end()
+                ->booleanNode('compound_examples')
+                    ->defaultTrue()
+                    ->info('Expose built-in compound example blocks (Hero, Feature grid, CTA, …).')
+                ->end()
+                ->booleanNode('a11y_helpers')
+                    ->defaultTrue()
+                    ->info('Expose accessibility traits (aria-*, role, alt) and landmark / skip-link blocks in GrapesJS.')
+                ->end()
+                ->booleanNode('show_devices')->defaultTrue()->end()
+                ->booleanNode('notice_on_unload')->defaultFalse()->end()
+                ->booleanNode('asset_embed_as_base64')->defaultTrue()->end()
+            ->end();
+    }
+
+    /**
+     * Adds the `assets_upload` to `canvas_styles` settings.
+     */
+    private function addGrapesjsAssetsUploadToCanvasStylesSections(ArrayNodeDefinition $grapesjs): void
+    {
+        $grapesjs
+            ->children()
+                ->arrayNode('assets_upload')
                     ->addDefaultsIfNotSet()
+                    ->info('GrapesJS Asset Manager upload to local disk or third-party storage (e.g. AWS S3).')
                     ->children()
-                        ->booleanNode('enabled')->defaultTrue()->end()
-                        ->scalarNode('cdn_version')->defaultValue('0.22.9')->end()
-                        ->scalarNode('module_base_url')
-                            ->defaultValue('https://esm.sh')
-                            ->info('ESM base the admin canvas imports GrapesJS (<base>/grapesjs@<cdn_version>) and its plugins from. Self-host a mirror (https:// URL or root-relative path) to drop the esm.sh dependency; allow it in script-src.')
-                            ->validate()
-                                ->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#^(https://[^/\s\\\\]+|/(?![/\\\\]))[^\s\\\\]*\z#', $v) !== 1)
-                                ->thenInvalid('grapesjs.module_base_url must be an https:// URL or a root-relative path (got %s).')
-                            ->end()
+                        ->booleanNode('enabled')->defaultFalse()->end()
+                        ->enumNode('storage')
+                            ->values(['local', 's3', 'service'])
+                            ->defaultValue('local')
+                            ->info('local = public filesystem; s3 = core/aws-s3-bundle helper; service = custom PageBuilderAssetUploadStorageInterface (or the deprecated PageBuilderAssetStorageInterface).')
                         ->end()
-                        ->scalarNode('height')->defaultValue('calc(100vh - 220px)')->end()
-                        ->booleanNode('allow_scripts')
-                            ->defaultFalse()
-                            ->info('When true, GrapesJS custom script blocks may be persisted and rendered. XSS risk — keep false unless editors are fully trusted.')
+                        ->scalarNode('service')
+                            ->defaultNull()
+                            ->info('Service id implementing PageBuilderAssetUploadStorageInterface (1.15) or the deprecated PageBuilderAssetStorageInterface when storage=service.')
                         ->end()
-                        ->booleanNode('allow_custom_code')
-                            ->defaultTrue()
-                            ->info('Expose Custom HTML / grapesjs-custom-code plugin.')
-                        ->end()
-                        ->booleanNode('compound_examples')
-                            ->defaultTrue()
-                            ->info('Expose built-in compound example blocks (Hero, Feature grid, CTA, …).')
-                        ->end()
-                        ->booleanNode('a11y_helpers')
-                            ->defaultTrue()
-                            ->info('Expose accessibility traits (aria-*, role, alt) and landmark / skip-link blocks in GrapesJS.')
-                        ->end()
-                        ->booleanNode('show_devices')->defaultTrue()->end()
-                        ->booleanNode('notice_on_unload')->defaultFalse()->end()
-                        ->booleanNode('asset_embed_as_base64')->defaultTrue()->end()
-                        ->arrayNode('assets_upload')
-                            ->addDefaultsIfNotSet()
-                            ->info('GrapesJS Asset Manager upload to local disk or third-party storage (e.g. AWS S3).')
-                            ->children()
-                                ->booleanNode('enabled')->defaultFalse()->end()
-                                ->enumNode('storage')
-                                    ->values(['local', 's3', 'service'])
-                                    ->defaultValue('local')
-                                    ->info('local = public filesystem; s3 = core/aws-s3-bundle helper; service = custom PageBuilderAssetUploadStorageInterface (or the deprecated PageBuilderAssetStorageInterface).')
-                                ->end()
-                                ->scalarNode('service')
-                                    ->defaultNull()
-                                    ->info('Service id implementing PageBuilderAssetUploadStorageInterface (1.15) or the deprecated PageBuilderAssetStorageInterface when storage=service.')
-                                ->end()
-                                ->integerNode('max_bytes')->defaultValue(5_242_880)->min(1)->end()
-                                ->arrayNode('allowed_mime')
-                                    ->info('Detected (finfo) MIME allowlist. image/svg+xml is not allowed by default: SVG served same-origin can run scripts (stored XSS); add it only with a CSP / separate asset origin.')
-                                    ->scalarPrototype()->end()
-                                    ->defaultValue([
-                                        'image/jpeg',
-                                        'image/png',
-                                        'image/gif',
-                                        'image/webp',
-                                    ])
-                                ->end()
-                                ->arrayNode('local')
-                                    ->addDefaultsIfNotSet()
-                                    ->children()
-                                        ->scalarNode('directory')
-                                            ->defaultValue('%kernel.project_dir%/public/uploads/page-builder')
-                                        ->end()
-                                        ->scalarNode('public_prefix')
-                                            ->defaultValue('/uploads/page-builder')
-                                        ->end()
-                                    ->end()
-                                ->end()
-                                ->arrayNode('s3')
-                                    ->addDefaultsIfNotSet()
-                                    ->children()
-                                        ->scalarNode('helper_service')
-                                            ->defaultValue('core_aws_s3.service.helper')
-                                            ->info('Service id of AwsS3Helper (or compatible).')
-                                        ->end()
-                                        ->scalarNode('folder')->defaultValue('page-builder')->end()
-                                        ->booleanNode('private')
-                                            ->defaultFalse()
-                                            ->info('false → public-read ACL for <img> URLs in canvas/public render.')
-                                        ->end()
-                                        ->scalarNode('public_base_url')
-                                            ->defaultValue('')
-                                            ->info('Optional CDN / CloudFront base URL prepended to the object key.')
-                                        ->end()
-                                    ->end()
-                                ->end()
-                            ->end()
-                        ->end()
-                        ->arrayNode('twig')
-                            ->addDefaultsIfNotSet()
-                            ->children()
-                                ->booleanNode('enabled')
-                                    ->defaultTrue()
-                                    ->info('Evaluate {{ Twig }} variables inside GrapesJS HTML on public render (sandboxed).')
-                                ->end()
-                                ->booleanNode('strict_variables')
-                                    ->defaultFalse()
-                                    ->info('When true, missing Twig variables throw; when false they render empty.')
-                                ->end()
-                                ->booleanNode('canvas_helpers')
-                                    ->defaultTrue()
-                                    ->info('Expose Twig variable insert blocks in the GrapesJS Block Manager.')
-                                ->end()
-                            ->end()
-                        ->end()
-                        ->arrayNode('canvas_styles')
+                        ->integerNode('max_bytes')->defaultValue(5_242_880)->min(1)->end()
+                        ->arrayNode('allowed_mime')
+                            ->info('Detected (finfo) MIME allowlist. image/svg+xml is not allowed by default: SVG served same-origin can run scripts (stored XSS); add it only with a CSP / separate asset origin.')
                             ->scalarPrototype()->end()
-                            ->defaultValue([])
-                            ->info('CSS URLs injected into the GrapesJS canvas iframe. Empty = derive from web_ui.css_framework.')
+                            ->defaultValue([
+                                'image/jpeg',
+                                'image/png',
+                                'image/gif',
+                                'image/webp',
+                            ])
                         ->end()
-                        ->arrayNode('assets')
-                            ->arrayPrototype()
-                                ->children()
-                                    ->scalarNode('type')->defaultValue('image')->end()
-                                    ->scalarNode('src')->isRequired()->end()
-                                    ->scalarNode('name')->defaultNull()->end()
-                                    ->integerNode('width')->defaultNull()->end()
-                                    ->integerNode('height')->defaultNull()->end()
-                                ->end()
-                            ->end()
-                            ->defaultValue([])
-                        ->end()
-                        ->arrayNode('plugins')
+                        ->arrayNode('local')
                             ->addDefaultsIfNotSet()
                             ->children()
-                                ->booleanNode('preset_webpage')->defaultTrue()->end()
-                                ->booleanNode('blocks_basic')->defaultTrue()->end()
-                                ->booleanNode('forms')->defaultTrue()->end()
-                                ->booleanNode('navbar')->defaultTrue()->end()
-                                ->booleanNode('countdown')->defaultTrue()->end()
-                                ->booleanNode('export')->defaultTrue()->end()
-                                ->booleanNode('tabs')->defaultTrue()->end()
-                                ->booleanNode('custom_code')->defaultTrue()->end()
-                                ->booleanNode('touch')->defaultTrue()->end()
-                                ->booleanNode('parser_postcss')->defaultTrue()->end()
-                                ->booleanNode('tooltip')->defaultTrue()->end()
-                                ->booleanNode('style_bg')->defaultTrue()->end()
-                                ->booleanNode('typed')->defaultTrue()->end()
-                                ->booleanNode('tui_image_editor')->defaultTrue()->end()
+                                ->scalarNode('directory')
+                                    ->defaultValue('%kernel.project_dir%/public/uploads/page-builder')
+                                ->end()
+                                ->scalarNode('public_prefix')
+                                    ->defaultValue('/uploads/page-builder')
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->arrayNode('s3')
+                            ->addDefaultsIfNotSet()
+                            ->children()
+                                ->scalarNode('helper_service')
+                                    ->defaultValue('core_aws_s3.service.helper')
+                                    ->info('Service id of AwsS3Helper (or compatible).')
+                                ->end()
+                                ->scalarNode('folder')->defaultValue('page-builder')->end()
+                                ->booleanNode('private')
+                                    ->defaultFalse()
+                                    ->info('false → public-read ACL for <img> URLs in canvas/public render.')
+                                ->end()
+                                ->scalarNode('public_base_url')
+                                    ->defaultValue('')
+                                    ->info('Optional CDN / CloudFront base URL prepended to the object key.')
+                                ->end()
                             ->end()
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('twig')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('enabled')
+                            ->defaultTrue()
+                            ->info('Evaluate {{ Twig }} variables inside GrapesJS HTML on public render (sandboxed).')
+                        ->end()
+                        ->booleanNode('strict_variables')
+                            ->defaultFalse()
+                            ->info('When true, missing Twig variables throw; when false they render empty.')
+                        ->end()
+                        ->booleanNode('canvas_helpers')
+                            ->defaultTrue()
+                            ->info('Expose Twig variable insert blocks in the GrapesJS Block Manager.')
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('canvas_styles')
+                    ->scalarPrototype()->end()
+                    ->defaultValue([])
+                    ->info('CSS URLs injected into the GrapesJS canvas iframe. Empty = derive from web_ui.css_framework.')
+                ->end()
             ->end();
+    }
 
-        return $treeBuilder;
+    /**
+     * Adds the `assets` to `plugins` settings.
+     */
+    private function addGrapesjsAssetsToPluginsSections(ArrayNodeDefinition $grapesjs): void
+    {
+        $grapesjs
+            ->children()
+                ->arrayNode('assets')
+                    ->arrayPrototype()
+                        ->children()
+                            ->scalarNode('type')->defaultValue('image')->end()
+                            ->scalarNode('src')->isRequired()->end()
+                            ->scalarNode('name')->defaultNull()->end()
+                            ->integerNode('width')->defaultNull()->end()
+                            ->integerNode('height')->defaultNull()->end()
+                        ->end()
+                    ->end()
+                    ->defaultValue([])
+                ->end()
+                ->arrayNode('plugins')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('preset_webpage')->defaultTrue()->end()
+                        ->booleanNode('blocks_basic')->defaultTrue()->end()
+                        ->booleanNode('forms')->defaultTrue()->end()
+                        ->booleanNode('navbar')->defaultTrue()->end()
+                        ->booleanNode('countdown')->defaultTrue()->end()
+                        ->booleanNode('export')->defaultTrue()->end()
+                        ->booleanNode('tabs')->defaultTrue()->end()
+                        ->booleanNode('custom_code')->defaultTrue()->end()
+                        ->booleanNode('touch')->defaultTrue()->end()
+                        ->booleanNode('parser_postcss')->defaultTrue()->end()
+                        ->booleanNode('tooltip')->defaultTrue()->end()
+                        ->booleanNode('style_bg')->defaultTrue()->end()
+                        ->booleanNode('typed')->defaultTrue()->end()
+                        ->booleanNode('tui_image_editor')->defaultTrue()->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    /**
+     * Adds the `grapesjs` section; its large children have their own methods.
+     */
+    private function addGrapesjsSection(ArrayNodeDefinition $rootNode): void
+    {
+        $grapesjs = $rootNode->children()->arrayNode('grapesjs');
+        $grapesjs
+            ->addDefaultsIfNotSet();
+        $this->addGrapesjsPart($grapesjs);
+        $this->addGrapesjsAssetsUploadToCanvasStylesSections($grapesjs);
+        $this->addGrapesjsAssetsToPluginsSections($grapesjs);
     }
 }
