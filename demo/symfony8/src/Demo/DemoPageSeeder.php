@@ -70,6 +70,9 @@ final class DemoPageSeeder
 
         $this->upsertTranslation($page, 'en', $case['title_en'], $pageKey);
         $this->upsertTranslation($page, 'es', $case['title_es'], $pageKey);
+        // The translation changes are flushed here (one plain flush): the write units below (saveDocument, publish)
+        // refuse to start while the entity manager holds unflushed changes (since 1.17, REQ-RUNTIME-003).
+        $this->documentService->flushPage($page);
         $this->applySeoDefaults($page, $case);
 
         if ($case['engine'] === 'classic') {
