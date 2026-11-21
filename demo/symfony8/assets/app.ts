@@ -1,4 +1,3 @@
-import './app.css';
 
 /**
  * Demo layout entry (Vite + TypeScript via Pentatrion / vite-plugin-symfony).

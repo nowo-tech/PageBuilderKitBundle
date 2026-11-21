@@ -8,52 +8,60 @@
     {% endif %}
 {% endblock %}
 
-{% block toolbar %}
-<div class="nowo-ui-toolbar">
-    <span class="nowo-ui-badge nowo-ui-badge--primary">{{ page_key }}</span>
-    {% if use_case is defined %}
-        <span class="nowo-ui-badge nowo-ui-badge--{{ use_case.engine == 'classic' ? 'warning' : 'neutral' }}">{{ use_case.engine }}</span>
-        {% if not use_case.publish %}<span class="nowo-ui-badge nowo-ui-badge--danger">draft</span>{% endif %}
-    {% endif %}
-    <strong>{{ page_title }}</strong>
-    <span class="nowo-ui-muted">· seed v{{ seed_version|default('?') }} · {{ page_tree.engine|default('classic') }} · {{ page_tree.status|default('') }}</span>
-    <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('showcase') }}">All use cases</a>
-    {% if use_case is defined and use_case.engine == 'classic' %}
-        <a class="nowo-ui-btn nowo-ui-btn--primary nowo-ui-btn--sm" href="{{ path('admin_page_builder_sections', {pageKey: page_key}) }}">Edit sections</a>
-    {% else %}
-        <a class="nowo-ui-btn nowo-ui-btn--primary nowo-ui-btn--sm" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">Edit in GrapesJS</a>
-    {% endif %}
-    {% if use_case is not defined or use_case.publish %}
-        <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">/p/{{ page_key }}</a>
-    {% endif %}
-    {% if page_tree.engine|default('') == 'classic' or (use_case is defined and use_case.engine == 'classic') %}
-        <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|default({})|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">
-            Switch {{ app.request.locale == 'es' ? 'EN' : 'ES' }} content
-        </a>
-    {% endif %}
-</div>
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}
+        <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('showcase') }}">All use cases</a>
+        {% if use_case is not defined or use_case.publish %}
+            <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('page_builder_public_render', {pageKey: page_key}) }}" target="_blank" rel="noopener">/p/{{ page_key }}</a>
+        {% endif %}
+        {% if page_tree.engine|default('') == 'classic' or (use_case is defined and use_case.engine == 'classic') %}
+            <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|default({})|merge(app.request.query.all)|merge({'_locale': app.request.locale == 'es' ? 'en' : 'es'})) }}">
+                Switch {{ app.request.locale == 'es' ? 'EN' : 'ES' }} content
+            </a>
+        {% endif %}
+        {% if use_case is defined and use_case.engine == 'classic' %}
+            <a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('admin_page_builder_sections', {pageKey: page_key}) }}">Edit sections</a>
+        {% else %}
+            <a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('admin_page_builder_canvas', {pageKey: page_key}) }}">Edit in GrapesJS</a>
+        {% endif %}
+    {% endset %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: page_title,
+        intro: 'Seed v' ~ seed_version|default('?') ~ ' · ' ~ page_tree.engine|default('classic') ~ (page_tree.status|default('') ? ' · ' ~ page_tree.status : ''),
+        toolbar: _toolbar,
+    }) }}
 {% endblock %}
 
 {% block body %}
-{% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
-{% if page_tree.engine|default('classic') == 'grapesjs' %}
-    {% if page_tree.html|default('') is empty %}
-        <div class="nowo-ui-flash nowo-ui-flash--info" role="note">
-            No GrapesJS content for <strong>{{ page_key }}</strong>.
-            Sign in (<code class="nowo-ui-code">admin</code>/<code class="nowo-ui-code">admin</code>) and open the canvas.
-        </div>
-    {% else %}
-        <div class="pbk-grapes-content">
-            {{ page_tree.html|pbk_harden_html }}
-        </div>
-    {% endif %}
-{% elseif page_tree.sections is empty %}
-    <div class="nowo-ui-flash nowo-ui-flash--info" role="note">No classic sections for <strong>{{ page_key }}</strong>.</div>
-{% else %}
-    <div class="pbk-classic-demo">
-        {% for section in page_tree.sections %}
-            {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
-        {% endfor %}
-    </div>
-{% endif %}
+    {% include '@NowoPageBuilderKitBundle/public/_edit_button.html.twig' with { page_tree: page_tree } %}
+    {% set _is_grapes = page_tree.engine|default('classic') == 'grapesjs' %}
+    {% set _is_empty = _is_grapes ? page_tree.html|default('') is empty : page_tree.sections is empty %}
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {
+        title: page_key,
+        kind: 'content',
+        testid: 'demo-page-render',
+        empty: _is_empty,
+        state_message: _is_grapes ? 'No GrapesJS content for ' ~ page_key ~ '. Sign in (admin / admin) and open the canvas.' : 'No classic sections for ' ~ page_key ~ '.',
+        page_tree: page_tree,
+        is_grapes: _is_grapes,
+        use_case: use_case|default(null),
+    } %}
+        {% block section_actions %}
+            <span class="nowo-ui-badge nowo-ui-badge--{{ is_grapes ? 'primary' : 'warning' }}">{{ page_tree.engine|default('classic') }}</span>
+            {% if use_case is not null and not use_case.publish %}<span class="nowo-ui-badge nowo-ui-badge--danger">draft</span>{% endif %}
+        {% endblock %}
+        {% block section_body %}
+            {% if is_grapes %}
+                <div class="pbk-grapes-content">
+                    {{ page_tree.html|pbk_harden_html }}
+                </div>
+            {% else %}
+                <div class="pbk-classic-demo">
+                    {% for section in page_tree.sections %}
+                        {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
 {% endblock %}

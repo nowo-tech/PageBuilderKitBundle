@@ -21,35 +21,15 @@ async function loginAsAdmin(page: import('@playwright/test').Page) {
   await expect(page).not.toHaveURL(/\/login$/);
 }
 
-/** Wait until the Web Debug Toolbar is visible and finished loading. */
-async function waitForWebProfiler(page: import('@playwright/test').Page) {
-  await page.waitForSelector('.sf-toolbar, .sf-minitoolbar', {
-    state: 'visible',
-    timeout: 20000,
-  }).catch(() => undefined);
-  const mini = page.locator('.sf-minitoolbar .sf-toolbar-icon, .sf-minitoolbar a').first();
-  if (await mini.isVisible().catch(() => false)) {
-    await mini.click();
-  }
-  await page.waitForFunction(
-    () => {
-      const bar = document.querySelector('.sf-toolbar') as HTMLElement | null;
-      if (!bar || bar.offsetParent === null) {
-        return true; // profiler optional in some envs
-      }
-      const text = (bar.textContent || '').replace(/\s+/g, ' ');
-      if (/Loading/i.test(text) && !/\b\d{3}\b/.test(text)) {
-        return false;
-      }
-      return !!document.querySelector('.sf-toolbar-block, .sf-toolbar-status');
-    },
-    { timeout: 25000 },
-  ).catch(() => undefined);
+/** The Symfony Web Debug Toolbar is dev chrome, not part of the demo platform: hide it before every capture. */
+async function hideWebProfiler(page: import('@playwright/test').Page) {
+  await page.addStyleTag({ content: '.sf-toolbar,.sf-minitoolbar,[id^="sfwdt"]{display:none!important}' });
+  await expect(page.locator('[data-testid="demo-platform"]')).toBeVisible();
   await new Promise((r) => setTimeout(r, 400));
 }
 
 async function shot(page: import('@playwright/test').Page, name: string) {
-  await waitForWebProfiler(page);
+  await hideWebProfiler(page);
   await page.screenshot({
     path: resolve(name.startsWith('builder-') ? manualDir : outDir, name),
     fullPage: false,
@@ -104,7 +84,7 @@ test.describe('PageBuilderKit screenshots (builder manual)', () => {
 
   test('builder-04 — public content fields page', async ({ page }) => {
     await page.goto('/fields');
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15000 });
     await shot(page, 'builder-04-fields-public.png');
   });
 

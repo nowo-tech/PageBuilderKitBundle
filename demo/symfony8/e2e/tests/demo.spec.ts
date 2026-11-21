@@ -25,14 +25,14 @@ test.describe('PageBuilderKit demo', () => {
   test('public fields page resolves slots and FAQ repeater', async ({ page }) => {
     const response = await page.goto('/fields');
     expect(response?.ok()).toBeTruthy();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/content fields|content fields demo|demo de content fields/i);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toContainText(/content fields|content fields demo|demo de content fields/i);
     await expect(page.locator('details.pbk-compound--faq, details').first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText('[[fields.');
   });
 
   test('fields page switches locale copy', async ({ page }) => {
     await page.goto('/fields?_locale=es');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/demo de content fields|content fields/i);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toContainText(/demo de content fields|content fields/i);
   });
 
   test('draft public route stays 404 while demo draft page loads', async ({ page }) => {
