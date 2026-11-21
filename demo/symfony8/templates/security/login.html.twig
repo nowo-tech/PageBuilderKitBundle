@@ -2,27 +2,28 @@
 
 {% block title %}Sign in{% endblock %}
 
+{% block nowo_ui_page_header %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: 'Admin login',
+        intro: 'Use the in-memory demo account (admin / admin) to access the Page Builder Kit admin screens.',
+    }) }}
+{% endblock %}
+
+{% block nowo_ui_flashes %}
+    {{ include('@NowoUiKit/demo_platform/_flashes.html.twig', {flash_messages: error ? {error: [error.messageKey|trans(error.messageData, 'security')]} : null}) }}
+{% endblock %}
+
 {% block body %}
-<section class="nowo-ui-card">
-    <div class="nowo-ui-card__header"><h1 class="nowo-ui-card__title">Admin login</h1></div>
-    <div class="nowo-ui-card__body">
-        <p class="nowo-ui-muted">Use the in-memory demo account to access PageBuilderKit admin screens.</p>
-
-        {% if error %}
-            <div class="nowo-ui-flash nowo-ui-flash--error" role="alert">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-        {% endif %}
-
-        <div class="nowo-ui-flash nowo-ui-flash--info" role="note">
-            Credentials: <code class="nowo-ui-code">admin</code> / <code class="nowo-ui-code">admin</code>
-        </div>
-
-        {{ form_start(login_form, { action: path('app_login'), attr: { class: 'pbk-demo-login' } }) }}
-            {% for child in login_form %}
-                {% if not child.rendered %}
-                    {{ form_row(child) }}
-                {% endif %}
-            {% endfor %}
-        {{ form_end(login_form) }}
-    </div>
-</section>
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'Sign in', kind: 'form', form: login_form} %}
+        {% block section_body %}
+            {{ form_start(form, { action: path('app_login'), attr: { id: 'demo-login-form', class: 'nowo-ui-form pbk-demo-login' } }) }}
+                {% for child in form %}
+                    {% if child.vars.name != 'submit' %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
+            {{ form_end(form, {render_rest: false}) }}
+        {% endblock %}
+        {% block section_footer %}{{ form_widget(form.submit) }}{% endblock %}
+    {% endembed %}
 {% endblock %}

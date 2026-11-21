@@ -10,60 +10,59 @@
     {% endfor %}
 {% endblock %}
 
-{% block toolbar %}
-<div class="nowo-ui-toolbar">
-    <span class="nowo-ui-badge nowo-ui-badge--primary">{{ page_key }}</span>
-    <span class="nowo-ui-badge nowo-ui-badge--info">{{ page_trees|length }} renders</span>
-    <strong>{{ page_title }}</strong>
-    <span class="nowo-ui-muted">· seed v{{ seed_version }} · Web Profiler collector demo</span>
-    <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('showcase') }}">All use cases</a>
-    {% for key in embed_keys %}
-        <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path(key) }}">{{ key }}</a>
-    {% endfor %}
-</div>
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}
+        <a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('showcase') }}">All use cases</a>
+        {% for key in embed_keys %}
+            <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path(key) }}">{{ key }}</a>
+        {% endfor %}
+    {% endset %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: page_title,
+        intro: page_trees|length ~ ' renders · seed v' ~ seed_version ~ ' · Web Profiler collector demo',
+        toolbar: _toolbar,
+    }) }}
+{% endblock %}
+
+{% block nowo_ui_flashes %}
+    {{ include('@NowoUiKit/demo_platform/_flashes.html.twig', {flash_messages: {info: [locale == 'es'
+        ? 'Esta ruta llama a PageRenderProvider::getRenderedTree() ' ~ page_trees|length ~ ' veces en la misma petición HTTP (' ~ embed_keys|join(', ') ~ '). Abre el panel Page Builder del Web Profiler: el contador de renders debe ser ≥ ' ~ page_trees|length ~ '.'
+        : 'This route calls PageRenderProvider::getRenderedTree() ' ~ page_trees|length ~ ' times in one HTTP request (' ~ embed_keys|join(', ') ~ '). Open the Web Profiler Page Builder panel: render count should be ≥ ' ~ page_trees|length ~ '.'
+    ]}}) }}
 {% endblock %}
 
 {% block body %}
-<div class="nowo-ui-flash nowo-ui-flash--info" role="note">
-    {% if locale == 'es' %}
-        Esta ruta llama a <code class="nowo-ui-code">PageRenderProvider::getRenderedTree()</code>
-        {{ page_trees|length }} veces en la misma petición HTTP
-        (<code class="nowo-ui-code">{{ embed_keys|join(', ') }}</code>).
-        Abre el panel <strong>Page Builder</strong> del Web Profiler: el contador de renders debe ser ≥ {{ page_trees|length }}.
-    {% else %}
-        This route calls <code class="nowo-ui-code">PageRenderProvider::getRenderedTree()</code>
-        {{ page_trees|length }} times in one HTTP request
-        (<code class="nowo-ui-code">{{ embed_keys|join(', ') }}</code>).
-        Open the Web Profiler <strong>Page Builder</strong> panel: render count should be ≥ {{ page_trees|length }}.
-    {% endif %}
-</div>
-
-{% for tree in page_trees %}
-    <section class="pbk-multi-render-chunk" data-pbk-embed="{{ tree.pageKey|default(loop.index) }}">
-        <div class="nowo-ui-toolbar">
-            <span class="nowo-ui-badge nowo-ui-badge--neutral">#{{ loop.index }}</span>
-            <span class="nowo-ui-badge nowo-ui-badge--neutral">{{ tree.pageKey|default('?') }}</span>
-            <span class="nowo-ui-badge nowo-ui-badge--{{ tree.engine|default('') == 'classic' ? 'warning' : 'primary' }}">{{ tree.engine|default('?') }}</span>
-            <strong>{{ tree.title|default(tree.pageKey) }}</strong>
-            <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('admin_page_builder_canvas', {pageKey: tree.pageKey}) }}">Canvas</a>
-        </div>
-        {% if tree.engine|default('classic') == 'grapesjs' %}
-            {% if tree.html|default('') is empty %}
-                <div class="nowo-ui-flash nowo-ui-flash--warning" role="note">No content for <strong>{{ tree.pageKey }}</strong>.</div>
-            {% else %}
-                <div class="pbk-grapes-content">
-                    {{ tree.html|pbk_harden_html }}
+    {% for tree in page_trees %}
+        {% set _is_grapes = tree.engine|default('classic') == 'grapesjs' %}
+        {% set _is_empty = _is_grapes ? tree.html|default('') is empty : tree.sections is empty %}
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {
+            title: '#' ~ loop.index ~ ' ' ~ tree.title|default(tree.pageKey),
+            kind: 'content',
+            empty: _is_empty,
+            state_message: 'No content for ' ~ tree.pageKey|default('?') ~ '.',
+            tree: tree,
+            is_grapes: _is_grapes,
+        } %}
+            {% block section_actions %}
+                <span class="nowo-ui-badge nowo-ui-badge--neutral">{{ tree.pageKey|default('?') }}</span>
+                <span class="nowo-ui-badge nowo-ui-badge--{{ tree.engine|default('') == 'classic' ? 'warning' : 'primary' }}">{{ tree.engine|default('?') }}</span>
+                <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('admin_page_builder_canvas', {pageKey: tree.pageKey}) }}">Canvas</a>
+            {% endblock %}
+            {% block section_body %}
+                <div data-pbk-embed="{{ tree.pageKey|default(loop.index) }}" class="pbk-multi-render-chunk">
+                    {% if is_grapes %}
+                        <div class="pbk-grapes-content">
+                            {{ tree.html|pbk_harden_html }}
+                        </div>
+                    {% else %}
+                        <div class="pbk-classic-demo">
+                            {% for section in tree.sections %}
+                                {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
-            {% endif %}
-        {% elseif tree.sections is empty %}
-            <div class="nowo-ui-flash nowo-ui-flash--warning" role="note">No classic sections for <strong>{{ tree.pageKey }}</strong>.</div>
-        {% else %}
-            <div class="pbk-classic-demo">
-                {% for section in tree.sections %}
-                    {% include '@NowoPageBuilderKitBundle/widgets/_section.html.twig' with { section: section } %}
-                {% endfor %}
-            </div>
-        {% endif %}
-    </section>
-{% endfor %}
+            {% endblock %}
+        {% endembed %}
+    {% endfor %}
 {% endblock %}

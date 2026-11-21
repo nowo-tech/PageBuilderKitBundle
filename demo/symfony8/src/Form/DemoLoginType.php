@@ -43,7 +43,7 @@ final class DemoLoginType extends AbstractType
         $this->addWithDefaults($builder, 'submit', SubmitType::class, [
             'label'              => 'Sign in',
             'translation_domain' => false,
-            'attr'               => ['class' => 'nowo-ui-btn nowo-ui-btn--primary'],
+            'attr'               => ['class' => 'nowo-ui-btn nowo-ui-btn--primary', 'form' => 'demo-login-form'],
         ]);
     }
 

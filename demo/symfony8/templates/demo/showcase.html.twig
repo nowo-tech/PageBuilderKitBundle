@@ -2,61 +2,64 @@
 
 {% block title %}{{ page_title }} · PBK Demo{% endblock %}
 
-{% block toolbar %}
-<div class="nowo-ui-toolbar">
-    <strong>{{ page_title }}</strong>
-    <span class="nowo-ui-muted">· seed v{{ seed_version }} · {{ use_cases|length }} use cases</span>
-    <a class="nowo-ui-btn nowo-ui-btn--primary nowo-ui-btn--sm" href="{{ path('admin_page_builder_list') }}">Admin pages</a>
-    <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('home') }}">Home landing</a>
-</div>
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}
+        <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('home') }}">Home landing</a>
+        <a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('admin_page_builder_list') }}">Admin pages</a>
+    {% endset %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: locale == 'es' ? 'Matriz completa de casos de uso' : 'Full use-case matrix',
+        intro: (locale == 'es'
+            ? 'Cada tarjeta es una página Doctrine sembrada (GrapesJS v2 o schema clásico v1). Abre la vista pública, el canvas o /p/{key}.'
+            : 'Each card is a seeded Doctrine page (GrapesJS v2 or classic schema v1). Open the public view, canvas, or /p/{key}.')
+            ~ ' · seed v' ~ seed_version ~ ' · ' ~ use_cases|length ~ ' use cases',
+        toolbar: _toolbar,
+    }) }}
+{% endblock %}
+
+{% block nowo_ui_flashes %}
+    {{ include('@NowoUiKit/demo_platform/_flashes.html.twig', {flash_messages: {info: [
+        'Login: admin / admin · Locale: ?_locale=es, ?_locale=en · Draft: ' ~ (locale == 'es' ? '/p/draft → 404 hasta publicar' : '/p/draft → 404 until published')
+    ]}}) }}
 {% endblock %}
 
 {% block body %}
-<h1>{{ locale == 'es' ? 'Matriz completa de casos de uso' : 'Full use-case matrix' }}</h1>
-<p class="nowo-ui-muted">
-    {{ locale == 'es'
-        ? 'Cada tarjeta es una página Doctrine sembrada (GrapesJS v2 o schema clásico v1). Abre la vista pública, el canvas o /p/{key}.'
-        : 'Each card is a seeded Doctrine page (GrapesJS v2 or classic schema v1). Open the public view, canvas, or /p/{key}.' }}
-</p>
-<div class="nowo-ui-flash nowo-ui-flash--info" role="note">
-    <strong>Login:</strong> <code class="nowo-ui-code">admin</code> / <code class="nowo-ui-code">admin</code><br>
-    <strong>Locale:</strong> <code class="nowo-ui-code">?_locale=es</code> · <code class="nowo-ui-code">?_locale=en</code><br>
-    <strong>Draft:</strong> {{ locale == 'es' ? '/p/draft → 404 hasta publicar' : '/p/draft → 404 until published' }}
-</div>
-
-{% for category, cases in by_category %}
-    <h2>{{ category }}</h2>
-    <div class="nowo-ui-cards">
-        {% for case in cases %}
-            <section class="nowo-ui-card">
-                <div class="nowo-ui-card__body">
-                    <p>
-                        <span class="nowo-ui-badge nowo-ui-badge--neutral">{{ case.key }}</span>
-                        <span class="nowo-ui-badge nowo-ui-badge--{{ case.engine == 'classic' ? 'warning' : 'primary' }}">{{ case.engine }}</span>
-                        {% if not case.publish %}
-                            <span class="nowo-ui-badge nowo-ui-badge--danger">draft</span>
-                        {% else %}
-                            <span class="nowo-ui-badge nowo-ui-badge--success">published</span>
-                        {% endif %}
-                    </p>
-                    <h3>{{ locale == 'es' ? case.title_es : case.title_en }}</h3>
-                    <p class="nowo-ui-muted">{{ locale == 'es' ? case.description_es : case.description_en }}</p>
-                    <div class="nowo-ui-row-actions">
-                        <a class="nowo-ui-btn nowo-ui-btn--primary nowo-ui-btn--sm" href="{{ path(case.route) }}">{{ locale == 'es' ? 'Ver' : 'View' }}</a>
-                        {% if case.seed is defined and case.seed == false %}
-                            <span class="nowo-ui-muted" title="Composite route — no Doctrine page">no page</span>
-                        {% else %}
-                            <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('admin_page_builder_canvas', {pageKey: case.key}) }}">Canvas</a>
-                            {% if case.publish %}
-                                <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('page_builder_public_render', {pageKey: case.key}) }}" target="_blank" rel="noopener">/p/{{ case.key }}</a>
-                            {% else %}
-                                <span class="nowo-ui-muted">/p/{{ case.key }} 404</span>
-                            {% endif %}
-                        {% endif %}
-                    </div>
+    {% for category, cases in by_category %}
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: category, kind: 'list', cases: cases} %}
+            {% block section_body %}
+                <div class="nowo-ui-cards">
+                    {% for case in cases %}
+                        <section class="nowo-ui-card">
+                            <div class="nowo-ui-card__body">
+                                <p>
+                                    <span class="nowo-ui-badge nowo-ui-badge--neutral">{{ case.key }}</span>
+                                    <span class="nowo-ui-badge nowo-ui-badge--{{ case.engine == 'classic' ? 'warning' : 'primary' }}">{{ case.engine }}</span>
+                                    {% if not case.publish %}
+                                        <span class="nowo-ui-badge nowo-ui-badge--danger">draft</span>
+                                    {% else %}
+                                        <span class="nowo-ui-badge nowo-ui-badge--success">published</span>
+                                    {% endif %}
+                                </p>
+                                <h3>{{ locale == 'es' ? case.title_es : case.title_en }}</h3>
+                                <p class="nowo-ui-muted">{{ locale == 'es' ? case.description_es : case.description_en }}</p>
+                                <div class="nowo-ui-row-actions">
+                                    <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path(case.route) }}">{{ locale == 'es' ? 'Ver' : 'View' }}</a>
+                                    {% if case.seed is defined and case.seed == false %}
+                                        <span class="nowo-ui-muted" title="Composite route — no Doctrine page">no page</span>
+                                    {% else %}
+                                        <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('admin_page_builder_canvas', {pageKey: case.key}) }}">Canvas</a>
+                                        {% if case.publish %}
+                                            <a class="nowo-ui-btn nowo-ui-btn--outline nowo-ui-btn--sm" href="{{ path('page_builder_public_render', {pageKey: case.key}) }}" target="_blank" rel="noopener">/p/{{ case.key }}</a>
+                                        {% else %}
+                                            <span class="nowo-ui-muted">/p/{{ case.key }} 404</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </section>
+                    {% endfor %}
                 </div>
-            </section>
-        {% endfor %}
-    </div>
-{% endfor %}
+            {% endblock %}
+        {% endembed %}
+    {% endfor %}
 {% endblock %}
