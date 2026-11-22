@@ -49,6 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Translations: the de, fr, it, nl and pt admin catalogues still held English copies for the page sections screen (title, hint, save and saved messages, "Invalid CSRF token.", empty states, column width), the SEO form (SEO title, Open Graph fields, canonical URL, "Save SEO", "SEO settings saved."), the skip link and the revisions "Diff" label; the es catalogue kept "Meta description" and "Diff". All are translated now.
+
+### Tests
+
+- A regression test checks that no message of the es, de, fr, it, nl and pt catalogues is an English copy, apart from language-neutral values (at most two words, such as "Editor" or "Live").
+
 ### Changed
 
 - Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60); the demo's own header is gone and the pages use the shell page headers and section cards. The demo stylesheet entry (`assets/app.css`) and the host admin layout bridge are gone; the toolbar of the page views is the page header. Demo only, no bundle change.
