@@ -21,7 +21,7 @@ $class = $argv[1];
 $configuration = new $class();
 
 try {
-    $defaults = var_export((new Processor())->processConfiguration($configuration, [[]]), true);
+    $defaults = var_export(new Processor()->processConfiguration($configuration, [[]]), true);
 } catch (InvalidConfigurationException $e) {
     // A required key without a default: the message is part of the comparison.
     $defaults = $e->getMessage();
@@ -29,6 +29,6 @@ try {
 
 echo json_encode([
     'defaults' => $defaults,
-    'yaml'     => (new YamlReferenceDumper())->dump($configuration),
-    'xml'      => (new XmlReferenceDumper())->dump($configuration),
+    'yaml'     => new YamlReferenceDumper()->dump($configuration),
+    'xml'      => new XmlReferenceDumper()->dump($configuration),
 ], \JSON_THROW_ON_ERROR);

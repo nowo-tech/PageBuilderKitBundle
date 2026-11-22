@@ -49,13 +49,13 @@ final class CatalogueNotEnglishCopyTest extends TestCase
     #[DataProvider('localeProvider')]
     public function messagesAreNotEnglishCopies(string $locale): void
     {
-        $english = self::flatten(self::load('en'));
+        $english = self::flatten($this->load('en'));
         $copies  = [];
-        foreach (self::flatten(self::load($locale)) as $key => $value) {
+        foreach (self::flatten($this->load($locale)) as $key => $value) {
             if (($english[$key] ?? null) !== $value || in_array($key, self::ALLOWED_KEYS, true)) {
                 continue;
             }
-            if (!self::isLanguageNeutral($value)) {
+            if (!$this->isLanguageNeutral($value)) {
                 $copies[] = sprintf('%s: "%s"', $key, $value);
             }
         }
@@ -63,7 +63,7 @@ final class CatalogueNotEnglishCopyTest extends TestCase
         self::assertSame([], $copies, sprintf("Untranslated (English) messages in %s:\n%s", $locale, implode("\n", $copies)));
     }
 
-    private static function isLanguageNeutral(string $value): bool
+    private function isLanguageNeutral(string $value): bool
     {
         $words = preg_split('/\s+/', trim((string) preg_replace('/%\w+%/', '', $value)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $words = array_filter($words, static fn (string $word): bool => preg_match('/\pL{2,}/u', $word) === 1);
@@ -72,7 +72,7 @@ final class CatalogueNotEnglishCopyTest extends TestCase
     }
 
     /** @return array<mixed> */
-    private static function load(string $locale): array
+    private function load(string $locale): array
     {
         $data = Yaml::parseFile(dirname(__DIR__, 3) . '/src/Resources/translations/' . self::DOMAIN . '.' . $locale . '.yaml');
         self::assertIsArray($data);

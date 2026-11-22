@@ -52,9 +52,9 @@ use const PHP_BINARY;
 final class ConfigurationThreadStackTest extends TestCase
 {
     /** The stack of a FrankenPHP thread on Alpine (dunglas/frankenphp:*-alpine). */
-    private const THREAD_STACK = '512K';
+    private const string THREAD_STACK = '512K';
 
-    private const ROOT = __DIR__ . '/../../..';
+    private const string ROOT = __DIR__ . '/../../..';
 
     /**
      * @return array<string, array{class-string<ConfigurationInterface>}>
@@ -80,13 +80,13 @@ final class ConfigurationThreadStackTest extends TestCase
         $configuration = new $class();
 
         try {
-            $defaults = var_export((new Processor())->processConfiguration($configuration, [[]]), true);
+            $defaults = var_export(new Processor()->processConfiguration($configuration, [[]]), true);
         } catch (InvalidConfigurationException $e) {
             $defaults = $e->getMessage();
         }
         self::assertSame($defaults, $child['defaults']);
-        self::assertSame((new YamlReferenceDumper())->dump($configuration), $child['yaml']);
-        self::assertSame((new XmlReferenceDumper())->dump($configuration), $child['xml']);
+        self::assertSame(new YamlReferenceDumper()->dump($configuration), $child['yaml']);
+        self::assertSame(new XmlReferenceDumper()->dump($configuration), $child['xml']);
     }
 
     /**

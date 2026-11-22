@@ -72,7 +72,7 @@ abstract class AbstractHttpTestCase extends TestCase
         self::assertInstanceOf(ContainerInterface::class, $container);
         $em = $container->get('doctrine.orm.entity_manager');
         self::assertInstanceOf(EntityManagerInterface::class, $em);
-        (new SchemaTool($em))->createSchema($em->getMetadataFactory()->getAllMetadata());
+        new SchemaTool($em)->createSchema($em->getMetadataFactory()->getAllMetadata());
         $this->em  = $em;
         $documents = $container->get(DocumentService::class);
         self::assertInstanceOf(DocumentService::class, $documents);
@@ -89,7 +89,7 @@ abstract class AbstractHttpTestCase extends TestCase
      */
     protected function request(string $method, string $uri, array $parameters = [], array $headers = [], ?array $json = null, array $files = []): Response
     {
-        assert($this->kernel !== null);
+        assert($this->kernel instanceof AdminHttpKernel);
         $server = [];
         foreach ($headers as $name => $value) {
             $server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = $value;
