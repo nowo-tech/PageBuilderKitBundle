@@ -2,11 +2,11 @@
 
 **Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md) · [Phase 7](../008-phase7-media-tags-nesting/spec.md) · [Phase 9](../009-product-polish-compliance/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-11-16 (post **v1.16.0**)
+**Last audited:** 2026-11-22 (post **v1.19.0**)
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **211** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
+**Total production sources:** **213** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
 
 ## Bundle entry
 
@@ -55,6 +55,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `DependencyInjection/Compiler/CsrfProtectionPass.php` | Refuses to compile without form CSRF protection (fail closed) | REQ-SEC-005 |
 | `DependencyInjection/Compiler/PageBuilderMappingDriverPass.php` | Attribute (default) or XML mapping of the entities (1.16, `doctrine.mapping_type`) | FR-ORM-001 |
 | `DependencyInjection/Compiler/PageBuilderEntityManagerPass.php` | Maps the bundle entities only on `doctrine.entity_manager` (1.14) | FR-ORM-003 |
+| `DependencyInjection/Compiler/PageBuilderPrivateEntityManagerPass.php` | `doctrine.private_entity_manager: true` resolves the application's manager the private one is created on and runs transaction-doctrine's pass; deprecation path and host-flush probe wiring when unset (1.19) | FR-ORM-005 |
 | `DependencyInjection/Compiler/AfterCommitMiddlewarePass.php` | Attaches the after-commit DBAL middleware to the bundle's connection only (1.14) | FR-ORM-004 |
 | `DependencyInjection/Compiler/AssetStoragePortsPass.php` | Wires the 1.15 asset upload storage port and the deprecated storage alias | FR-ARC-001, FR-P2-ADM-005 |
 
@@ -182,6 +183,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Service/DocumentNormalizer.php` | Schema v1/v2 + fields/fieldValues normalization | FR-DOC-004, FR-P2-DOC-002, FR-P5-SCH-001 |
 | `Service/DocumentStructureValidator.php` | Engine-aware structure validation | FR-P9-ENG-001 |
 | `Service/DocumentService.php` | Create/save/publish/duplicate | FR-DOC-001, FR-ADM-004, FR-SEC-003, FR-P3-IO-001 |
+| `Service/PageStaleEditException.php` | Domain conflict: an editor saved from a read another editor's committed save has replaced (`document`, `content`, `seo`); raised under the page lock before anything is written (1.18) | FR-ORM-006, REQ-RUNTIME-003 |
 | `Service/DocumentDiff.php` | Structure/props comparison | FR-P3-REV-003 |
 | `Service/DocumentImportExportService.php` | JSON export/import `formatVersion: 1` | FR-P3-IO-002 |
 | `Service/ClassicPageTreeBuilder.php` | Classic sections tree for render | FR-P9-ENG-002, FR-REN-001 |
@@ -360,7 +362,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Bundle entry | 1 | 1 |
 | Controllers | 12 | 12 |
 | Debug / Web Profiler | 5 | 5 |
-| Dependency injection and compiler | 12 | 12 |
+| Dependency injection and compiler | 13 | 13 |
 | Entities | 12 | 12 |
 | Enums and locale | 6 | 6 |
 | Event subscribers and listeners | 3 | 3 |
@@ -370,7 +372,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Grapes block packs | 2 | 2 |
 | Media | 10 | 10 |
 | Repository | 8 | 8 |
-| Services | 26 | 26 |
+| Services | 27 | 27 |
 | HTML | 2 | 2 |
 | Content fields and bind slots | 4 | 4 |
 | Utilities | 1 | 1 |
@@ -382,4 +384,4 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Resources — admin and public Twig | 27 | 27 |
 | Resources — frontend assets | 12 | 12 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **211** | **211** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **213** | **213** |
