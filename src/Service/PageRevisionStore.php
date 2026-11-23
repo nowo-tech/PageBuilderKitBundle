@@ -63,6 +63,8 @@ final readonly class PageRevisionStore
         if (!$this->enabled) {
             return null;
         }
+        // 2.0 (W1-2): a page your own manager loaded is re-loaded by id; a new one it holds is refused.
+        $page = $this->transaction?->own($page) ?? $page;
 
         $payload = $this->extractLivePayload($page);
         if ($payload === null) {
@@ -81,6 +83,7 @@ final readonly class PageRevisionStore
             ->setStructure($payload['structure'])
             ->setWidgetPropsByLocale($payload['widgetPropsByLocale'])
             ->setLabel($label);
+        // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
         $page->addRevision($revision);
 
         $this->entityManager->persist($revision);
@@ -108,6 +111,7 @@ final readonly class PageRevisionStore
         if (!$this->enabled || $this->maxPerPage < 1) {
             return;
         }
+        $page = $this->transaction?->own($page) ?? $page;
 
         $all = $this->revisionRepository->findByPageNewestFirst($page);
         if (count($all) <= $this->maxPerPage) {
@@ -115,6 +119,7 @@ final readonly class PageRevisionStore
         }
 
         foreach (array_slice($all, $this->maxPerPage) as $stale) {
+            // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
             $page->removeRevision($stale);
             $this->entityManager->remove($stale);
         }

@@ -301,14 +301,26 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      * the private manager writes: persisting it there would insert it again, and changing it would be saved by nobody
      * (1.x flushed your manager). So it is re-loaded by id; the bundle service then applies its change to that instance.
      * A new page (no id), a page the manager already holds, and a dedicated `doctrine.entity_manager` or
-     * `transaction: host` (not the private manager) are returned as they are.
+     * `transaction: host` (not the private manager) are returned as they are. A NEW page your own manager holds (you
+     * persisted it there) is refused before anything is written: the bundle would insert it, and your flush would insert
+     * it a second time.
      *
      * @throws InvalidArgumentException when the page no longer exists
+     * @throws LogicException when your own manager holds the new page
      */
     public function own(BuilderPage $page): BuilderPage
     {
+        if (!$this->entityManager instanceof PrivateEntityManager) {
+            return $page;
+        }
+
         $id = $page->getId();
-        if (!$this->entityManager instanceof PrivateEntityManager || $id === null || $this->entityManager->contains($page)) {
+        if ($id === null) {
+            $this->refuseNewPageOfYourManager($this->entityManager, $page);
+
+            return $page;
+        }
+        if ($this->entityManager->contains($page)) {
             return $page;
         }
 
@@ -326,11 +338,35 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      */
     public function assertOwned(BuilderPage $page): void
     {
-        if (!$this->entityManager instanceof PrivateEntityManager || $page->getId() === null || $this->entityManager->contains($page)) {
+        if (!$this->entityManager instanceof PrivateEntityManager) {
+            return;
+        }
+        if ($page->getId() === null) {
+            $this->refuseNewPageOfYourManager($this->entityManager, $page);
+
+            return;
+        }
+        if ($this->entityManager->contains($page)) {
             return;
         }
 
         throw new LogicException(sprintf('The page "%s" was not loaded through NowoPageBuilderKitBundle: its changes would be saved by nobody. Load it with DocumentService::loadPageByKey() (or the bundle\'s repository) and change that instance; do not change bundle entities through your own entity manager (see UPGRADING.md "To 2.0.0", "Private manager only").', $page->getPageKey()));
+    }
+
+    /**
+     * 2.0 (W1-2, audit L1): a new page your own manager holds (`$yourManager->persist($page)`) is refused before anything
+     * is written: the private manager would insert it, and your next flush would insert it again (a unique violation
+     * that closes your manager and loses its other pending changes).
+     *
+     * @throws LogicException when your own manager holds the new page
+     */
+    private function refuseNewPageOfYourManager(PrivateEntityManager $manager, BuilderPage $page): void
+    {
+        if (!$manager->source()->contains($page)) {
+            return;
+        }
+
+        throw new LogicException(sprintf('The new page "%s" was persisted through your own entity manager: NowoPageBuilderKitBundle would insert it, and your next flush would insert it a second time. Persist bundle entities through the bundle\'s services (DocumentService::createPage(), PagePublisherInterface::createPageByKey()), not your manager; nothing was written (see UPGRADING.md "To 2.0.0", "Private manager only").', $page->getPageKey()));
     }
 
     /**

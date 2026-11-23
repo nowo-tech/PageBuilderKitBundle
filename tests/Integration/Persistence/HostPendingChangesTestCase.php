@@ -284,6 +284,54 @@ abstract class HostPendingChangesTestCase extends TestCase
         self::assertSame('published', $page('about', 'status'), 'nor writes back the status of the page your manager held');
     }
 
+    /**
+     * W1-2 (audit L1): a NEW page your own manager holds (you persisted it there) is refused by the bundle writes before
+     * anything is written. Without the refusal the private manager would insert it and your next flush would insert it a
+     * second time: a unique violation that closes your manager and loses your other pending changes (1.x inserted it
+     * once, through your manager). Your manager stays open, and your own flush writes your entity and the page once.
+     */
+    #[Test]
+    public function aNewPageYourManagerPersistedIsRefusedAndYourFlushWritesItOnce(): void
+    {
+        $container  = $this->boot();
+        $default    = $this->manager($container);
+        $connection = $default->getConnection();
+        $documents  = $this->service($container, DocumentService::class, DocumentService::class);
+        $revisions  = $this->service($container, PageRevisionService::class, PageRevisionService::class);
+
+        $note = new HostNote('host pending');
+        $default->persist($note);
+        $page = new BuilderPage()->setPageKey('host-new')->setUuid('11111111-1111-4111-8111-111111111111');
+        $default->persist($page);
+
+        $writes = [
+            'flushPage'    => static fn () => $documents->flushPage($page),
+            'saveDocument' => fn () => $documents->saveDocument($page, $this->grapes('<p>x</p>'), []),
+            'publish'      => static fn () => $documents->publish($page),
+            'revision'     => static fn () => $revisions->create($page, 'manual'),
+        ];
+        foreach ($writes as $name => $write) {
+            try {
+                $write();
+                self::fail($name . ': a new page your manager holds must be refused.');
+            } catch (LogicException $exception) {
+                self::assertStringContainsString('The new page "host-new" was persisted through your own entity manager', $exception->getMessage(), $name);
+                self::assertStringContainsString('Persist bundle entities through the bundle\'s services', $exception->getMessage(), $name);
+            }
+        }
+
+        self::assertSame(0, (int) $connection->fetchOne('SELECT COUNT(*) FROM pb_page'), 'nothing was written');
+        self::assertSame(0, (int) $connection->fetchOne('SELECT COUNT(*) FROM host_note'));
+        self::assertTrue($default->isOpen());
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($note));
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($page));
+
+        $default->flush();
+        self::assertSame(['host pending'], $connection->fetchFirstColumn('SELECT text FROM host_note'));
+        self::assertSame(1, (int) $connection->fetchOne('SELECT COUNT(*) FROM pb_page'), 'your flush inserts the page once');
+        self::assertTrue($default->isOpen());
+    }
+
     private function boot(): ContainerInterface
     {
         $this->directory = sys_get_temp_dir() . '/nowo-page-builder-kit-host-pending-' . uniqid('', true);

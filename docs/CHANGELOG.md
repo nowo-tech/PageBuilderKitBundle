@@ -99,7 +99,10 @@ builder write flushing its own pending changes (see UPGRADING "To 2.0.0", "Befor
 - **BREAKING:** a page loaded by the application's own manager and handed to a bundle write (`DocumentService`
   `saveDocument()` / `publish()` / `unpublish()` / `duplicatePage()`, the revision, template and content-field
   services) is re-loaded by id in the private manager (never inserted again); `DocumentService::flushPage()` and
-  `saveTranslation()` refuse such a page with a `LogicException` before anything is written (lesson W1-2).
+  `saveTranslation()` refuse such a page with a `LogicException` before anything is written (lesson W1-2). A NEW page
+  the application persisted through its own manager is refused by every bundle write (also `PageRevisionStore`
+  `snapshot()` / `prune()`) with a `LogicException` before anything is written: the private manager would insert it
+  and the application's next flush would insert it a second time.
 - **BREAKING:** a service still tied to a removed port fails the container build (`PageBuilderRemovedPortsPass`,
   lesson W1-1): a class that implements `PageBuilderAssetStorageInterface` or `GrapesTwigContextProviderInterface`
   (Symfony would otherwise drop it without a word), an alias or a decorator of a removed id, a tagged Twig context

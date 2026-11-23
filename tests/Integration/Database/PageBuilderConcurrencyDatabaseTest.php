@@ -23,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -48,8 +49,11 @@ use function proc_get_status;
 use function proc_open;
 use function rawurlencode;
 use function str_contains;
+use function str_ends_with;
 use function stream_get_contents;
+use function strlen;
 use function strtolower;
+use function substr;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
@@ -86,6 +90,19 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     private ContainerInterface $container;
 
     /**
+     * Suffix of a data set run with `doctrine.transaction: host` (DDD hosts): the bundle's admin writes then run on your
+     * default manager through transaction-doctrine's `forHostEntityManager()` (REQ-RUNTIME-003 rules 1, 2 and 6).
+     */
+    private const string HOST = '|host';
+
+    /**
+     * With `transaction: host` the bundle flushes its own writes only while one of its admin controllers serves the main
+     * request (the bundle UI's use case). The test's direct service calls (seeds, the write under test) run inside such
+     * a main request, pushed on the request stack; it is taken off around each real HTTP request of the test.
+     */
+    private ?Request $adminUseCase = null;
+
+    /**
      * @return iterable<string, array{0: string}>
      */
     public static function databases(): iterable
@@ -93,7 +110,11 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         yield 'MySQL 8.4' => ['PBK_MYSQL_URL'];
         yield 'MariaDB 11.4' => ['PBK_MARIADB_URL'];
         yield 'PostgreSQL 16' => ['PBK_POSTGRES_URL'];
-        // 2.0: these zero-config sets run on the private manager (1.19 ran them twice: default path and private opt-in).
+        // 2.0: the zero-config sets above run on the private manager; the same rule 1 / 2 / 4 / 6 suite with
+        // transaction: host runs the admin's writes on your default manager (forHostEntityManager()).
+        yield 'MySQL 8.4, transaction: host' => ['PBK_MYSQL_URL' . self::HOST];
+        yield 'MariaDB 11.4, transaction: host' => ['PBK_MARIADB_URL' . self::HOST];
+        yield 'PostgreSQL 16, transaction: host' => ['PBK_POSTGRES_URL' . self::HOST];
     }
 
     protected function tearDown(): void
@@ -482,13 +503,20 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      */
     private function boot(string $env, array $bundle = [], int $lockWait = 1): string
     {
+        $host = str_ends_with($env, self::HOST);
+        $env  = $host ? substr($env, 0, -strlen(self::HOST)) : $env;
+        if ($host) {
+            $bundle['doctrine'] = ['transaction' => 'host'];
+        }
+
         $url = getenv($env);
         if (!is_string($url) || $url === '') {
             self::markTestSkipped($env . ' is not set (make test-with-db).');
         }
 
-        $this->url    = $url;
-        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env, $url);
+        $this->url          = $url;
+        $this->adminUseCase = null;
+        $this->kernel       = new AdminHttpKernel($bundle, self::class . '|' . $env . ($host ? self::HOST : ''), $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);
@@ -505,6 +533,11 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         $documents = $container->get(DocumentService::class);
         assert($documents instanceof DocumentService);
         $this->documents = $documents;
+        if ($host) {
+            $this->adminUseCase = Request::create(self::ADMIN . '/pages');
+            $this->adminUseCase->attributes->set('_controller', PageDocumentApiController::class . '::saveDocument');
+            $this->requestStack()->push($this->adminUseCase);
+        }
 
         return $url;
     }
@@ -751,10 +784,29 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
     private function handle(Request $request): Response
     {
         assert($this->kernel instanceof AdminHttpKernel);
-        $response = $this->kernel->handle($request);
-        $this->kernel->terminate($request, $response);
+        // A real request of its own: the admin use case of the direct service calls is taken off meanwhile.
+        if ($this->adminUseCase instanceof Request) {
+            $this->requestStack()->pop();
+        }
+
+        try {
+            $response = $this->kernel->handle($request);
+            $this->kernel->terminate($request, $response);
+        } finally {
+            if ($this->adminUseCase instanceof Request) {
+                $this->requestStack()->push($this->adminUseCase);
+            }
+        }
 
         return $response;
+    }
+
+    private function requestStack(): RequestStack
+    {
+        $stack = $this->container->get('request_stack');
+        assert($stack instanceof RequestStack);
+
+        return $stack;
     }
 
     /**
