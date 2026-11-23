@@ -16,6 +16,13 @@ import {
   ensureLocaleContent,
   parseJsonAttr,
 } from './grapes-types';
+import { createBundleLogger } from './logger';
+
+declare const __PAGE_BUILDER_KIT_BUILD_TIME__: string;
+
+createBundleLogger('page-builder-kit/canvas', {
+  buildTime: typeof __PAGE_BUILDER_KIT_BUILD_TIME__ !== 'undefined' ? __PAGE_BUILDER_KIT_BUILD_TIME__ : undefined,
+}).scriptLoaded();
 
 /** Grapes editor instance — typed loosely until official GrapesJS types are vendored. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
