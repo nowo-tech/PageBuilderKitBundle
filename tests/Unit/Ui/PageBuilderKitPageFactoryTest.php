@@ -40,7 +40,7 @@ final class PageBuilderKitPageFactoryTest extends TestCase
         $factory = PageFixtures::factory(new PageBuilderKitPages(null, ['index' => 'host.html.twig']));
 
         self::assertSame('host.html.twig', $factory->template('index'));
-        self::assertSame(['x' => 1, 'nowo_page_builder_legacy_layout' => null, 'nowo_page_builder_legacy_blocks' => []], $factory->context(['x' => 1]));
+        self::assertSame(['x' => 1], $factory->context(['x' => 1]));
     }
 
     #[Test]

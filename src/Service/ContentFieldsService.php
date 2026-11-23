@@ -47,7 +47,7 @@ final readonly class ContentFieldsService
      */
     public function saveSchema(BuilderPage $page, array $fields): void
     {
-        $this->unit($page, fn () => $this->doSaveSchema($page, $fields));
+        $this->unit($page, fn (BuilderPage $page) => $this->doSaveSchema($page, $fields));
     }
 
     /**
@@ -56,7 +56,7 @@ final readonly class ContentFieldsService
      */
     public function saveValues(BuilderPage $page, array $fieldValues, ?array $fields = null): void
     {
-        $this->unit($page, fn () => $this->doSaveValues($page, $fieldValues, $fields));
+        $this->unit($page, fn (BuilderPage $page) => $this->doSaveValues($page, $fieldValues, $fields));
     }
 
     /**
@@ -104,7 +104,7 @@ final readonly class ContentFieldsService
      */
     public function mergeValues(BuilderPage $page, array $postedByLocale, array $originalsByLocale = [], string $labelLocale = '', array $labels = [], array $labelOriginals = []): void
     {
-        $this->unit($page, function () use ($page, $postedByLocale, $originalsByLocale, $labelLocale, $labels, $labelOriginals): void {
+        $this->unit($page, function (BuilderPage $page) use ($postedByLocale, $originalsByLocale, $labelLocale, $labels, $labelOriginals): void {
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
             $values    = $this->contentFieldsNormalizer->normalizeValues($structure['fieldValues'] ?? [], $schema);
@@ -160,7 +160,7 @@ final readonly class ContentFieldsService
      */
     public function saveSchemaWithField(BuilderPage $page, array $field): void
     {
-        $this->unit($page, function () use ($page, $field): void {
+        $this->unit($page, function (BuilderPage $page) use ($field): void {
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []);
             $key       = is_string($field['key'] ?? null) ? $field['key'] : '';
@@ -180,7 +180,7 @@ final readonly class ContentFieldsService
      */
     public function saveSchemaWithoutField(BuilderPage $page, string $key): void
     {
-        $this->unit($page, function () use ($page, $key): void {
+        $this->unit($page, function (BuilderPage $page) use ($key): void {
             $structure = $this->documentNormalizer->normalize($this->requireDocument($page)->getStructure());
             $schema    = array_values(array_filter(
                 $this->contentFieldsNormalizer->normalizeSchema($structure['fields'] ?? []),
@@ -205,7 +205,7 @@ final readonly class ContentFieldsService
         mixed $value,
         ?array $definition = null,
     ): void {
-        $this->unit($page, fn () => $this->doSaveFieldValue($page, $key, $locale, $value, $definition));
+        $this->unit($page, fn (BuilderPage $page) => $this->doSaveFieldValue($page, $key, $locale, $value, $definition));
     }
 
     /**
@@ -414,10 +414,15 @@ final readonly class ContentFieldsService
      *
      * @param callable(): void $operation
      */
+    /**
+     * @param callable(BuilderPage): void $operation runs on the page as the bundle's manager holds it (2.0, W1-2: a page
+     *                                               your own manager loaded is re-loaded by id, never inserted again)
+     */
     private function unit(BuilderPage $page, callable $operation): void
     {
+        $page = $this->transaction instanceof PageBuilderTransaction ? $this->transaction->own($page) : $page;
         if (!$this->transaction instanceof PageBuilderTransaction) {
-            $operation();
+            $operation($page);
 
             return;
         }
@@ -425,7 +430,7 @@ final readonly class ContentFieldsService
         // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
         $this->transaction->run(function () use ($page, $operation): void {
             $this->transaction?->lockPage($page);
-            $operation();
+            $operation($page);
         });
     }
 

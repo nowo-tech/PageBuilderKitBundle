@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadData;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +26,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         $tmp     = sys_get_temp_dir() . '/pbk-gif-' . uniqid('', true);
         file_put_contents($tmp, 'GIF89a');
 
-        $result = $storage->store(new UploadedFile($tmp, '', 'image/gif', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, '', 'image/gif', null, true)));
 
         self::assertDirectoryExists($dir);
         self::assertStringStartsWith('/media/', $result->src);
@@ -63,7 +64,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         $upload  = new UploadedFile(__FILE__, 'x.png', 'image/png', null, false);
 
         $this->expectException(InvalidArgumentException::class);
-        $storage->store($upload);
+        $storage->storeUpload(AssetUploadData::fromUploadedFile($upload));
     }
 
     #[Test]
@@ -75,7 +76,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         file_put_contents($tmp, 'plain');
 
         $this->expectException(InvalidArgumentException::class);
-        $storage->store(new UploadedFile($tmp, 'note.txt', 'text/plain', null, true));
+        $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'note.txt', 'text/plain', null, true)));
     }
 
     #[Test]
@@ -87,7 +88,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         file_put_contents($tmp, "GIF89a<?php echo 'pwned'; ?>");
 
         try {
-            $storage->store(new UploadedFile($tmp, 'x.php', 'image/gif', null, true));
+            $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'x.php', 'image/gif', null, true)));
             self::fail('Polyglot upload named .php must be rejected.');
         } catch (InvalidArgumentException $exception) {
             self::assertStringContainsString('does not match detected MIME type "image/gif"', $exception->getMessage());
@@ -104,7 +105,7 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
         $tmp     = sys_get_temp_dir() . '/pbk-ext-src-' . uniqid('', true);
         file_put_contents($tmp, 'GIF89a');
 
-        $result = $storage->store(new UploadedFile($tmp, 'Banner.GIF', 'image/gif', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'Banner.GIF', 'image/gif', null, true)));
 
         self::assertStringEndsWith('.gif', $result->storageKey ?? '');
     }
@@ -118,6 +119,6 @@ final class LocalFilesystemAssetStorageEdgeCasesTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('MIME type "image/svg+xml" is not allowed.');
-        $storage->store(new UploadedFile($tmp, 'x.svg', 'image/svg+xml', null, true));
+        $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'x.svg', 'image/svg+xml', null, true)));
     }
 }

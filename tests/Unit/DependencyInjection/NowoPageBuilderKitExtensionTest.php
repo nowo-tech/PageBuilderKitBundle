@@ -42,9 +42,6 @@ final class NowoPageBuilderKitExtensionTest extends TestCase
                 'security'       => [
                     'allow_unauthenticated' => true,
                 ],
-                'web_ui' => [
-                    'css_framework' => 'bootstrap5',
-                ],
                 'doctrine' => [
                     'table_prefix' => 'pb_',
                 ],
@@ -59,7 +56,8 @@ final class NowoPageBuilderKitExtensionTest extends TestCase
         self::assertSame('en', $container->getParameter('nowo_page_builder_kit.default_locale'));
         self::assertSame(['en', 'de'], $container->getParameter('nowo_page_builder_kit.locales'));
         self::assertSame('pb_', $container->getParameter('nowo_page_builder_kit.doctrine.table_prefix'));
-        self::assertSame('bootstrap5', $container->getParameter('nowo_page_builder_kit.web_ui.css_framework'));
+        self::assertFalse($container->hasParameter('nowo_page_builder_kit.web_ui.css_framework'), 'removed in 2.0');
+        self::assertFalse($container->hasParameter('nowo_page_builder_kit.doctrine.connection'), 'removed in 2.0');
         self::assertSame('/admin/page-builder', $container->getParameter('nowo_page_builder_kit.web_ui.path_prefix'));
 
         $localesDef = $container->getDefinition(BuilderLocales::class);

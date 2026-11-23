@@ -114,6 +114,7 @@ final readonly class DocumentService implements PagePublisherInterface
      */
     public function saveDocument(BuilderPage $page, array $structure, array $widgetPropsByLocale, ?string $baseToken = null): void
     {
+        $page                = $this->own($page);
         $normalizedStructure = $this->documentNormalizer->normalize($structure);
         $isGrapes            = $this->documentNormalizer->isGrapesStructure($normalizedStructure);
         if ($isGrapes) {
@@ -147,9 +148,11 @@ final readonly class DocumentService implements PagePublisherInterface
             $document = $page->getDocument();
             if (!$document instanceof BuilderDocument) {
                 $document = new BuilderDocument();
+                // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
                 $document->setPage($page);
             }
 
+            // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
             $document->setStructure($normalizedStructure);
             foreach ($propsByLocale as $locale => $props) {
                 $document->upsertLocale($locale, $props);
@@ -216,12 +219,15 @@ final readonly class DocumentService implements PagePublisherInterface
      */
     public function duplicatePage(BuilderPage $source, string $newPageKey, ?string $title = null): BuilderPage
     {
+        $source = $this->own($source);
+
         // 1.17: one write unit (a failure never leaves a half-copied page).
         return $this->unit(fn (): BuilderPage => $this->doDuplicatePage($source, $newPageKey, $title));
     }
 
     public function publish(BuilderPage $page): void
     {
+        $page = $this->own($page);
         $this->unit(function () use ($page): void {
             // The required-field check and the revision read the content being published: read it under the lock.
             $this->transaction?->lockPage($page);
@@ -231,9 +237,12 @@ final readonly class DocumentService implements PagePublisherInterface
 
     public function unpublish(BuilderPage $page): void
     {
+        $page = $this->own($page);
         $this->unit(function () use ($page): void {
             $this->transaction?->lockPage($page);
+            // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
             $page->setStatus(PageStatus::Draft);
+            // @igor-ignore - Doctrine entity of this write unit (re-loaded by id, W1-2), not a shared service.
             $page->setPublishedAt(null);
             $this->commit(new PageUnpublishedEvent($page->getPageKey(), $page->getUuid()));
         });
@@ -337,6 +346,7 @@ final readonly class DocumentService implements PagePublisherInterface
      */
     public function saveTranslation(BuilderPage $page, BuilderPageTranslation $translation, array $originals = []): void
     {
+        $this->transaction?->assertOwned($page);
         $posted = [];
         foreach (self::SEO_FIELDS as $field) {
             $posted[$field] = $translation->{'get' . ucfirst($field)}();
@@ -413,6 +423,7 @@ final readonly class DocumentService implements PagePublisherInterface
      */
     public function flushPage(BuilderPage $page): void
     {
+        $this->transaction?->assertOwned($page);
         $this->entityManager->persist($page);
 
         try {
@@ -613,6 +624,19 @@ final readonly class DocumentService implements PagePublisherInterface
         }
 
         return $page;
+    }
+
+    /**
+     * 2.0 (W1-2): the page as the bundle's manager holds it ({@see PageBuilderTransaction::own()}): a page your own
+     * manager loaded is re-loaded by id, never inserted again.
+     *
+     * @internal used by the bundle's write services
+     *
+     * @throws InvalidArgumentException when the page no longer exists
+     */
+    public function own(BuilderPage $page): BuilderPage
+    {
+        return $this->transaction instanceof PageBuilderTransaction ? $this->transaction->own($page) : $page;
     }
 
     /**

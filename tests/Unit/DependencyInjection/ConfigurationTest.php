@@ -8,6 +8,7 @@ use Nowo\PageBuilderKitBundle\DependencyInjection\Configuration;
 use Nowo\PageBuilderKitBundle\Enum\HtmlSanitizeStrategy;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\ArrayNode;
@@ -43,11 +44,12 @@ final class ConfigurationTest extends TestCase
         self::assertNull($config['security']['access_checker']);
         self::assertFalse($config['security']['allow_unauthenticated']);
         self::assertNull($config['web_ui']['layout_template']);
-        self::assertSame('tailwind', $config['web_ui']['css_framework']);
+        self::assertArrayNotHasKey('css_framework', $config['web_ui'], 'removed in 2.0');
         self::assertSame([], $config['web_ui']['templates']);
         self::assertSame('/admin/page-builder', $config['web_ui']['path_prefix']);
         self::assertSame('', $config['doctrine']['table_prefix']);
-        self::assertSame('default', $config['doctrine']['connection']);
+        self::assertArrayNotHasKey('connection', $config['doctrine'], 'removed in 2.0');
+        self::assertNull($config['doctrine']['private_entity_manager']);
         self::assertNull($config['doctrine']['entity_manager']);
         self::assertSame('bundle', $config['doctrine']['transaction']);
         self::assertSame('attribute', $config['doctrine']['mapping_type']);
@@ -63,21 +65,51 @@ final class ConfigurationTest extends TestCase
         self::assertTrue($config['debug']['collector']);
     }
 
+    /**
+     * 2.0: the keys deprecated in 1.x fail the build with a message naming what replaces them (never Symfony's generic
+     * "Unrecognized option", never a silent fallback).
+     *
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function removedKeys(): iterable
+    {
+        yield 'doctrine.connection (deprecated since 1.8)' => [['doctrine' => ['connection' => 'default']], 'The "nowo_page_builder_kit.doctrine.connection" option was removed in 2.0: deprecated and ignored since 1.8'];
+        yield 'web_ui.css_framework (deprecated since 1.12)' => [['web_ui' => ['css_framework' => 'bootstrap5']], 'The "nowo_page_builder_kit.web_ui.css_framework" option was removed in 2.0: deprecated since 1.12'];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
     #[Test]
-    public function doctrineConnectionIsDeprecated(): void
+    #[DataProvider('removedKeys')]
+    public function aRemovedKeyFailsTheBuild(array $config, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        new Processor()->processConfiguration(new Configuration(), [$config]);
+    }
+
+    /** Q4: `doctrine.private_entity_manager` is a deprecated no-op in 2.x, removed in 3.0; `false` is refused. */
+    #[Test]
+    public function privateEntityManagerIsDeprecatedAndFalseRefused(): void
     {
         $root = new Configuration()->getConfigTreeBuilder()->buildTree();
         self::assertInstanceOf(ArrayNode::class, $root);
         $doctrine = $root->getChildren()['doctrine'];
         self::assertInstanceOf(ArrayNode::class, $doctrine);
-        $connection = $doctrine->getChildren()['connection'];
-        self::assertInstanceOf(BaseNode::class, $connection);
+        $node = $doctrine->getChildren()['private_entity_manager'];
+        self::assertInstanceOf(BaseNode::class, $node);
 
-        self::assertTrue($connection->isDeprecated());
-        $deprecation = $connection->getDeprecation('connection', 'nowo_page_builder_kit.doctrine');
+        self::assertTrue($node->isDeprecated());
+        $deprecation = $node->getDeprecation('private_entity_manager', 'nowo_page_builder_kit.doctrine');
         self::assertSame('nowo-tech/page-builder-kit-bundle', $deprecation['package']);
-        self::assertSame('1.8', $deprecation['version']);
-        self::assertStringContainsString('doctrine.orm.entity_managers', $deprecation['message']);
+        self::assertSame('2.0', $deprecation['version']);
+        self::assertStringContainsString('removed in 3.0', $deprecation['message']);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('private_entity_manager: false is no longer supported');
+        new Processor()->processConfiguration(new Configuration(), [['doctrine' => ['private_entity_manager' => false]]]);
     }
 
     #[Test]
@@ -135,22 +167,6 @@ final class ConfigurationTest extends TestCase
         new Processor()->processConfiguration(new Configuration(), [[
             'web_ui' => ['templates' => ['dashboard' => 'x.html.twig']],
         ]]);
-    }
-
-    #[Test]
-    public function cssFrameworkIsDeprecated(): void
-    {
-        $root = new Configuration()->getConfigTreeBuilder()->buildTree();
-        self::assertInstanceOf(ArrayNode::class, $root);
-        $webUi = $root->getChildren()['web_ui'];
-        self::assertInstanceOf(ArrayNode::class, $webUi);
-        $node = $webUi->getChildren()['css_framework'];
-        self::assertInstanceOf(BaseNode::class, $node);
-
-        self::assertTrue($node->isDeprecated());
-        $deprecation = $node->getDeprecation('css_framework', 'nowo_page_builder_kit.web_ui');
-        self::assertSame('1.12', $deprecation['version']);
-        self::assertStringContainsString('grapesjs.canvas_styles', $deprecation['message']);
     }
 
     #[Test]

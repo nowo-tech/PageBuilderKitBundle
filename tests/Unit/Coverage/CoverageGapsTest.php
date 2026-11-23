@@ -22,8 +22,9 @@ use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\ElementAppearanceNormalizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
-use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
+use Nowo\PageBuilderKitBundle\Service\PageContext;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
 use Nowo\PageBuilderKitBundle\Tests\Support\WidgetTypesFixture;
@@ -53,8 +54,6 @@ use function file_put_contents;
 use function strtolower;
 use function sys_get_temp_dir;
 use function uniqid;
-
-use const UPLOAD_ERR_NO_FILE;
 
 #[CoversClass(DocumentService::class)]
 #[CoversClass(DocumentNormalizer::class)]
@@ -503,7 +502,7 @@ final class CoverageGapsTest extends TestCase
         self::assertNotFalse($png);
         file_put_contents($tmp, $png);
 
-        $result = $storage->store(new UploadedFile($tmp, 'x', 'image/png', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'x', 'image/png', null, true)));
         self::assertStringStartsWith('https://array-object.example/', $result->src);
 
         $helper2 = new class {
@@ -528,7 +527,7 @@ final class CoverageGapsTest extends TestCase
         $tmp2 = sys_get_temp_dir() . '/pbk-s3d-' . uniqid('', true) . '.png';
         file_put_contents($tmp2, $png);
         $r2 = new AwsS3AssetStorage($helper2, 'f', false, 5_000_000, ['image/png'])
-            ->store(new UploadedFile($tmp2, 'n.png', 'image/png', null, true));
+            ->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp2, 'n.png', 'image/png', null, true)));
         self::assertStringStartsWith('https://fallback/', $r2->src);
 
         $helper3 = new class {
@@ -547,7 +546,7 @@ final class CoverageGapsTest extends TestCase
         file_put_contents($tmp3, $png);
         try {
             new AwsS3AssetStorage($helper3, 'f', false, 5_000_000, ['image/png'])
-                ->store(new UploadedFile($tmp3, 'n.png', 'image/png', null, true));
+                ->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp3, 'n.png', 'image/png', null, true)));
             self::fail('Expected bucket resolve failure');
         } catch (RuntimeException $e) {
             self::assertNotSame('', $e->getMessage());
@@ -577,7 +576,7 @@ final class CoverageGapsTest extends TestCase
         $tmp     = sys_get_temp_dir() . '/pbk-s3f-' . uniqid('', true) . '.txt';
         file_put_contents($tmp, 'plain');
         try {
-            $storage->store(new UploadedFile($tmp, 'n.txt', 'text/plain', null, true));
+            $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'n.txt', 'text/plain', null, true)));
             self::fail('mime');
         } catch (InvalidArgumentException $e) {
             self::assertStringContainsString('MIME', $e->getMessage());
@@ -588,7 +587,7 @@ final class CoverageGapsTest extends TestCase
         self::assertNotFalse($png);
         file_put_contents($tmp2, $png);
         $this->expectException(RuntimeException::class);
-        $storage->store(new UploadedFile($tmp2, 'n.png', 'image/png', null, true));
+        $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp2, 'n.png', 'image/png', null, true)));
     }
 
     #[Test]
@@ -610,21 +609,9 @@ final class CoverageGapsTest extends TestCase
                 return '';
             }
         };
-        $result = $storage->store($upload);
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile($upload));
         self::assertStringEndsWith('.png', (string) $result->storageKey);
 
-    }
-
-    #[Test]
-    public function localFilesystemRejectsInvalidUpload(): void
-    {
-        $dir     = sys_get_temp_dir() . '/pbk-loc2-' . uniqid('', true);
-        $storage = new LocalFilesystemAssetStorage($dir, '/u', 5_000_000, ['image/png']);
-        $tmp     = sys_get_temp_dir() . '/pbk-inv-' . uniqid('', true) . '.png';
-        file_put_contents($tmp, 'x');
-        $upload = new UploadedFile($tmp, 'x.png', 'image/png', UPLOAD_ERR_NO_FILE, true);
-        $this->expectException(InvalidArgumentException::class);
-        $storage->store($upload);
     }
 
     #[Test]
@@ -676,8 +663,8 @@ final class CoverageGapsTest extends TestCase
             }
         };
 
-        $provider = new class implements GrapesTwigContextProviderInterface {
-            public function getContext(BuilderPage $page, string $locale): array
+        $provider = new class implements GrapesTwigPageContextProviderInterface {
+            public function getPageContext(PageContext $page, string $locale): array
             {
                 return ['extra' => 'yes'];
             }

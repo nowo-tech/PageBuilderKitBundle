@@ -21,7 +21,7 @@ Mermaid diagrams for **Page Builder Kit Bundle** (rendered by GitHub, many IDEs,
   - [Standard Symfony host](#standard-symfony-host)
   - [DDD / hexagonal host](#ddd--hexagonal-host)
 - [REQ-ARCH-001 status](#req-arch-001-status)
-- [Deferred to 2.0](#deferred-to-20)
+- [Done in 2.0](#done-in-20)
 - [Related docs](#related-docs)
 
 ---
@@ -34,7 +34,7 @@ flowchart TB
         Routes["routing.yaml"]
         Config["nowo_page_builder_kit.yaml"]
         TwigHost["Twig templates / pencil include"]
-        Ctx["GrapesTwigContextProviderInterface"]
+        Ctx["GrapesTwigPageContextProviderInterface"]
         Access["PageBuilderKitAccessCheckerInterface"]
     end
 
@@ -279,7 +279,7 @@ flowchart TB
     Raw["Grapes HTML with {{ }} / {% for %}"]
     San["GrapesDocumentSanitizer<br/>+ restoreTwigDelimiters"]
     CtxBuiltins["Built-ins:<br/>title, slug, pageKey, locale, status…"]
-    CtxHost["Host GrapesTwigContextProviderInterface<br/>e.g. products, highlights"]
+    CtxHost["Host GrapesTwigPageContextProviderInterface<br/>e.g. products, highlights"]
     Sandbox["GrapesTwigRenderer<br/>sandbox: if / for / set"]
     Out["Interpolated HTML for public page"]
 
@@ -331,7 +331,7 @@ flowchart LR
     Handler["AssetUploadHandler"]
     Local["LocalFilesystemAssetStorage"]
     S3["AwsS3AssetStorage"]
-    Custom["PageBuilderAssetStorageInterface"]
+    Custom["PageBuilderAssetUploadStorageInterface"]
 
     AM --> EP --> Handler
     Handler -->|storage=local| Local
@@ -399,8 +399,8 @@ decorate it). No port, event or VO of this list takes a Symfony, Doctrine or HTT
 | `Persistence\PageBuilderPendingEventsInterface` | port (1.14) | `PageBuilderTransaction`: dispatch the write events after your commit (`transaction: host`) |
 | `Repository\BuilderPageRepositoryInterface`, `BuilderPageRevisionRepositoryInterface`, `BuilderPageTemplateRepositoryInterface`, `BuilderPageStatusQueryInterface` | read ports | bundle repositories; they return the bundle's own entities (standard hosts) or scalars |
 | `Security\PageBuilderKitAccessCheckerInterface` | SPI | `security.access_checker`, else the role-based checker |
-| `Media\PageBuilderAssetUploadStorageInterface` (1.15), `PageBuilderAssetLibraryInterface` | SPI | asset storage (`AssetUpload` VO); `PageBuilderAssetStorageInterface::store(UploadedFile)` is deprecated |
-| `Service\GrapesTwigPageContextProviderInterface` (1.15) | SPI (tag `nowo_page_builder_kit.grapes_twig_context`) | `PageContext` VO; `GrapesTwigContextProviderInterface` (entity) is deprecated |
+| `Media\PageBuilderAssetUploadStorageInterface` (1.15), `PageBuilderAssetLibraryInterface` | SPI | asset storage (`AssetUpload` VO); the only port since 2.0 (`PageBuilderAssetStorageInterface::store(UploadedFile)` was removed) |
+| `Service\GrapesTwigPageContextProviderInterface` (1.15) | SPI (tag `nowo_page_builder_kit.grapes_twig_context`) | `PageContext` VO; the only port since 2.0 (the entity-based `GrapesTwigContextProviderInterface` was removed) |
 | `Content\ContentFieldDefinitionProviderInterface` | SPI | catalogue of content fields per page key |
 | `Widget\WidgetTypeInterface`, `WidgetPackInterface`, `Grapes\GrapesBlockPackInterface` | SPI (tags) | classic widgets and GrapesJS blocks |
 | `Security\Html\PageBuilderHtmlSanitizerInterface` | SPI | `html.sanitize.service` |
@@ -417,9 +417,10 @@ Both paths are supported; the standard one is the zero-config default. Examples:
 
 ### Standard Symfony host
 
-Nothing to configure: the six bundle entities are mapped with attributes on the manager that maps them (your default
-one), the admin UI and `DocumentService` flush their writes (`doctrine.transaction: bundle`), and listeners receive the
-id events after the commit.
+Nothing to configure: the six bundle entities are mapped with attributes on your default manager, the admin UI and
+`DocumentService` write through the bundle's **private entity manager** (2.0: on your default manager's connection,
+mapping and listeners, same tables; your manager is never flushed), and listeners receive the id events after the
+commit.
 
 ### DDD / hexagonal host
 
@@ -452,32 +453,31 @@ manager, host transaction mode).
 |------|--------|-------|
 | 1. Interfaces + VOs | ✅ | ports above; key-based publisher (1.14), `PageContext` / `AssetUpload` VOs (1.15) |
 | 2. No forced base class / trait | ✅ | bundle-owned entities, attribute mapping by default, XML mapping (1.16) |
-| 3. No framework types in ports, events, VOs | ✅ | deprecated `store(UploadedFile)` / entity context provider kept until 2.0 |
+| 3. No framework types in ports, events, VOs | ✅ | 2.0 removed `store(UploadedFile)` and the entity context provider; a service still on them fails the build |
 | 4. Events carry ids | ✅ | `Event\*` |
 | 5. SPI documented | ✅ | this page, [WIDGET_AUTHORS.md](WIDGET_AUTHORS.md) |
-| 6. Never flush the host EM | ⚠️ default until 2.0 | `doctrine.transaction: bundle` without `entity_manager` flushes the manager that maps the entities (the host default one) |
+| 6. Never flush the host EM | ✅ (2.0) | the private entity manager is the only mode of `transaction: bundle` without a dedicated `entity_manager`; a dedicated manager and `transaction: host` stay (DDD) |
 | 7. Events after commit | ✅ | after-commit middleware + outbox (1.14) |
 | 8. Config through provider ports | ✅ | config tree and the SPI above |
 
-## Deferred to 2.0
+## Done in 2.0
 
-Tracked in [UPGRADING.md](UPGRADING.md#to-1160):
+Announced in 1.x ([UPGRADING.md](UPGRADING.md), "To 1.19.0" / "Preparing for 2.0"), shipped in 2.0.0:
 
-- **Rule 6 default.** Without `doctrine.entity_manager`, `transaction: bundle` (the default) flushes the manager that
-  maps the bundle entities, which in a standard host is the default one (pending host changes included). Changing the
-  default to a bundle-owned manager or to `host` mode in 1.x would move the tables to another manager or stop
-  persisting the writes of existing hosts, so it waits for a major. Until then: set `doctrine.entity_manager` (and,
-  for DDD hosts, `transaction: host`).
-  **1.19** adds the 2.0 behaviour as an opt-in, `doctrine.private_entity_manager: true`: a private entity manager
-  (nowo-tech/transaction-doctrine's `PrivateManager\PrivateEntityManager`) on the default manager's connection,
-  mapping and event manager, the same tables, no host configuration. The bundle's repositories get a
-  `PrivateManagerRegistry`, its write units run `forEntityManager()` on the private manager (a failure drops it, never
-  the host's manager), and `OwnEntityManagerSubscriber` drops it at every outermost boundary (also tagged for
-  transaction-doctrine's boundary listener and `kernel.reset`). Unset or `false` triggers a deprecation notice and the
-  host-flush probe before every flush of the default manager (UPGRADING "To 1.19.0"). In 2.0 the private manager is
-  the only behaviour of `transaction: bundle` without `entity_manager`.
-- **Removal of the deprecated SPI.** `PageBuilderAssetStorageInterface::store(UploadedFile)` and
-  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)` (runtime notices since 1.15 and 1.19).
+- **Rule 6.** With `transaction: bundle` and no dedicated `doctrine.entity_manager` (or one naming the default
+  manager), the bundle writes through a private entity manager (nowo-tech/transaction-doctrine's
+  `PrivateManager\PrivateEntityManager`) on the default manager's connection, mapping and event manager, the same
+  tables, no host configuration. The bundle's repositories get a `PrivateManagerRegistry`, its write units run
+  `forEntityManager()` on the private manager (a failure drops it, never the host's manager), and
+  `OwnEntityManagerSubscriber` drops it at every outermost boundary (also tagged for transaction-doctrine's boundary
+  listener and `kernel.reset`). A page the host's manager loaded and handed to a bundle write is re-loaded by id
+  (`PageBuilderTransaction::own()`), never inserted again. The 1.19 notices and host-flush probe are gone;
+  `doctrine.private_entity_manager` is a deprecated no-op (`false` fails the build), removed in 3.0.
+- **Rules 1 and 3.** `PageBuilderAssetStorageInterface::store(UploadedFile)` and
+  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)` are removed; `PageBuilderRemovedPortsPass` fails the
+  build on any service still tied to them (lesson W1-1).
+- **UI contract.** The 1.x layout bridge, `admin/layout.html.twig` and the two layout Twig functions are removed; the
+  `web_ui.css_framework` and `doctrine.connection` keys fail the build.
 
 ## Related docs
 

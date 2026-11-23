@@ -1309,8 +1309,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     web_ui?: array{
  *         path_prefix?: scalar|Param|null, // URL prefix for all admin UI and document API routes. Public /p/{pageKey} is unaffected. Host should firewall this path. // Default: "/admin/page-builder"
- *         layout_template?: scalar|Param|null, // Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. A 1.x layout without the UiKit canonical blocks (it renders {% block admin %}) is wrapped in a deprecated bridge. // Default: null
- *         css_framework?: "bootstrap"|"bootstrap4"|"bootstrap5"|"tabler"|"tailwind"|"foundation"|"custom"|"none"|Param, // Deprecated: The "nowo_page_builder_kit.web_ui.css_framework.css_framework" option is deprecated: the admin pages use nowo_ui_kit.css_framework (REQ-UI-003). Set nowo_page_builder_kit.grapesjs.canvas_styles for the GrapesJS canvas iframe instead. // Deprecated since 1.12: the admin pages take the CSS stack from nowo_ui_kit.css_framework. Only picks the default GrapesJS canvas iframe stylesheets when grapesjs.canvas_styles is empty, and feeds the deprecated nowo_page_builder_css_framework() Twig function. // Default: "tailwind"
+ *         layout_template?: scalar|Param|null, // Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. The layout must render the UiKit canonical blocks: since 2.0 a 1.x layout that renders only {% block admin %} fails at render (the 1.x bridge was removed). // Default: null
  *         templates?: array<string, scalar|Param|null>,
  *     },
  *     seo?: array{ // Defaults for page-level SEO / Open Graph when translation fields are empty.
@@ -1324,7 +1323,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         entity_manager?: scalar|Param|null, // Doctrine entity manager that maps the bundle entities (1.14). Null (default): the manager returned by getManagerForClass() for the bundle entities, the default one in a standard host. When set, the bundle entities are mapped on that manager ONLY, every read and write uses it, and the bundle recovers (resets) it when a failed write closed it; the build fails when the manager does not exist. // Default: null
  *         transaction?: "bundle"|"host"|Param, // bundle (default): the bundle flushes its writes on its entity manager. host: the bundle never flushes; the host use case owns the transaction and the write events are dispatched after the host commit (1.14, DDD hosts). // Default: "bundle"
  *         mapping_type?: "attribute"|"xml"|Param, // Mapping driver of the bundle entities (1.16): attribute (default, unchanged) or xml (src/Resources/config/doctrine-xml/*.orm.xml, the same tables, columns, indexes and constraints) for hosts whose managers only load XML mapping. Registered on doctrine.entity_manager (or the default entity manager). // Default: "attribute"
- *         connection?: scalar|Param|null, // Deprecated: The "connection" option at path "nowo_page_builder_kit.doctrine.connection" is deprecated and ignored: it was never wired to Doctrine. Map the bundle entities on the entity manager/connection you need in doctrine.orm.entity_managers instead. // Deprecated and ignored: the bundle entities use the default Doctrine entity manager mapping; route them to another connection through your doctrine.orm.entity_managers mappings. // Default: "default"
  *     },
  *     html?: array{
  *         sanitize?: array{

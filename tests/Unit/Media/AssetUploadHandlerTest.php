@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Media\AssetUpload;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadResult;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetLibraryInterface;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
+use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -21,13 +22,15 @@ use function is_string;
 use function sys_get_temp_dir;
 use function uniqid;
 
+use const UPLOAD_ERR_NO_FILE;
+
 #[CoversClass(AssetUploadHandler::class)]
 final class AssetUploadHandlerTest extends TestCase
 {
     #[Test]
     public function isEnabledReflectsConstructorFlag(): void
     {
-        $storage = $this->createStub(PageBuilderAssetStorageInterface::class);
+        $storage = $this->createStub(PageBuilderAssetUploadStorageInterface::class);
         self::assertFalse(new AssetUploadHandler($storage)->isEnabled());
         self::assertTrue(new AssetUploadHandler($storage, true)->isEnabled());
     }
@@ -39,8 +42,8 @@ final class AssetUploadHandlerTest extends TestCase
         file_put_contents($tmp, 'x');
         $upload = new UploadedFile($tmp, 'x.png', 'image/png', null, true);
 
-        $storage = new class implements PageBuilderAssetStorageInterface {
-            public function store(UploadedFile $file): AssetUploadResult
+        $storage = new class implements PageBuilderAssetUploadStorageInterface {
+            public function storeUpload(AssetUpload $upload): AssetUploadResult
             {
                 return new AssetUploadResult('/x.png', 'x.png');
             }
@@ -57,8 +60,8 @@ final class AssetUploadHandlerTest extends TestCase
         $tmp = sys_get_temp_dir() . '/pbk-' . uniqid('', true) . '.png';
         file_put_contents($tmp, 'x');
         $upload  = new UploadedFile($tmp, 'x.png', 'image/png', null, true);
-        $storage = new class implements PageBuilderAssetStorageInterface {
-            public function store(UploadedFile $file): AssetUploadResult
+        $storage = new class implements PageBuilderAssetUploadStorageInterface {
+            public function storeUpload(AssetUpload $upload): AssetUploadResult
             {
                 return new AssetUploadResult('/x.png', 'x.png');
             }
@@ -88,7 +91,7 @@ final class AssetUploadHandlerTest extends TestCase
     #[Test]
     public function handleThrowsWhenDisabledOrEmpty(): void
     {
-        $storage = $this->createStub(PageBuilderAssetStorageInterface::class);
+        $storage = $this->createStub(PageBuilderAssetUploadStorageInterface::class);
 
         $this->expectException(RuntimeException::class);
         new AssetUploadHandler($storage, false)->handle([]);
@@ -97,10 +100,36 @@ final class AssetUploadHandlerTest extends TestCase
     #[Test]
     public function handleThrowsWhenNoValidFiles(): void
     {
-        $storage = $this->createStub(PageBuilderAssetStorageInterface::class);
+        $storage = $this->createStub(PageBuilderAssetUploadStorageInterface::class);
 
         $this->expectException(InvalidArgumentException::class);
         new AssetUploadHandler($storage, true)->handle([null]);
+    }
+
+    /** The check every built-in storage ran on the UploadedFile: an invalid upload never reaches the storage. */
+    #[Test]
+    public function handleRejectsAnInvalidUploadBeforeTheStorage(): void
+    {
+        $tmp = sys_get_temp_dir() . '/pbk-' . uniqid('', true) . '.png';
+        file_put_contents($tmp, 'x');
+        $storage = new class implements PageBuilderAssetUploadStorageInterface {
+            public int $calls = 0;
+
+            public function storeUpload(AssetUpload $upload): AssetUploadResult
+            {
+                ++$this->calls;
+
+                return new AssetUploadResult('/x.png', 'x.png');
+            }
+        };
+
+        try {
+            new AssetUploadHandler($storage, true)->handle([new UploadedFile($tmp, 'x.png', 'image/png', UPLOAD_ERR_NO_FILE, true)]);
+            self::fail('An invalid upload must be refused.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('Invalid uploaded file.', $exception->getMessage());
+        }
+        self::assertSame(0, $storage->calls);
     }
 
     #[Test]
@@ -117,8 +146,8 @@ final class AssetUploadHandlerTest extends TestCase
     #[Test]
     public function listLibraryDelegatesWhenStorageSupportsIt(): void
     {
-        $storage = new class implements PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface {
-            public function store(UploadedFile $file): AssetUploadResult
+        $storage = new class implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetLibraryInterface {
+            public function storeUpload(AssetUpload $upload): AssetUploadResult
             {
                 return new AssetUploadResult('/x.png', 'x.png');
             }
@@ -133,7 +162,7 @@ final class AssetUploadHandlerTest extends TestCase
         self::assertTrue($handler->supportsLibrary());
         self::assertSame('/a.png', $handler->listLibrary()[0]['src']);
 
-        $plain    = $this->createStub(PageBuilderAssetStorageInterface::class);
+        $plain    = $this->createStub(PageBuilderAssetUploadStorageInterface::class);
         $disabled = new AssetUploadHandler($plain, false);
         self::assertFalse($disabled->supportsLibrary());
         self::assertSame([], $disabled->listLibrary());

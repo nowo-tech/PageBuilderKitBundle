@@ -18,8 +18,6 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Twig\TwigFunction;
 
-use function in_array;
-
 #[CoversClass(PageBuilderKitExtension::class)]
 final class PageBuilderKitExtensionTest extends TestCase
 {
@@ -115,17 +113,9 @@ final class PageBuilderKitExtensionTest extends TestCase
             $inline,
         );
 
-        self::assertSame(
-            '@NowoPageBuilderKitBundle/admin/layout.html.twig',
-            $extension->layoutTemplate(),
-        );
-        self::assertSame('@NowoPageBuilderKitBundle/admin/layout.html.twig', new PageBuilderKitExtension(null, 'tailwind', $renderProvider, $registry, $accessChecker, $inline)->layoutTemplate());
-        self::assertSame('host/admin.html.twig', new PageBuilderKitExtension('host/admin.html.twig', 'tailwind', $renderProvider, $registry, $accessChecker, $inline)->layoutTemplate());
-        self::assertSame('tailwind', $extension->cssFramework());
+        // 2.0: the two Twig functions deprecated since 1.12 are gone (their constructor arguments are ignored).
         foreach ($extension->getFunctions() as $function) {
-            if (in_array($function->getName(), ['nowo_page_builder_layout_template', 'nowo_page_builder_css_framework'], true)) {
-                self::assertTrue($function->isDeprecated(), $function->getName());
-            }
+            self::assertNotContains($function->getName(), ['nowo_page_builder_layout_template', 'nowo_page_builder_css_framework']);
         }
         self::assertTrue($extension->canEdit());
         self::assertFalse($extension->revisionsEnabled());
@@ -139,7 +129,7 @@ final class PageBuilderKitExtensionTest extends TestCase
             ],
             $extension->widgetTypes(),
         );
-        self::assertCount(11, $extension->getFunctions());
+        self::assertCount(9, $extension->getFunctions());
         self::assertSame('<p>x</p>', $extension->hydrateBinds('<p>x</p>', 'home'));
         self::assertTrue($extension->can('layout'));
         self::assertSame('<span>field</span>', $extension->field('home', 'hero_title', ['type' => 'string']));

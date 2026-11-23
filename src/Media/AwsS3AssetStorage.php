@@ -6,7 +6,6 @@ namespace Nowo\PageBuilderKitBundle\Media;
 
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function bin2hex;
 use function count;
@@ -31,9 +30,10 @@ use const PATHINFO_BASENAME;
  * Stores uploads via core/aws-s3-bundle AwsS3Helper (optional dependency).
  *
  * Expects an object exposing uploadFile() + getFileURL() (AwsS3Helper).
- * Optional listFiles($prefix, $limit) enables the media library.
+ * Optional listFiles($prefix, $limit) enables the media library. 2.0: the deprecated `store(UploadedFile)` was removed
+ * with `PageBuilderAssetStorageInterface`; {@see storeUpload()} is the only upload method.
  */
-final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
+final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetLibraryInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
@@ -57,19 +57,7 @@ final readonly class AwsS3AssetStorage implements PageBuilderAssetUploadStorageI
     }
 
     /**
-     * @deprecated since 1.15, use {@see storeUpload()}; removed in 2.0
-     */
-    public function store(UploadedFile $file): AssetUploadResult
-    {
-        if (!$file->isValid()) {
-            throw new InvalidArgumentException('Invalid uploaded file.');
-        }
-
-        return $this->storeUpload(AssetUploadData::fromUploadedFile($file));
-    }
-
-    /**
-     * 1.15: the same checks and the same upload as {@see store()} had, from the framework-free VO.
+     * 1.15: size, MIME allowlist and MIME/extension checks, then the upload, from the framework-free VO.
      */
     public function storeUpload(AssetUpload $upload): AssetUploadResult
     {

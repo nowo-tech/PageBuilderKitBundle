@@ -11,6 +11,7 @@ use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\GrapesBlockPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderEntityManagerPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderMappingDriverPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderPrivateEntityManagerPass;
+use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\PageBuilderRemovedPortsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetPackPass;
 use Nowo\PageBuilderKitBundle\DependencyInjection\Compiler\WidgetTypePass;
@@ -31,13 +32,19 @@ final class NowoPageBuilderKitBundle extends Bundle
         $container->addCompilerPass(new WidgetPackPass());
         $container->addCompilerPass(new GrapesBlockPackPass());
         $container->addCompilerPass(new CsrfProtectionPass());
-        // 1.15: asset storage ports (storage=service class, the handler's port; host definitions are loaded here).
-        $container->addCompilerPass(new AssetStoragePortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 0);
+        // 2.0 (W1-1): the ports removed in 2.0 fail the build, before any pass drops a definition (1000) and once the
+        // #[AsDecorator] attributes and autoconfigured tags are applied (99).
+        $container->addCompilerPass(new PageBuilderRemovedPortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 1000);
+        $container->addCompilerPass(new PageBuilderRemovedPortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 99);
+        // 1.15: the asset storage port (storage=service class; host definitions are loaded here). 2.0: at 1000, before
+        // Symfony's ResolveClassPass, so a configured storage that cannot be loaded gets a message naming the port.
+        $container->addCompilerPass(new AssetStoragePortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 1000);
 
         // Before DoctrineBundle's MiddlewaresPass: the after-commit middleware on the bundle connection only (1.14).
         $container->addCompilerPass(new AfterCommitMiddlewarePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
 
-        // 1.19: the private manager's source and its middleware's connection; the shared host-flush probe when present.
+        // The private manager (2.0: the only mode with transaction: bundle and no dedicated manager), its source and its
+        // middleware's connection.
         $container->addCompilerPass(new PageBuilderPrivateEntityManagerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
 
         // Before the mapping passes: a clear error for an unknown doctrine.entity_manager (1.14).

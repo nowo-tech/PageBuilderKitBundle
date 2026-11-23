@@ -47,11 +47,10 @@ nowo_page_builder_kit:
         default_robots: 'index,follow'
     doctrine:
         table_prefix: ''
-        entity_manager: null    # 1.14: manager that maps the bundle entities (null: resolved by entity class)
+        entity_manager: null    # 1.14: a dedicated manager (DDD option); null: the private manager on the default one (2.0)
         transaction: bundle     # 1.14: bundle | host (host: the bundle never flushes, DDD hosts)
-        private_entity_manager: null # 1.19: true = private manager on the default connection (2.0 behaviour); null/false = notice
         mapping_type: attribute # 1.16: attribute | xml (the shipped XML mapping, same tables and columns)
-        # connection: default   # deprecated since 1.8, ignored (see below)
+        # private_entity_manager: deprecated since 2.0, no effect (false fails the build); removed in 3.0
     conflict_response:          # 1.17: lock conflicts on the bundle's routes (see CONCURRENCY.md)
         status: null            # 409 (default) | 503; null follows nowo-tech/transaction-doctrine
         retry_after: null       # seconds for CONFLICT_001; null follows transaction-doctrine, else 1
@@ -91,7 +90,7 @@ nowo_page_builder_kit:
                 folder: page-builder
                 private: false
                 public_base_url: ''
-        canvas_styles: []   # CSS URLs of the canvas iframe; empty → derived from the deprecated web_ui.css_framework
+        canvas_styles: []   # CSS URLs of the canvas iframe; empty → none
         assets: []          # empty → stock picsum/pravatar placeholders
         plugins:
             preset_webpage: true
@@ -189,9 +188,12 @@ Twig: `nowo_page_builder_can('content')`, `nowo_page_builder_can_edit()`.
 | Key | Default | Description |
 | --- | --- | --- |
 | `path_prefix` | `/admin/page-builder` | URL prefix for **all admin** routes (list, canvas, sections, SEO, versions, document API, asset upload). Must start with `/` and must **not** end with `/`. Public `/p/{pageKey}` is unchanged. |
-| `layout_template` | `null` | Layout the admin pages extend (REQ-UI-003). `null` = UiKit `nowo_ui_kit.layouts.admin` (set it once for every Nowo bundle). A layout rendering the UiKit canonical blocks is used as is; a 1.x layout rendering `{% block admin %}` is wrapped in the deprecated bridge `admin/_legacy_layout.html.twig`. The 1.x default `@NowoPageBuilderKitBundle/admin/layout.html.twig` is normalised to `null`. |
+| `layout_template` | `null` | Layout the admin pages extend (REQ-UI-003). `null` = UiKit `nowo_ui_kit.layouts.admin` (set it once for every Nowo bundle). The layout must render the UiKit canonical blocks: since 2.0 a 1.x layout that renders only `{% block admin %}` fails the admin pages with a `LogicException` naming the fix (the 1.x bridge was removed). The 1.x default value `@NowoPageBuilderKitBundle/admin/layout.html.twig` (that template was removed in 2.0) is normalised to `null`. |
 | `templates` | `{}` | Per-page template overrides, page id ⇒ template. Ids: `index`, `canvas`, `content`, `seo`, `sections`, `revisions`, `revision_diff`, `templates` (others fail the compilation). Use a thin `{% extends '@!NowoPageBuilderKitBundle/admin/pages/<page>.html.twig' %}` that overrides one data block — see [TEMPLATES](TEMPLATES.md). |
-| `css_framework` | `tailwind` | **Deprecated since 1.12.** The admin pages take the CSS stack from `nowo_ui_kit.css_framework` (theme slots). The value only seeds the default GrapesJS canvas iframe styles when `grapesjs.canvas_styles` is empty (Bootstrap 4 / 5, Tabler, Foundation from jsDelivr) and feeds the deprecated `nowo_page_builder_css_framework()`. Allowed: `bootstrap`, `bootstrap4`, `bootstrap5`, `tabler`, `tailwind`, `foundation`, `custom`, `none`. |
+
+`web_ui.css_framework` (deprecated since 1.12) was **removed in 2.0**: a leftover key fails the build. The admin pages
+take the CSS stack from `nowo_ui_kit.css_framework` (theme slots); the GrapesJS canvas iframe takes its stylesheets from
+`grapesjs.canvas_styles` (empty: no extra stylesheet, as with the 1.x default `tailwind`).
 
 **Host integration (UiKit page contract).** The admin pages are UiKit scaffolds (see [TEMPLATES](TEMPLATES.md)), so the
 host configures the shell and the look once in UiKit, not here:
@@ -281,11 +283,10 @@ Then list is `/cms/pages`, canvas `/cms/pages/{pageKey}/canvas`, upload `/cms/as
 | Key | Default | Description |
 | --- | --- | --- |
 | `table_prefix` | `''` | Prefix applied to bundle entity tables (`pb_page`, `pb_document`, …) through `TablePrefixListener`. Use when several apps/tenants share one database. |
-| `entity_manager` | `null` | **1.14.** Doctrine entity manager that maps the bundle entities. `null`: the manager returned by `getManagerForClass()` for the bundle entities (your default one in a standard host). When set, the entities are mapped on that manager **only** (also removed from an `auto_mapping: true` default, and kept off a default metadata driver such as DoctrineBundle 3.4 `auto_discover_entities`; fixed in Unreleased), every bundle read and write uses it, the bundle recovers it when a failed write closed it and clears it at the end of each request / message / command. The build fails when the manager does not exist or does not map the entities. |
-| `private_entity_manager` | `null` | **1.19.** `true`: the bundle reads and writes its entities through a private entity manager of its own, created on the connection, mapping and event manager of your default entity manager (same tables, nothing else to configure); a page builder write never flushes your pending changes, a failed one closes only the private manager, and the private manager is dropped at the end of each request / message / command. Requires `transaction: bundle` and no `entity_manager` (the build fails otherwise). `null` (default) or `false`: the 1.x behaviour (your default manager is flushed), with a deprecation notice and the host-flush probe (also when `entity_manager` names your default manager); with the private manager, an entity of yours that points at a bundle entity takes it from your manager with `getReference()`; 2.0 always uses the private manager and removes the option (`false` included). See UPGRADING "To 1.19.0". |
+| `entity_manager` | `null` | **1.14** (the DDD option). Doctrine entity manager that maps the bundle entities. `null` (or the name of your default manager): with `transaction: bundle` the bundle reads and writes through its **private entity manager** (2.0), created on the connection, mapping and event manager of your default entity manager (same tables, nothing else to configure): a page builder write never flushes your pending changes, a failed one closes only the private manager, and the private manager is dropped at the end of each request / message / command. An entity of yours that points at a bundle entity takes it from your manager with `getReference()`. A dedicated manager: the entities are mapped on that manager **only** (also removed from an `auto_mapping: true` default, and kept off a default metadata driver such as DoctrineBundle 3.4 `auto_discover_entities`), every bundle read and write uses it, the bundle recovers it when a failed write closed it and clears it at the end of each request / message / command. The build fails when the manager does not exist or does not map the entities. |
+| `private_entity_manager` | `null` | **Deprecated since 2.0, removed in 3.0.** 1.19's opt-in to the private manager, which 2.0 always uses. `true`: accepted, no effect (a deprecation notice; still refused with `entity_manager` or `transaction: host`). `false`: refused (the build fails: the 1.x mode that flushed your default manager was removed). See UPGRADING "To 2.0.0". |
 | `transaction` | `bundle` | **1.14.** `bundle`: the bundle flushes its writes on its entity manager. `host`: the bundle never flushes when the host calls its services (its own admin UI still does); the host's use case owns the transaction and the write events are dispatched after the host commit (see USAGE "Standard Symfony and DDD / hexagonal hosts"). |
 | `mapping_type` | `attribute` | **1.16.** Mapping driver of the six bundle entities, registered on `entity_manager` (or the default manager): `attribute` (unchanged) or `xml` (`src/Resources/config/doctrine-xml/*.orm.xml`, the same tables, columns, indexes and constraints) for managers that load XML mapping only. |
-| `connection` | `default` | **Deprecated since 1.8, ignored.** Use `entity_manager` (1.14). It was only stored as the `nowo_page_builder_kit.doctrine.connection` parameter and never wired to Doctrine. The bundle entities are mapped like any other mapping: to use another connection, add the bundle mapping to the matching entity manager in `doctrine.orm.entity_managers`. Setting the key triggers a deprecation notice; it will be removed in the next major. |
 
 Example — tables become `tenant_a_pb_page`, etc.:
 
@@ -332,7 +333,7 @@ Sanitization runs when `DocumentService` saves widget props and when widgets san
 | `notice_on_unload` | `false` | Browser “unsaved changes” prompt. |
 | `asset_embed_as_base64` | `true` | Embed dropped files as base64 when upload is disabled. Forced `false` when `assets_upload.enabled`. |
 | `assets_upload` | map | See [Asset uploads](#asset-uploads). |
-| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe (what the edited page looks like). Empty → derived from the deprecated `web_ui.css_framework` (Bootstrap, etc.); set it explicitly instead. The editor's own styles are local assets (`css/grapes.min.css`, `css/grapick.min.css`); the GrapesJS scripts are loaded at run time from `module_base_url` at `cdn_version`. |
+| `canvas_styles` | `[]` | CSS URLs injected into the canvas iframe (what the edited page looks like). Empty → no extra stylesheet (as with `tailwind`, the 1.x default of the `web_ui.css_framework` key removed in 2.0); list your front-end stylesheets here. The editor's own styles are local assets (`css/grapes.min.css`, `css/grapick.min.css`); the GrapesJS scripts are loaded at run time from `module_base_url` at `cdn_version`. |
 | `assets` | `[]` | Initial Asset Manager entries (`type`, `src`, `name`, `width`, `height`). Empty → stock demo images. |
 | `plugins.*` | mostly `true` | Toggle official plugins (see below). |
 
@@ -367,8 +368,9 @@ Also available from GrapesJS core (always on): Block / Style / Layer / Trait / S
 
 Built-in context: `title`, `slug`, `pageKey`, `locale`, `status`, `page.*`, `seo.*`.
 
-Host extras — implement `GrapesTwigPageContextProviderInterface` (auto-tagged; 1.15, entity-free). The entity-based
-`GrapesTwigContextProviderInterface` is deprecated (removed in 2.0) and still works:
+Host extras — implement `GrapesTwigPageContextProviderInterface` (auto-tagged; 1.15, entity-free; since 2.0 the only
+port: the entity-based `GrapesTwigContextProviderInterface` was removed, and a tagged service without this interface
+fails the build):
 
 ```php
 final class AppGrapesTwigContextProvider implements GrapesTwigPageContextProviderInterface
@@ -403,7 +405,7 @@ With `grapesjs.a11y_helpers: true` (default), the canvas exposes category **A11y
 | --- | --- | --- |
 | `assets_upload.enabled` | `false` | Enable `POST …/assets/upload` and `GET …/assets` (library) for GrapesJS + content admin. |
 | `assets_upload.storage` | `local` | `local` \| `s3` \| `service`. |
-| `assets_upload.service` | `null` | Custom storage id when `storage=service`: implements `PageBuilderAssetUploadStorageInterface` (1.15), or the deprecated `PageBuilderAssetStorageInterface`. |
+| `assets_upload.service` | `null` | Custom storage id when `storage=service`: implements `PageBuilderAssetUploadStorageInterface` (1.15; since 2.0 the only port: a service without it fails the build). |
 | `assets_upload.max_bytes` | `5242880` | Max upload size. |
 | `assets_upload.allowed_mime` | jpeg/png/gif/webp | Allowlist checked against the **detected** (finfo) MIME type. The stored extension is always derived from that MIME type (`jpg`/`png`/`gif`/`webp`/`avif`/`svg`, otherwise `bin`); uploads whose file-name extension does not match (e.g. a GIF polyglot named `x.php`) are rejected. `image/svg+xml` is **not** in the default list: SVG served from your origin can run scripts (stored XSS). Add it only if uploads come from fully trusted users or are served from a separate origin / with a restrictive CSP. |
 | `assets_upload.local.directory` | `%kernel.project_dir%/public/uploads/page-builder` | Disk path. |
@@ -432,8 +434,6 @@ The bundle registers Twig functions (not globals):
 
 | Function | Meaning |
 | --- | --- |
-| `nowo_page_builder_layout_template()` | **Deprecated since 1.12** — layout of 1.x page copies (`web_ui.layout_template`, else the deprecated `admin/layout.html.twig`, which extends the UiKit admin layout) |
-| `nowo_page_builder_css_framework()` | **Deprecated since 1.12** — the deprecated `web_ui.css_framework` value |
 | `nowo_page_builder_render(pageKey, locale?)` | Rendered page tree for Twig |
 | `nowo_page_builder_widget_types()` | Registered widget type metadata |
 

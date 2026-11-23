@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadData;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -34,7 +35,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
         file_put_contents($tmp, $png);
 
         $upload = new UploadedFile($tmp, 'pixel.png', 'image/png', null, true);
-        $result = $storage->store($upload);
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile($upload));
 
         self::assertStringStartsWith('/uploads/page-builder/', $result->src);
         self::assertSame('image', $result->type);
@@ -53,7 +54,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
         $upload = new UploadedFile($tmp, 'note.txt', 'text/plain', null, true);
 
         $this->expectException(InvalidArgumentException::class);
-        $storage->store($upload);
+        $storage->storeUpload(AssetUploadData::fromUploadedFile($upload));
     }
 
     #[Test]
@@ -65,7 +66,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
         file_put_contents($tmp, str_repeat('a', 20));
 
         $this->expectException(InvalidArgumentException::class);
-        $storage->store(new UploadedFile($tmp, 'big.png', 'image/png', null, true));
+        $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'big.png', 'image/png', null, true)));
     }
 
     #[Test]
@@ -88,7 +89,7 @@ final class LocalFilesystemAssetStorageTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid file name.');
-        $storage->store($upload);
+        $storage->storeUpload(AssetUploadData::fromUploadedFile($upload));
     }
 
     #[Test]

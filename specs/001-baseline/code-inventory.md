@@ -55,9 +55,10 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `DependencyInjection/Compiler/CsrfProtectionPass.php` | Refuses to compile without form CSRF protection (fail closed) | REQ-SEC-005 |
 | `DependencyInjection/Compiler/PageBuilderMappingDriverPass.php` | Attribute (default) or XML mapping of the entities (1.16, `doctrine.mapping_type`) | FR-ORM-001 |
 | `DependencyInjection/Compiler/PageBuilderEntityManagerPass.php` | Maps the bundle entities only on `doctrine.entity_manager` (1.14) | FR-ORM-003 |
-| `DependencyInjection/Compiler/PageBuilderPrivateEntityManagerPass.php` | `doctrine.private_entity_manager: true` resolves the application's manager the private one is created on and runs transaction-doctrine's pass; deprecation path and host-flush probe wiring when unset (1.19) | FR-ORM-005 |
+| `DependencyInjection/Compiler/PageBuilderPrivateEntityManagerPass.php` | Resolves the application's manager the private one is created on (switches `doctrine.entity_manager` naming the default manager to the private manager) and runs transaction-doctrine's pass (2.0) | FR-ORM-005 |
+| `DependencyInjection/Compiler/PageBuilderRemovedPortsPass.php` | Fails the build on services still tied to the ports removed in 2.0 (loading errors, aliases, decorators, tagged context providers) | FR-ARC-001 |
 | `DependencyInjection/Compiler/AfterCommitMiddlewarePass.php` | Attaches the after-commit DBAL middleware to the bundle's connection only (1.14) | FR-ORM-004 |
-| `DependencyInjection/Compiler/AssetStoragePortsPass.php` | Wires the 1.15 asset upload storage port and the deprecated storage alias | FR-ARC-001, FR-P2-ADM-005 |
+| `DependencyInjection/Compiler/AssetStoragePortsPass.php` | Wires the asset upload storage port for `storage: service` and refuses a service off the port (2.0) | FR-ARC-001, FR-P2-ADM-005 |
 
 ## Entities
 
@@ -152,13 +153,12 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Media/PageBuilderAssetStorageInterface.php` | Upload storage contract | FR-P2-ADM-005 |
 | `Media/PageBuilderAssetLibraryInterface.php` | Optional library list contract | FR-P7-MED-001 |
 | `Media/AssetUploadHandler.php` | Upload orchestration + library | FR-P2-ADM-005, FR-P7-MED-001, FR-P7-MED-002 |
 | `Media/AssetUploadResult.php` | Upload result VO | FR-P2-ADM-005 |
 | `Media/LocalFilesystemAssetStorage.php` | Local disk storage + list | FR-P2-ADM-005, FR-P7-MED-001 |
 | `Media/AwsS3AssetStorage.php` | S3 storage | FR-P2-ADM-005 |
-| `Media/PageBuilderAssetUploadStorageInterface.php` | Framework-free upload storage port (1.15; twin of the deprecated storage contract) | FR-ARC-001, FR-P2-ADM-005 |
+| `Media/PageBuilderAssetUploadStorageInterface.php` | Framework-free upload storage port (1.15; the only one since 2.0) | FR-ARC-001, FR-P2-ADM-005 |
 | `Media/AssetUpload.php` | Uploaded file as a bundle value object (no `UploadedFile`) | FR-ARC-001, FR-P2-ADM-005 |
 | `Media/AssetUploadData.php` | Keeps upload values outside the VO; builds it from an HTTP upload | FR-ARC-001, FR-P2-ADM-005 |
 | `Media/UploadedAssetExtension.php` | Stored extension derived from detected MIME (never the client name) | FR-P2-ADM-005, FR-SEC-005 |
@@ -203,8 +203,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | `Service/GrapesJsFrontendConfig.php` | Canvas CDN/plugin/blockPacks config | FR-P2-ADM-002, FR-P7-TAG-001 |
 | `Service/GrapesDocumentSanitizer.php` | Sanitize Grapes HTML/CSS + locale content | FR-P2-REN-003, FR-P9-ENG-003 |
 | `Service/GrapesTwigRenderer.php` | Sandboxed Twig in Grapes HTML | FR-P2-REN-002 |
-| `Service/GrapesTwigContextProviderInterface.php` | Host Twig context hook | FR-P2-REN-002 |
-| `Service/GrapesTwigPageContextProviderInterface.php` | Entity-free host Twig context hook (1.15) | FR-ARC-001, FR-P2-REN-002 |
+| `Service/GrapesTwigPageContextProviderInterface.php` | Entity-free host Twig context hook (1.15; the only one since 2.0) | FR-ARC-001, FR-P2-REN-002 |
 | `Service/PageContext.php` | Page being rendered, by id and key (no entity) | FR-ARC-001, FR-P2-REN-002 |
 | `Service/PagePublisherInterface.php` | Key-based write port (implemented by `DocumentService`) | FR-ARC-001, FR-DOC-001 |
 
@@ -289,8 +288,6 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
-| `Resources/views/admin/layout.html.twig` | Deprecated 1.x layout (extends the UiKit admin layout) | FR-ADM-002, FR-CFG-002, REQ-UI-003 |
-| `Resources/views/admin/_legacy_layout.html.twig` | Deprecated bridge around a 1.x host layout | REQ-UI-003 |
 | `Resources/views/admin/pages/index.html.twig` | Page list UI (engine badges) | FR-ADM-001, FR-P5-UI-003, FR-P9-UX-001, FR-P9-STD-003, FR-P9-STD-004 |
 | `Resources/views/admin/pages/canvas.html.twig` | Grapes canvas host | FR-ADM-002, FR-P2-ADM-001 |
 | `Resources/views/admin/pages/sections.html.twig` | Classic Sections UI (legacy banner) | FR-P2-ADM-004, FR-P9-UX-002, FR-P9-STD-004 |

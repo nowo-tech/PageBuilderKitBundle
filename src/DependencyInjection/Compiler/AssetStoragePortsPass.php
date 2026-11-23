@@ -4,27 +4,23 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\DependencyInjection\Compiler;
 
-use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
+use LogicException;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
+use ReflectionClass;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Reference;
 
-use function class_exists;
-use function is_a;
 use function is_string;
+use function sprintf;
 
 /**
- * Wires the asset storage ports (1.15, REQ-ARCH-001 rule 3).
+ * Wires the asset storage port (1.15, REQ-ARCH-001 rule 3; 2.0: the only port).
  *
- * 1. `storage: service`: the 1.15 {@see PageBuilderAssetUploadStorageInterface} alias points at the service when its
- *    class implements that port; the deprecated {@see PageBuilderAssetStorageInterface} alias (marked deprecated) only
- *    when it implements that one. A class that cannot be resolved keeps the pre-1.15 wiring (deprecated port). Aliases
- *    the host defined itself are never replaced.
- * 2. The upload handler gets the port the host provides: the 1.15 port when the host aliased or decorated it (or the
- *    configured storage implements it), else the deprecated port, so a storage that implements only the old interface
- *    keeps working unchanged.
+ * `storage: service`: the {@see PageBuilderAssetUploadStorageInterface} alias points at the configured service, which
+ * must implement that port. A service whose class implements neither it (for example one that still implements only
+ * the `PageBuilderAssetStorageInterface` removed in 2.0) nor can be loaded fails the build with a message naming the
+ * replacement: the upload handler never falls back to another storage. An alias of the port the host defined itself
+ * is never replaced. A service built by a factory (class known only at run time) is aliased as is.
  *
  * Runs before optimization: host definitions are loaded, decorators are not applied yet (they follow the alias).
  */
@@ -32,77 +28,38 @@ final class AssetStoragePortsPass implements CompilerPassInterface
 {
     public const string PACKAGE = 'nowo-tech/page-builder-kit-bundle';
 
-    public const string DEPRECATION = 'The "%alias_id%" service alias is deprecated, use "' . PageBuilderAssetUploadStorageInterface::class . '" instead.';
-
     public const string STORAGE_ID = 'nowo_page_builder_kit.asset_storage';
 
     public function process(ContainerBuilder $container): void
     {
-        if (!$container->has(self::STORAGE_ID)) {
+        if (!$container->has(self::STORAGE_ID) || $container->has(PageBuilderAssetUploadStorageInterface::class)) {
             return;
         }
 
-        $this->aliasCustomStorage($container);
-
-        $storage     = $this->resolveAlias($container, self::STORAGE_ID);
-        $newOverride = $this->isOverridden($container, PageBuilderAssetUploadStorageInterface::class, $storage);
-        $oldOverride = $this->isOverridden($container, PageBuilderAssetStorageInterface::class, $storage);
-        $useNew      = $newOverride || (!$oldOverride && $container->has(PageBuilderAssetUploadStorageInterface::class));
-
-        if ($container->hasDefinition(AssetUploadHandler::class)) {
-            $container->getDefinition(AssetUploadHandler::class)->setArgument(
-                '$storage',
-                new Reference($useNew ? PageBuilderAssetUploadStorageInterface::class : PageBuilderAssetStorageInterface::class),
-            );
-        }
-    }
-
-    private function aliasCustomStorage(ContainerBuilder $container): void
-    {
-        $hasNew = $container->has(PageBuilderAssetUploadStorageInterface::class);
-        $hasOld = $container->has(PageBuilderAssetStorageInterface::class);
-        if ($hasNew && $hasOld) {
-            return;
-        }
-
-        $class = $this->classOf($container, self::STORAGE_ID);
-        if ($class === null) {
-            // Unknown class (factory, synthetic, missing service): the pre-1.15 wiring, without a deprecation.
-            if (!$hasOld) {
-                $container->setAlias(PageBuilderAssetStorageInterface::class, self::STORAGE_ID)->setPublic(false);
+        $id = $this->resolveAlias($container, self::STORAGE_ID);
+        if ($container->hasDefinition($id)) {
+            $definition = $container->getDefinition($id);
+            $class      = $container->getParameterBag()->resolveValue($definition->getClass() ?? $id);
+            if (is_string($class) && $definition->getFactory() === null && !$definition->isSynthetic()) {
+                $reflection = $container->getReflectionClass($class, false);
+                if (!$reflection instanceof ReflectionClass) {
+                    throw new LogicException(sprintf('nowo_page_builder_kit.grapesjs.assets_upload.service is "%s" (%s), which cannot be loaded: the class or one of its interfaces is missing. %s', $id, $class, self::hint()));
+                }
+                if (!$reflection->implementsInterface(PageBuilderAssetUploadStorageInterface::class)) {
+                    throw new LogicException(sprintf('nowo_page_builder_kit.grapesjs.assets_upload.service is "%s" (%s), which does not implement "%s". %s', $id, $class, PageBuilderAssetUploadStorageInterface::class, self::hint()));
+                }
             }
-
-            return;
         }
 
-        $implementsNew = is_a($class, PageBuilderAssetUploadStorageInterface::class, true);
-        if ($implementsNew && !$hasNew) {
-            $container->setAlias(PageBuilderAssetUploadStorageInterface::class, self::STORAGE_ID)->setPublic(false);
-        }
-
-        // A class that implements neither port keeps the pre-1.15 alias (and its error at injection time).
-        if (!$hasOld && (is_a($class, PageBuilderAssetStorageInterface::class, true) || !$implementsNew)) {
-            $container->setAlias(PageBuilderAssetStorageInterface::class, self::STORAGE_ID)->setPublic(false)
-                ->setDeprecated(self::PACKAGE, '1.15', self::DEPRECATION);
-        }
+        $container->setAlias(PageBuilderAssetUploadStorageInterface::class, self::STORAGE_ID)->setPublic(false);
     }
 
     /**
-     * True when the port is decorated, or its alias resolves to another service than the configured storage.
+     * What a storage implements since 2.0.
      */
-    private function isOverridden(ContainerBuilder $container, string $port, string $storage): bool
+    public static function hint(): string
     {
-        foreach ($container->getDefinitions() as $definition) {
-            if (($definition->getDecoratedService()[0] ?? null) === $port) {
-                return true;
-            }
-        }
-
-        if (!$container->has($port)) {
-            return false;
-        }
-
-        return $this->resolveAlias($container, $port) !== $storage;
+        return sprintf('Since 2.0 the asset storage implements "%s" (storeUpload(AssetUpload)); "%s" (deprecated since 1.15) was removed. See UPGRADING.md "To 1.15.0" and "To 2.0.0".', PageBuilderAssetUploadStorageInterface::class, 'Nowo\\PageBuilderKitBundle\\Media\\PageBuilderAssetStorageInterface');
     }
 
     private function resolveAlias(ContainerBuilder $container, string $id): string
@@ -114,25 +71,5 @@ final class AssetStoragePortsPass implements CompilerPassInterface
         }
 
         return $id;
-    }
-
-    /**
-     * @return class-string|null
-     */
-    private function classOf(ContainerBuilder $container, string $service): ?string
-    {
-        $id = $this->resolveAlias($container, $service);
-        if (!$container->hasDefinition($id)) {
-            return null;
-        }
-
-        $definition = $container->getDefinition($id);
-        $class      = $container->getParameterBag()->resolveValue($definition->getClass() ?? $id);
-
-        if (!is_string($class) || $definition->getFactory() !== null || !class_exists($class)) {
-            return null;
-        }
-
-        return $class;
     }
 }

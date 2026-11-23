@@ -16,8 +16,9 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
-use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
+use Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
+use Nowo\PageBuilderKitBundle\Service\PageContext;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProvider;
 use Nowo\PageBuilderKitBundle\Service\PageSeoBuilder;
 use Nowo\PageBuilderKitBundle\Service\WidgetPropsMerger;
@@ -290,8 +291,8 @@ final class PageRenderProviderTest extends TestCase
             new GrapesTwigRenderer(true, false, new GrapesDocumentSanitizer()),
             new PageSeoBuilder('Demo', '', 'https://example.com'),
             new ArrayIterator([
-                new class implements GrapesTwigContextProviderInterface {
-                    public function getContext(BuilderPage $page, string $locale): array
+                new class implements GrapesTwigPageContextProviderInterface {
+                    public function getPageContext(PageContext $page, string $locale): array
                     {
                         return ['promo' => 'Sale'];
                     }

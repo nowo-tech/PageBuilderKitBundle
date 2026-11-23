@@ -40,7 +40,8 @@ final class ConflictResponseWiringTest extends TestCase
         self::assertTrue($container->hasDefinition(NowoPageBuilderKitExtension::COMMIT_TRACKING_MIDDLEWARE));
         // Audit UW-4: above 0, before the framework's error listener logs the exception.
         self::assertSame([['event' => 'kernel.request', 'method' => 'onRequest', 'priority' => PageBuilderConflictListener::REQUEST_PRIORITY], ['event' => 'kernel.exception', 'method' => 'onException', 'priority' => 64]], $listener->getTag('kernel.event_listener'));
-        self::assertNull($container->getDefinition(PageBuilderTransaction::class)->getArgument('$managerName'));
+        // 2.0: the private manager's source manager (resolved to the default entity manager by a compiler pass).
+        self::assertSame('%' . NowoPageBuilderKitExtension::PRIVATE_SOURCE_MANAGER_PARAMETER . '%', $container->getDefinition(PageBuilderTransaction::class)->getArgument('$managerName'));
     }
 
     #[Test]

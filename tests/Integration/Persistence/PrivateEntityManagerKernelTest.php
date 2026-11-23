@@ -7,10 +7,8 @@ namespace Nowo\PageBuilderKitBundle\Tests\Integration\Persistence;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
-use Nowo\PageBuilderKitBundle\DependencyInjection\NowoPageBuilderKitExtension;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Persistence\OwnEntityManagerSubscriber;
-use Nowo\PageBuilderKitBundle\Repository\BuilderPageRepositoryInterface;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
@@ -34,15 +32,13 @@ use function str_contains;
 use const E_USER_DEPRECATED;
 
 /**
- * 1.19 (REQ-ARCH-001 rule 6): `doctrine.private_entity_manager: true` through a real kernel (SQLite), and the host-flush
- * probe of the default path. The application's pending changes stay pending in private mode; the private manager is
- * dropped at every boundary of a kept-alive kernel (FrankenPHP worker mode with kernel reset off, no services
- * resetter, no NowoTransactionDoctrineBundle) and replaced when a failed write closed it.
+ * 2.0 (REQ-ARCH-001 rule 6): the private entity manager, the only mode with zero configuration, through a real kernel
+ * (SQLite). The application's pending changes stay pending; the private manager is dropped at every boundary of a
+ * kept-alive kernel (FrankenPHP worker mode with kernel reset off, no services resetter, no
+ * NowoTransactionDoctrineBundle) and replaced when a failed write closed it. No notice and no host-flush probe remain.
  */
 final class PrivateEntityManagerKernelTest extends TestCase
 {
-    private const string NOTICE = 'Your pending changes to ' . HostNote::class . ' were flushed by NowoPageBuilderKitBundle; 2.0 no longer does.';
-
     private ?PersistenceTestKernel $kernel = null;
 
     /** @var list<string> */
@@ -67,7 +63,7 @@ final class PrivateEntityManagerKernelTest extends TestCase
 
     public function testPrivateModeKeepsTheApplicationsPendingChangesPending(): void
     {
-        $container = $this->boot(['private_entity_manager' => true]);
+        $container = $this->boot([]);
         $default   = $this->defaultManager($container);
         $private   = $container->get('nowo_page_builder_kit.entity_manager');
         self::assertInstanceOf(PrivateEntityManager::class, $private);
@@ -95,7 +91,7 @@ final class PrivateEntityManagerKernelTest extends TestCase
         self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($pending));
         self::assertFalse($default->contains($page), 'the page belongs to the private manager');
         self::assertTrue($private->contains($page));
-        self::assertSame([], $this->probeNotices(), 'no probe in private mode');
+        self::assertSame([], $this->probeNotices(), 'no probe in 2.0');
 
         $default->flush();
         self::assertSame(['edited, not flushed', 'pending insert'], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note ORDER BY id'));
@@ -103,7 +99,7 @@ final class PrivateEntityManagerKernelTest extends TestCase
 
     public function testAFailedPrivateWriteClosesOnlyThePrivateManager(): void
     {
-        $container = $this->boot(['private_entity_manager' => true]);
+        $container = $this->boot([]);
         $default   = $this->defaultManager($container);
         $private   = $container->get('nowo_page_builder_kit.entity_manager');
         self::assertInstanceOf(PrivateEntityManager::class, $private);
@@ -132,7 +128,7 @@ final class PrivateEntityManagerKernelTest extends TestCase
      */
     public function testKeptAliveKernelDropsThePrivateManagerAtEveryRequest(): void
     {
-        $container = $this->boot(['private_entity_manager' => true]);
+        $container = $this->boot([]);
         $private   = $container->get('nowo_page_builder_kit.entity_manager');
         self::assertInstanceOf(PrivateEntityManager::class, $private);
         $default = $this->defaultManager($container);
@@ -163,7 +159,7 @@ final class PrivateEntityManagerKernelTest extends TestCase
 
     public function testABoundaryDropsThePrivateManagerAndNeverBuildsOne(): void
     {
-        $container = $this->boot(['private_entity_manager' => true]);
+        $container = $this->boot([]);
         $private   = $container->get('nowo_page_builder_kit.entity_manager');
         self::assertInstanceOf(PrivateEntityManager::class, $private);
         $subscriber = $container->get(OwnEntityManagerSubscriber::class);
@@ -177,91 +173,74 @@ final class PrivateEntityManagerKernelTest extends TestCase
         self::assertFalse($private->isCreated(), 'a boundary never builds one');
     }
 
-    public function testDefaultPathReportsTheApplicationsChangesItFlushesOncePerRequest(): void
-    {
-        $container = $this->boot([]);
-        $default   = $this->defaultManager($container);
-        self::assertSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
-        $publisher = $this->publisher($container);
-        $publisher->createPageByKey('probe', 'Probe', 'en');
-        $documents = $container->get(DocumentService::class);
-        self::assertInstanceOf(DocumentService::class, $documents);
-        $page = $documents->loadPageByKey('probe');
-        self::assertInstanceOf(BuilderPage::class, $page);
-
-        $default->persist(new HostNote('flushed by the bundle'));
-        $documents->flushPage($page);
-        $default->persist(new HostNote('again'));
-        $documents->flushPage($page);
-
-        self::assertSame([self::NOTICE], $this->probeNotices());
-        self::assertSame(['flushed by the bundle', 'again'], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note ORDER BY id'), '1.x behaviour unchanged');
-
-        // The next request is a new unit of work: reported again.
-        $kernel = $container->get('http_kernel');
-        self::assertInstanceOf(HttpKernel::class, $kernel);
-        self::assertSame(200, $this->request($kernel, '/t/show/probe'));
-        $default->persist(new HostNote('next unit'));
-        $documents->flushPage($page);
-        self::assertSame([self::NOTICE, self::NOTICE], $this->probeNotices());
-    }
-
     /**
-     * Audit XD-4: `doctrine.entity_manager` naming the default manager is the default path under another spelling: the
-     * build notice is triggered and every bundle flush of that manager (here `flushPage()`) runs the probe.
+     * W0-1: `doctrine.entity_manager` naming the default manager was the 1.x default path under another spelling (the
+     * bundle flushed it); since 2.0 it is the private manager on that manager, without a notice.
      */
-    public function testEntityManagerNamingTheDefaultManagerGetsTheNoticeAndTheProbe(): void
+    public function testEntityManagerNamingTheDefaultManagerUsesThePrivateManager(): void
     {
         $container = $this->boot(['entity_manager' => 'default', 'table_prefix' => 'named_' . md5((string) microtime(true)) . '_'], true);
-        $build     = [];
-        foreach ($this->deprecations as $message) {
-            if (str_contains($message, NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION)) {
-                $build[] = $message;
-            }
-        }
-        self::assertCount(1, $build, 'the build notice of an unset option');
-        $this->deprecations = [];
+        self::assertSame([], $this->bundleDeprecations(), 'no notice');
 
         $default = $this->defaultManager($container);
-        self::assertSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
+        $private = $container->get('nowo_page_builder_kit.entity_manager');
+        self::assertInstanceOf(PrivateEntityManager::class, $private);
         $this->publisher($container)->createPageByKey('named', 'Named', 'en');
         $documents = $container->get(DocumentService::class);
         self::assertInstanceOf(DocumentService::class, $documents);
         $page = $documents->loadPageByKey('named');
         self::assertInstanceOf(BuilderPage::class, $page);
 
-        $default->persist(new HostNote('flushed by flushPage'));
+        $pending = new HostNote('not flushed by flushPage');
+        $default->persist($pending);
         $documents->flushPage($page);
 
-        self::assertSame([self::NOTICE], $this->probeNotices());
-        self::assertSame(['flushed by flushPage'], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note ORDER BY id'), '1.x behaviour unchanged');
-    }
-
-    public function testDefaultPathWithoutApplicationChangesReportsNothing(): void
-    {
-        $container = $this->boot([]);
-        $this->publisher($container)->createPageByKey('quiet', 'Quiet', 'en');
-        $this->publisher($container)->publishByKey('quiet');
-
         self::assertSame([], $this->probeNotices());
-        $repository = $container->get(BuilderPageRepositoryInterface::class);
-        self::assertInstanceOf(BuilderPageRepositoryInterface::class, $repository);
-        self::assertSame('quiet', $repository->findOneByPageKey('quiet')?->getPageKey());
+        self::assertSame([], $default->getConnection()->fetchFirstColumn('SELECT text FROM host_note ORDER BY id'), 'the application\'s change is not flushed');
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($pending));
+        self::assertTrue($container->has(OwnEntityManagerSubscriber::class), 'the subscriber drops the private manager');
     }
 
-    public function testTheBuildNoticeNamesTheOptionWhenItIsUnset(): void
+    public function testZeroConfigBuildsWithoutNoticeAndWritesThroughThePrivateManager(): void
     {
         $this->kernel = new PersistenceTestKernel($this->doctrine(), ['table_prefix' => 'notice_' . md5((string) microtime(true)) . '_']);
         $this->kernel->boot();
 
+        self::assertSame([], $this->bundleDeprecations(), 'no notice when the container is built');
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(ContainerInterface::class, $container);
+        self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'));
+    }
+
+    /**
+     * Q4: `private_entity_manager: true` stays valid in 2.x as a deprecated no-op (removed in 3.0).
+     */
+    public function testTrueIsADeprecatedNoOp(): void
+    {
+        $container = $this->boot(['private_entity_manager' => true, 'table_prefix' => 'true_' . md5((string) microtime(true)) . '_'], true);
+
+        // The configuration is processed again by Symfony's env-placeholder validation: the same notice, once per pass.
+        $notices = $this->bundleDeprecations();
+        self::assertNotSame([], $notices);
+        foreach ($notices as $notice) {
+            self::assertStringContainsString('The "private_entity_manager" option at "nowo_page_builder_kit.doctrine" has no effect since 2.0', $notice);
+        }
+        self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'));
+    }
+
+    /**
+     * @return list<string> the deprecations of this bundle
+     */
+    private function bundleDeprecations(): array
+    {
         $notices = [];
         foreach ($this->deprecations as $message) {
-            if (str_contains($message, NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION)) {
+            if (str_contains($message, 'nowo-tech/page-builder-kit-bundle') || str_contains($message, 'NowoPageBuilderKitBundle')) {
                 $notices[] = $message;
             }
         }
 
-        self::assertCount(1, $notices, 'once per container build');
+        return $notices;
     }
 
     /** Replaces `{field}` with the column of that BuilderPage field (the host's naming strategy). */

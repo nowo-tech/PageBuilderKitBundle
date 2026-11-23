@@ -13,6 +13,7 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 use function array_diff_key;
+use function array_key_exists;
 use function array_keys;
 use function implode;
 use function in_array;
@@ -27,6 +28,10 @@ final class Configuration implements ConfigurationInterface
 {
     public const string ALIAS = 'nowo_page_builder_kit';
 
+    /**
+     * @var list<string> CSS stacks the removed `web_ui.css_framework` accepted (1.x). Kept as a public constant; the
+     *                   GrapesJS canvas default still uses one of them ({@see NowoPageBuilderKitExtension::CANVAS_CSS_FRAMEWORK}).
+     */
     public const array CSS_FRAMEWORKS = [
         'bootstrap',
         'bootstrap4',
@@ -37,6 +42,22 @@ final class Configuration implements ConfigurationInterface
         'custom',
         'none',
     ];
+
+    /**
+     * `web_ui` keys removed in 2.0 => what replaces them. A leftover key fails the build with this text instead of
+     * Symfony's generic "Unrecognized option".
+     */
+    public const array REMOVED_WEB_UI_KEYS = [
+        'css_framework' => 'deprecated since 1.12; the admin pages use "nowo_ui_kit.css_framework", and the GrapesJS canvas iframe takes its stylesheets from "nowo_page_builder_kit.grapesjs.canvas_styles" (without it, none: the 1.x default "tailwind" added no canvas stylesheet)',
+    ];
+
+    /** `doctrine` keys removed in 2.0 => what replaces them. */
+    public const array REMOVED_DOCTRINE_KEYS = [
+        'connection' => 'deprecated and ignored since 1.8; remove it (to put the bundle tables on another connection, map the bundle entities on that entity manager in doctrine.orm.entity_managers and set doctrine.entity_manager)',
+    ];
+
+    /** Deprecation of `doctrine.private_entity_manager` (any value) since 2.0; the key is removed in 3.0 (rule Q4). */
+    public const string PRIVATE_ENTITY_MANAGER_DEPRECATION = 'The "%node%" option at "%path%" has no effect since 2.0 (with transaction: bundle and no dedicated entity_manager, the private entity manager is the only mode): remove it. The key is removed in 3.0.';
 
     public function getConfigTreeBuilder(): TreeBuilder
     {
@@ -104,7 +125,8 @@ final class Configuration implements ConfigurationInterface
                     ->beforeNormalization()
                         ->ifArray()
                         ->then(static function (array $v): array {
-                            // The 1.x default layout is deprecated (REQ-UI-003): null = nowo_ui_kit.layouts.admin.
+                            $v = self::refuseRemovedKeys($v, self::REMOVED_WEB_UI_KEYS, 'web_ui');
+                            // The 1.x default layout value (REQ-UI-003, removed in 2.0): null = nowo_ui_kit.layouts.admin.
                             if (($v['layout_template'] ?? null) === PageBuilderKitPages::LEGACY_DEFAULT_LAYOUT) {
                                 $v['layout_template'] = null;
                             }
@@ -126,13 +148,7 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                         ->scalarNode('layout_template')
                             ->defaultNull()
-                            ->info('Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. A 1.x layout without the UiKit canonical blocks (it renders {% block admin %}) is wrapped in a deprecated bridge.')
-                        ->end()
-                        ->enumNode('css_framework')
-                            ->values(self::CSS_FRAMEWORKS)
-                            ->defaultValue('tailwind')
-                            ->info('Deprecated since 1.12: the admin pages take the CSS stack from nowo_ui_kit.css_framework. Only picks the default GrapesJS canvas iframe stylesheets when grapesjs.canvas_styles is empty, and feeds the deprecated nowo_page_builder_css_framework() Twig function.')
-                            ->setDeprecated('nowo-tech/page-builder-kit-bundle', '1.12', 'The "%path%.%node%" option is deprecated: the admin pages use nowo_ui_kit.css_framework (REQ-UI-003). Set nowo_page_builder_kit.grapesjs.canvas_styles for the GrapesJS canvas iframe instead.')
+                            ->info('Layout the admin pages extend (REQ-UI-003). Null (default) = nowo_ui_kit.layouts.admin. The layout must render the UiKit canonical blocks: since 2.0 a 1.x layout that renders only {% block admin %} fails at render (the 1.x bridge was removed).')
                         ->end()
                         ->arrayNode('templates')
                             ->info('Per-page template overrides (REQ-UI-003), page id => template. Ids: ' . implode(', ', array_keys(PageBuilderKitPages::TEMPLATES)) . '. Prefer a thin {% extends \'@!NowoPageBuilderKitBundle/...\' %} that overrides one data block.')
@@ -197,6 +213,16 @@ final class Configuration implements ConfigurationInterface
                 ->end()
                 ->arrayNode('doctrine')
                     ->addDefaultsIfNotSet()
+                    ->beforeNormalization()
+                        ->ifArray()
+                        ->then(static fn (array $v): array => self::refuseRemovedKeys($v, self::REMOVED_DOCTRINE_KEYS, 'doctrine'))
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static fn (array $v): bool => ($v['private_entity_manager'] ?? null) === false)
+                        ->then(static function (array $v): never {
+                            throw new InvalidConfigurationException(self::privateEntityManagerFalseMessage(is_string($v['entity_manager'] ?? null) ? $v['entity_manager'] : null, ($v['transaction'] ?? 'bundle') === 'host'));
+                        })
+                    ->end()
                     ->validate()
                         ->ifTrue(static fn (array $v): bool => ($v['private_entity_manager'] ?? null) === true && ($v['entity_manager'] ?? null) !== null)
                         ->thenInvalid('nowo_page_builder_kit.doctrine.private_entity_manager: true cannot be combined with doctrine.entity_manager: the private manager is created on the default entity manager. Use one of the two.')
@@ -209,7 +235,7 @@ final class Configuration implements ConfigurationInterface
                         ->scalarNode('table_prefix')->defaultValue('')->end()
                         ->scalarNode('entity_manager')
                             ->defaultNull()
-                            ->info('Doctrine entity manager that maps the bundle entities (1.14). Null (default): the manager returned by getManagerForClass() for the bundle entities, the default one in a standard host. When set, the bundle entities are mapped on that manager ONLY, every read and write uses it, and the bundle recovers (resets) it when a failed write closed it; the build fails when the manager does not exist.')
+                            ->info('Doctrine entity manager that maps the bundle entities (1.14, the DDD option). Null (default): the default entity manager, through the bundle\'s private entity manager with transaction: bundle (2.0: the bundle never flushes your manager); naming the default manager is the same as null. When it names a dedicated manager, the bundle entities are mapped on that manager ONLY, every read and write uses it, and the bundle recovers (resets) it when a failed write closed it; the build fails when the manager does not exist.')
                             ->validate()
                                 ->ifTrue(static fn (mixed $v): bool => $v !== null && (!is_string($v) || trim($v) === ''))
                                 ->thenInvalid('doctrine.entity_manager must be a non-empty entity manager name or null.')
@@ -217,7 +243,8 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                         ->booleanNode('private_entity_manager')
                             ->defaultNull()
-                            ->info('1.19 (REQ-ARCH-001 rule 6): true = the bundle reads and writes its entities through a private entity manager of its own, created on the connection, mapping and event manager of the default entity manager (same tables, nothing else to configure), so a page builder write never flushes the application\'s pending changes. Requires transaction: bundle and no entity_manager. Null (default) or false = the bundle flushes the default entity manager (the 1.x behaviour), with a deprecation notice and the host-flush probe. 2.0 always uses the private manager (false is removed); entity_manager and transaction: host stay.')
+                            ->setDeprecated('nowo-tech/page-builder-kit-bundle', '2.0', self::PRIVATE_ENTITY_MANAGER_DEPRECATION)
+                            ->info('Deprecated since 2.0, removed in 3.0 (REQ-ARCH-001 rule 6). With transaction: bundle and no dedicated entity_manager the bundle always reads and writes its entities through a private entity manager of its own, created on the connection, mapping and event manager of the default entity manager (same tables, nothing to configure), so a page builder write never flushes the application\'s pending changes. true: accepted, no effect (still refused with entity_manager or transaction: host, as in 1.19). false: refused (the 1.x mode that flushed the application\'s manager was removed in 2.0).')
                         ->end()
                         ->enumNode('transaction')
                             ->values(['bundle', 'host'])
@@ -228,11 +255,6 @@ final class Configuration implements ConfigurationInterface
                             ->values(['attribute', 'xml'])
                             ->defaultValue('attribute')
                             ->info('Mapping driver of the bundle entities (1.16): attribute (default, unchanged) or xml (src/Resources/config/doctrine-xml/*.orm.xml, the same tables, columns, indexes and constraints) for hosts whose managers only load XML mapping. Registered on doctrine.entity_manager (or the default entity manager).')
-                        ->end()
-                        ->scalarNode('connection')
-                            ->defaultValue('default')
-                            ->info('Deprecated and ignored: the bundle entities use the default Doctrine entity manager mapping; route them to another connection through your doctrine.orm.entity_managers mappings.')
-                            ->setDeprecated('nowo-tech/page-builder-kit-bundle', '1.8', 'The "%node%" option at path "%path%" is deprecated and ignored: it was never wired to Doctrine. Map the bundle entities on the entity manager/connection you need in doctrine.orm.entity_managers instead.')
                         ->end()
                     ->end()
                 ->end()
@@ -355,11 +377,11 @@ final class Configuration implements ConfigurationInterface
                         ->enumNode('storage')
                             ->values(['local', 's3', 'service'])
                             ->defaultValue('local')
-                            ->info('local = public filesystem; s3 = core/aws-s3-bundle helper; service = custom PageBuilderAssetUploadStorageInterface (or the deprecated PageBuilderAssetStorageInterface).')
+                            ->info('local = public filesystem; s3 = core/aws-s3-bundle helper; service = custom PageBuilderAssetUploadStorageInterface (the only port since 2.0).')
                         ->end()
                         ->scalarNode('service')
                             ->defaultNull()
-                            ->info('Service id implementing PageBuilderAssetUploadStorageInterface (1.15) or the deprecated PageBuilderAssetStorageInterface when storage=service.')
+                            ->info('Service id implementing PageBuilderAssetUploadStorageInterface when storage=service (2.0: a service that does not implement it fails the build).')
                         ->end()
                         ->integerNode('max_bytes')->defaultValue(5_242_880)->min(1)->end()
                         ->arrayNode('allowed_mime')
@@ -423,7 +445,7 @@ final class Configuration implements ConfigurationInterface
                 ->arrayNode('canvas_styles')
                     ->scalarPrototype()->end()
                     ->defaultValue([])
-                    ->info('CSS URLs injected into the GrapesJS canvas iframe. Empty = derive from web_ui.css_framework.')
+                    ->info('CSS URLs injected into the GrapesJS canvas iframe. Empty = no extra stylesheet (as with tailwind, the 1.x default of the web_ui.css_framework key removed in 2.0).')
                 ->end()
             ->end();
     }
@@ -480,5 +502,41 @@ final class Configuration implements ConfigurationInterface
         $this->addGrapesjsPart($grapesjs);
         $this->addGrapesjsAssetsUploadToCanvasStylesSections($grapesjs);
         $this->addGrapesjsAssetsToPluginsSections($grapesjs);
+    }
+
+    /**
+     * Build error of `doctrine.private_entity_manager: false` (2.0 removed the 1.x mode it kept).
+     */
+    public static function privateEntityManagerFalseMessage(?string $entityManager, bool $hostTransaction = false): string
+    {
+        $message = 'nowo_page_builder_kit.doctrine.private_entity_manager: false is no longer supported: 2.0 removed the mode in which page builder writes flush your application\'s default entity manager. Remove the key.';
+        if ($hostTransaction) {
+            $message .= ' doctrine.transaction: host stays: your use case keeps owning the flush.';
+        } elseif ($entityManager !== null && $entityManager !== '') {
+            $message .= sprintf(' doctrine.entity_manager "%s" stays: a dedicated manager keeps working as in 1.x; if it names your default entity manager, 2.0 uses the private entity manager on it.', $entityManager);
+        } else {
+            $message .= ' The bundle then writes through its private entity manager (same connection and tables), which never flushes your pending changes; or set doctrine.entity_manager to a dedicated manager, or doctrine.transaction: host.';
+        }
+
+        return $message . ' See UPGRADING.md "To 2.0.0".';
+    }
+
+    /**
+     * Fails on a key removed in 2.0, naming what replaces it.
+     *
+     * @param array<mixed> $values
+     * @param array<string, string> $removed key => what replaces it
+     *
+     * @return array<mixed>
+     */
+    private static function refuseRemovedKeys(array $values, array $removed, string $path): array
+    {
+        foreach ($removed as $key => $replacement) {
+            if (array_key_exists($key, $values)) {
+                throw new InvalidConfigurationException(sprintf('The "%s.%s.%s" option was removed in 2.0: %s. See UPGRADING.md "To 2.0.0".', self::ALIAS, $path, $key, $replacement));
+            }
+        }
+
+        return $values;
     }
 }

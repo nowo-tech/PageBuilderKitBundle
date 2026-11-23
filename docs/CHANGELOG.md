@@ -49,6 +49,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+2.0.0 (major, REQ-ARCH-001 rules 1, 3 and 6): removes only what 1.x deprecated. An application that runs 1.19 without
+deprecation notices from this bundle upgrades without code changes, except for application code that relied on a page
+builder write flushing its own pending changes (see UPGRADING "To 2.0.0", "Before you upgrade").
+
+### Removed
+
+- **BREAKING:** the 1.x mode in which page builder writes (`doctrine.transaction: bundle` without `entity_manager`, or
+  with `entity_manager` naming the default manager) flushed the application's default entity manager (deprecated in
+  1.19): its two deprecation notices (`NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION`,
+  `::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION`, `::NAMED_DEFAULT_MANAGER_NOTICE_PARAMETER`), the host-flush probe
+  (`nowo_page_builder_kit.host_flush_probe`, `NowoPageBuilderKitExtension::HOST_FLUSH_PROBE_SERVICE`,
+  `::registerHostFlushProbe()`, `PageBuilderPrivateEntityManagerPass::SHARED_BOUNDARY_LISTENER`) and its calls in
+  `Persistence\PageBuilderTransaction`, whose `$hostFlushProbe` and `$resetsHostFlushProbe` constructor arguments are
+  kept, ignored (deprecated, removed in 3.0).
+- **BREAKING:** `doctrine.private_entity_manager: false` now fails the container build with a message that says what to
+  do (deprecated in 1.19).
+- **BREAKING:** `Media\PageBuilderAssetStorageInterface` and its service alias, `LocalFilesystemAssetStorage::store()`
+  and `AwsS3AssetStorage::store(UploadedFile)`, and the bridge in `AssetUploadHandler` (deprecated in 1.15):
+  `PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)` is the only asset storage port.
+  `AssetStoragePortsPass::DEPRECATION` is gone with the alias.
+- **BREAKING:** `Service\GrapesTwigContextProviderInterface` (deprecated in 1.15, runtime notice since 1.19) and its
+  selection in `PageRenderProvider` (`PageRenderProvider::CONTEXT_PROVIDER_DEPRECATION`):
+  `GrapesTwigPageContextProviderInterface` is the only Twig context provider port; `PageRenderProvider` refuses any
+  other object with an `InvalidArgumentException`.
+- **BREAKING:** the layout bridge `admin/_legacy_layout.html.twig` (`PageBuilderKitPages::LEGACY_ADMIN_BRIDGE`, the
+  bridge variables `nowo_page_builder_legacy_layout` / `nowo_page_builder_legacy_blocks`), the 1.x default layout
+  `admin/layout.html.twig`, `PageBuilderKitPages::legacyLayoutTemplate()` and the Twig functions
+  `nowo_page_builder_layout_template()` / `nowo_page_builder_css_framework()` (deprecated in 1.12, "removal in 2.0"): a
+  `web_ui.layout_template` that does not render the UiKit canonical blocks now fails the admin page with a
+  `LogicException` that says what to do, instead of being wrapped. The two `Twig\PageBuilderKitExtension` constructor
+  arguments that fed the functions are kept, ignored (removed in 3.0). The 1.x default value of
+  `web_ui.layout_template` still means `null`.
+- **BREAKING:** `web_ui.css_framework` (deprecated in 1.12) and `doctrine.connection` (deprecated and ignored since
+  1.8): a leftover key fails the build naming the fix; the `nowo_page_builder_kit.web_ui.css_framework` and
+  `nowo_page_builder_kit.doctrine.connection` container parameters are gone with them. Without
+  `grapesjs.canvas_styles`, the GrapesJS canvas iframe gets what the 1.x default (`tailwind`) gave it: no extra
+  stylesheet.
+
+### Changed
+
+- **BREAKING:** with `doctrine.transaction: bundle` (the default) and no dedicated `doctrine.entity_manager` (or one
+  naming the application's default manager), the bundle reads and writes its entities through its private entity
+  manager (transaction-doctrine's `PrivateEntityManager`, same connection, mapping, listeners and tables; the 1.19
+  opt-in): a page builder write never flushes the application's manager, and no longer refuses to start while that
+  manager holds pending changes. The private manager is dropped at every request, Messenger message and console command
+  boundary and at `kernel.reset`. `doctrine.entity_manager: <dedicated manager>` and `doctrine.transaction: host` (the
+  DDD options) are unchanged.
+- **BREAKING:** a page loaded by the application's own manager and handed to a bundle write (`DocumentService`
+  `saveDocument()` / `publish()` / `unpublish()` / `duplicatePage()`, the revision, template and content-field
+  services) is re-loaded by id in the private manager (never inserted again); `DocumentService::flushPage()` and
+  `saveTranslation()` refuse such a page with a `LogicException` before anything is written (lesson W1-2). A NEW page
+  the application persisted through its own manager is refused by every bundle write (also `PageRevisionStore`
+  `snapshot()` / `prune()`) with a `LogicException` before anything is written: the private manager would insert it
+  and the application's next flush would insert it a second time.
+- **BREAKING:** a service still tied to a removed port fails the container build (`PageBuilderRemovedPortsPass`,
+  lesson W1-1): a class that implements `PageBuilderAssetStorageInterface` or `GrapesTwigContextProviderInterface`
+  (Symfony would otherwise drop it without a word), an alias or a decorator of a removed id, a tagged Twig context
+  provider without `GrapesTwigPageContextProviderInterface`, or a `grapesjs.assets_upload.service` without
+  `PageBuilderAssetUploadStorageInterface`.
+- `doctrine.private_entity_manager: true` is accepted and deprecated (no effect; still refused with `entity_manager` or
+  `transaction: host`, as in 1.19; removed in 3.0). 1.19's "Preparing for 2.0" said the key is removed: UPGRADING
+  "To 2.0.0" corrects that.
+- CI: pushes and pull requests of the `1.x` maintenance branch run the workflow.
+- Demo: the configuration drops `doctrine.private_entity_manager: true` (the 2.0 default); the
+  `examples/acme-grapes-block-pack` example accepts `^1.4 || ^2.0` (it uses no removed SPI).
+- Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60); the demo's own header is gone and the pages use the shell page headers and section cards. The demo stylesheet entry (`assets/app.css`) and the host admin layout bridge are gone; the toolbar of the page views is the page header. Demo only, no bundle change.
+- CI: a new `release-gates` job runs `make rector-dry`, `validate-phpdoc`, `validate-translations` and `check-twig-extra` (full mode only, one matrix cell each), so a gate cannot fail only at release time. CI only, no change to the shipped bundle.
+
+### Security
+
+- After 2.0.0 is released, the 1.x line receives security fixes for 6 months: fixes rated Moderate and above are
+  backported to the last 1.x minor (1.19); Low ones are fixed in 2.x only.
+
 ### Fixed
 
 - Translations: the de, fr, it, nl and pt admin catalogues still held English copies for the page sections screen (title, hint, save and saved messages, "Invalid CSRF token.", empty states, column width), the SEO form (SEO title, Open Graph fields, canonical URL, "Save SEO", "SEO settings saved."), the skip link and the revisions "Diff" label; the es catalogue kept "Meta description" and "Diff". All are translated now.
@@ -57,11 +130,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Tests
 
 - A regression test checks that no message of the es, de, fr, it, nl and pt catalogues is an English copy, apart from language-neutral values (at most two words, such as "Editor" or "Live").
-
-### Changed
-
-- Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60); the demo's own header is gone and the pages use the shell page headers and section cards. The demo stylesheet entry (`assets/app.css`) and the host admin layout bridge are gone; the toolbar of the page views is the page header. Demo only, no bundle change.
-- CI: a new `release-gates` job runs `make rector-dry`, `validate-phpdoc`, `validate-translations` and `check-twig-extra` (full mode only, one matrix cell each), so a gate cannot fail only at release time. CI only, no change to the shipped bundle.
 
 ## [1.19.0] - 2026-11-20
 
