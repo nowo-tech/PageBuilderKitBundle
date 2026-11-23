@@ -2,6 +2,13 @@
  * Inline content-field editor (modal) for public / admin editable fields.
  * Built as IIFE into `src/Resources/public/js/page-builder-inline-edit.js`.
  */
+import { createBundleLogger } from './logger';
+
+declare const __PAGE_BUILDER_KIT_BUILD_TIME__: string;
+
+createBundleLogger('page-builder-kit/inline-edit', {
+  buildTime: typeof __PAGE_BUILDER_KIT_BUILD_TIME__ !== 'undefined' ? __PAGE_BUILDER_KIT_BUILD_TIME__ : undefined,
+}).scriptLoaded();
 
 export {};
 

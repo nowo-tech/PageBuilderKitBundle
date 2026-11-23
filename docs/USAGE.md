@@ -56,6 +56,7 @@ Architecture diagrams (Mermaid): [ARCHITECTURE.md](ARCHITECTURE.md).
 - [Template sharing](#template-sharing)
 - [Web Profiler collector](#web-profiler-collector)
 - [Public bind hydration, section filter and status query](#public-bind-hydration-section-filter-and-status-query)
+- [Browser console](#browser-console)
 
 ## Admin routes
 
@@ -923,3 +924,7 @@ final class ClinicContentFieldDefinitionProvider implements ContentFieldDefiniti
 **Section filter.** `ContentSectionFilter::sanitize($request->query->get('section'))` returns a lowercase `[a-z0-9_]+` slug or `null`; `ContentSectionFilter::filterSchema($schema, $section)` keeps rows whose `key` equals the section or starts with `{section}_`.
 
 **Status query.** `BuilderPageStatusQueryInterface::findStatusByPageKey($pageKey)` returns `?PageStatus` with a scalar `SELECT p.status` (no document JSON hydrated) — use it in public controllers to decide 404 vs render.
+
+## Browser console
+
+The bundle's script logs one line when it loads (`📦 [page-builder-kit/<script>] script loaded, build: 2026-11-23 14:05 UTC`) so a developer can tell which build a page runs. To silence it, set `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE = 'quiet'` before the script loads; nothing is printed then. The default is unchanged.

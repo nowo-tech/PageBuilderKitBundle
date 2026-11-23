@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Console**: each shipped script (`page-builder-canvas.js`, `page-builder-inline-edit.js`, `page-builder-admin.js`) logs one line on load, `📦 [page-builder-kit/<script>] script loaded, build: 2026-11-23 14:05 UTC`, with the house `createBundleLogger`. The build time is read from the committed `build-info.json` (`{sourceHash, builtAt}`): it is reused while the sources are unchanged and renewed only when they change, so rebuilding unchanged sources never rewrites the committed assets (no wall-clock stamp, no user data). Quiet switch: `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE = 'quiet'` prints nothing; the default is unchanged.
+
 ## [2.0.0] - 2026-11-23
 
 2.0.0 (major, REQ-ARCH-001 rules 1, 3 and 6): removes only what 1.x deprecated. An application that runs 1.19 without
