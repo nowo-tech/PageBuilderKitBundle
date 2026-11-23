@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x     | :white_check_mark: |
+| 2.x     | :white_check_mark: |
+| 1.x     | security fixes (Moderate and above, backported to 1.19) until 6 months after 2.0.0 |
 
 ## Reporting a Vulnerability
 
