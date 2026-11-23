@@ -7,6 +7,11 @@ parameters:
         - tests
     excludePaths:
         - demo/*
+        # 2.0 (W1-1): host fixtures that implement the ports removed in 2.0 (or an unrelated missing interface) on
+        # purpose: they cannot be loaded, which is what the removed-ports kernel test checks.
+        - tests/Fixtures/RemovedPorts/ImplementsStorage/*
+        - tests/Fixtures/RemovedPorts/ImplementsContext/*
+        - tests/Fixtures/RemovedPorts/Unrelated/*
     treatPhpDocTypesAsCertain: false
     ignoreErrors: []
     scanFiles:

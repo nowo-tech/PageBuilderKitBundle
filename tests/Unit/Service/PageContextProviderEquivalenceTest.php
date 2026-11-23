@@ -6,6 +6,7 @@ namespace Nowo\PageBuilderKitBundle\Tests\Unit\Service;
 
 use ArrayIterator;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPageTranslation;
@@ -17,7 +18,6 @@ use Nowo\PageBuilderKitBundle\Security\PageBuilderProtection;
 use Nowo\PageBuilderKitBundle\Security\PageBuilderProtectionConfig;
 use Nowo\PageBuilderKitBundle\Service\DocumentNormalizer;
 use Nowo\PageBuilderKitBundle\Service\GrapesDocumentSanitizer;
-use Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigPageContextProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\GrapesTwigRenderer;
 use Nowo\PageBuilderKitBundle\Service\PageContext;
@@ -29,11 +29,13 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use stdClass;
 
 /**
  * 1.15 (REQ-ARCH-001 rule 1): a Twig context provider on the entity-free {@see GrapesTwigPageContextProviderInterface}
- * renders the same HTML as one on the deprecated entity port, from the same page data; a provider implementing both
- * gets only the new method called.
+ * gets the page's ids, key, status, publication date and the title and slug of the rendered locale. 2.0: it is the only
+ * Twig context provider port (the entity-based `GrapesTwigContextProviderInterface` was removed): any other object is
+ * refused.
  */
 #[CoversClass(PageRenderProvider::class)]
 #[CoversClass(PageContext::class)]
@@ -42,27 +44,10 @@ final class PageContextProviderEquivalenceTest extends TestCase
     private const string HTML = '<p>{{ owner }}|{{ ref }}|{{ state }}|{{ when }}|{{ heading }}|{{ path }}|{{ lang }}</p>';
 
     #[Test]
-    public function newProviderRendersLikeTheDeprecatedOne(): void
+    public function theProviderGetsThePageData(): void
     {
         $page = $this->page();
-
-        $legacy = new class implements GrapesTwigContextProviderInterface {
-            public function getContext(BuilderPage $page, string $locale): array
-            {
-                $translation = $page->getTranslation($locale);
-
-                return [
-                    'owner'   => (string) $page->getId(),
-                    'ref'     => $page->getPageKey() . '/' . $page->getUuid(),
-                    'state'   => $page->getStatus()->value,
-                    'when'    => $page->getPublishedAt()?->format('Y-m-d') ?? '',
-                    'heading' => $translation?->getTitle() ?? '',
-                    'path'    => $translation?->getSlug() ?? '',
-                    'lang'    => $locale,
-                ];
-            }
-        };
-        $new = new class implements GrapesTwigPageContextProviderInterface {
+        $new  = new class implements GrapesTwigPageContextProviderInterface {
             public function getPageContext(PageContext $page, string $locale): array
             {
                 return [
@@ -77,33 +62,18 @@ final class PageContextProviderEquivalenceTest extends TestCase
             }
         };
 
-        foreach (['es', 'en'] as $locale) {
-            $old = $this->render($page, $legacy, $locale);
-            self::assertSame($old, $this->render($page, $new, $locale), $locale);
-        }
-
-        self::assertStringContainsString('<p>42|home/', $this->render($page, $new, 'es'));
-        self::assertStringContainsString('|published|2026-11-12|Inicio|inicio|es</p>', $this->render($page, $new, 'es'));
-        // No translation for "en": no title / slug, on both ports.
+        self::assertStringContainsString('<p>42|home/' . $page->getUuid() . '|published|2026-11-12|Inicio|inicio|es</p>', $this->render($page, $new, 'es'));
+        // No translation for "en": no title / slug.
         self::assertStringContainsString('|published|2026-11-12|||en</p>', $this->render($page, $new, 'en'));
     }
 
     #[Test]
-    public function providerImplementingBothGetsOnlyTheNewMethod(): void
+    public function aProviderOffThePortIsRefused(): void
     {
-        $both = new class implements GrapesTwigContextProviderInterface, GrapesTwigPageContextProviderInterface {
-            public function getContext(BuilderPage $page, string $locale): array
-            {
-                return ['owner' => 'legacy'];
-            }
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('A Twig context provider must implement "' . GrapesTwigPageContextProviderInterface::class . '"');
 
-            public function getPageContext(PageContext $page, string $locale): array
-            {
-                return ['owner' => 'new'];
-            }
-        };
-
-        self::assertStringContainsString('<p>new|', $this->render($this->page(), $both, 'es'));
+        $this->render($this->page(), new stdClass(), 'es');
     }
 
     private function page(): BuilderPage
@@ -127,7 +97,7 @@ final class PageContextProviderEquivalenceTest extends TestCase
         return $page;
     }
 
-    private function render(BuilderPage $page, GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface $contextProvider, string $locale): string
+    private function render(BuilderPage $page, object $contextProvider, string $locale): string
     {
         $provider = new PageRenderProvider(
             new readonly class($page) implements BuilderPageRepositoryInterface {
@@ -153,7 +123,7 @@ final class PageContextProviderEquivalenceTest extends TestCase
             new GrapesDocumentSanitizer(),
             new GrapesTwigRenderer(true, false, new GrapesDocumentSanitizer()),
             new PageSeoBuilder('Demo', '', 'https://example.com'),
-            new ArrayIterator([$contextProvider]),
+            new ArrayIterator([$contextProvider]), // @phpstan-ignore argument.type (a provider off the port, on purpose)
         );
 
         return (string) $provider->getRenderedTree('home', $locale)['html'];

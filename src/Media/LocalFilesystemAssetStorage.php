@@ -6,7 +6,6 @@ namespace Nowo\PageBuilderKitBundle\Media;
 
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function bin2hex;
 use function closedir;
@@ -30,10 +29,10 @@ use function usort;
 /**
  * Validates and stores uploads on the local public filesystem.
  *
- * 1.15: {@see storeUpload()} (framework-free port) runs the same checks as {@see store()}; {@see store()} checks the
- * HTTP upload and delegates to it.
+ * 1.15: {@see storeUpload()} (framework-free port). 2.0: the deprecated `store(UploadedFile)` was removed with
+ * `PageBuilderAssetStorageInterface`.
  */
-final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetStorageInterface, PageBuilderAssetLibraryInterface
+final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetUploadStorageInterface, PageBuilderAssetLibraryInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
@@ -49,18 +48,6 @@ final readonly class LocalFilesystemAssetStorage implements PageBuilderAssetUplo
             'image/webp',
         ],
     ) {
-    }
-
-    /**
-     * @deprecated since 1.15, use {@see storeUpload()}; removed in 2.0
-     */
-    public function store(UploadedFile $file): AssetUploadResult
-    {
-        if (!$file->isValid()) {
-            throw new InvalidArgumentException('Invalid uploaded file.');
-        }
-
-        return $this->storeUpload(AssetUploadData::fromUploadedFile($file));
     }
 
     public function storeUpload(AssetUpload $upload): AssetUploadResult

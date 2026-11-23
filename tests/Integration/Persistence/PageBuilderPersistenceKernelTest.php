@@ -33,6 +33,7 @@ use Nowo\PageBuilderKitBundle\Service\PagePublisherInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionService;
 use Nowo\PageBuilderKitBundle\Service\PageTemplateService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
+use Nowo\TransactionDoctrine\PrivateManager\PrivateEntityManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
@@ -112,8 +113,10 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $container = $this->boot($this->singleManager(), []);
         $default   = $this->manager($container, 'default');
 
-        self::assertSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
-        self::assertFalse($container->has(OwnEntityManagerSubscriber::class), 'the host manager is never reset by the bundle');
+        // 2.0: the bundle's private manager on the default one (same tables); only the private manager is dropped.
+        self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'));
+        self::assertNotSame($default, $container->get('nowo_page_builder_kit.entity_manager'));
+        self::assertTrue($container->has(OwnEntityManagerSubscriber::class), 'the private manager is dropped at every boundary');
 
         $publisher = $container->get(PagePublisherInterface::class);
         self::assertInstanceOf(PagePublisherInterface::class, $publisher);
@@ -928,7 +931,17 @@ final class PageBuilderPersistenceKernelTest extends TestCase
     {
         $container = $this->boot($this->singleManager(), ['entity_manager' => 'default']);
 
-        self::assertFalse($container->has(OwnEntityManagerSubscriber::class), 'rule 7: the host clears its own default manager');
+        // 2.0 (W0-1): the default manager named explicitly is the zero-config setup: the private manager on it. The
+        // subscriber drops that private manager only, never the host's default manager (rule 7).
+        self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'));
+        self::assertTrue($container->has(OwnEntityManagerSubscriber::class));
+        $default = $this->manager($container, 'default');
+        $note    = new HostNote('pending');
+        $default->persist($note);
+        $subscriber = $container->get(OwnEntityManagerSubscriber::class);
+        self::assertInstanceOf(OwnEntityManagerSubscriber::class, $subscriber);
+        $subscriber->clearState();
+        self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($note), 'rule 7: the host clears its own default manager');
     }
 
     public function testDefaultPathNeverResetsTheHostManager(): void
@@ -942,12 +955,12 @@ final class PageBuilderPersistenceKernelTest extends TestCase
         $kernel->terminate($request, $response);
         self::assertFalse($default->isOpen());
 
+        // 2.0: the bundle writes through its private manager: the host's closed manager neither stops it nor is reset by
+        // it (the host owns its manager).
         $request  = Request::create('/t/create/next');
         $response = $kernel->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
-        self::assertSame(500, $response->getStatusCode(), 'the host owns its manager: the bundle does not reset it before its write');
-        // 1.17 (REQ-RUNTIME-003 rule 2): the failed write unit found the host's manager closed and replaced it
-        // through the registry (transaction-doctrine's forHostEntityManager()); an open one is never reset.
-        self::assertTrue($default->isOpen());
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertFalse($default->isOpen(), 'the bundle does not reset the host\'s manager');
         $kernel->terminate($request, $response);
 
         $request  = Request::create('/t/create/after');

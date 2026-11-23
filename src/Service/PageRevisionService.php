@@ -44,6 +44,7 @@ final readonly class PageRevisionService
         if (!$this->store->isEnabled()) {
             throw new InvalidArgumentException('Page revisions are disabled.');
         }
+        $page = $this->documentService->own($page);
 
         // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.
         return $this->documentService->unit(function () use ($page, $label): ?BuilderPageRevision {
@@ -58,6 +59,8 @@ final readonly class PageRevisionService
         if (!$this->store->isEnabled()) {
             throw new InvalidArgumentException('Page revisions are disabled.');
         }
+
+        $page = $this->documentService->own($page);
 
         // 1.17: one write unit, under the page lock (the "Before restore" snapshot and the restore see the same content).
         // @igor-ignore - Write-unit closure: run once, synchronously, by the runner; never stored.

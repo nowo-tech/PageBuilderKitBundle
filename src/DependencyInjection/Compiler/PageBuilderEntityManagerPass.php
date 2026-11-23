@@ -31,7 +31,8 @@ use function str_starts_with;
  * of that chain cannot claim the entities either (DoctrineBundle 3.4 `auto_discover_entities`; only the public
  * `addDriver()` of the `doctrine.orm.<manager>_metadata_driver` chain is used). It fails the build when the
  * configured manager does not exist or does not map the entities. When the configured
- * manager is the host's default manager, the bundle does not clear it at the unit-of-work boundaries (1.15.1).
+ * manager is the host's default manager, the bundle does not clear it at the unit-of-work boundaries (1.15.1); with
+ * `transaction: bundle` the bundle then writes through its private manager on it (2.0) and drops only that one.
  */
 final readonly class PageBuilderEntityManagerPass implements CompilerPassInterface
 {
@@ -69,8 +70,14 @@ final readonly class PageBuilderEntityManagerPass implements CompilerPassInterfa
 
         // The host's default manager is the host's to clear (REQ-RUNTIME-002 rule 7): never touched by the bundle.
         $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
+        $private = $container->hasParameter(NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_PARAMETER)
+            && $container->getParameter(NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_PARAMETER) === true;
         if ($name === $default) {
-            $container->removeDefinition(OwnEntityManagerSubscriber::class);
+            // 2.0: with transaction: bundle the bundle writes through its private manager on it
+            // (PageBuilderPrivateEntityManagerPass), and the subscriber drops only that one.
+            if (!$private) {
+                $container->removeDefinition(OwnEntityManagerSubscriber::class);
+            }
         } elseif ($container->hasDefinition(PageBuilderTransaction::class)) {
             // 1.17 (REQ-RUNTIME-003 rule 2): the bundle's own manager may be closed and reset after a failed write
             // unit (forEntityManager()); the host's never is (forHostEntityManager(), the default).

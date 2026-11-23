@@ -7,15 +7,13 @@ namespace Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
 use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface;
 use Nowo\PageBuilderKitBundle\NowoPageBuilderKitBundle;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DddHost\MediaLibrary;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DddHost\MediaLibraryAssetStorage;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DecoratingUploadStorage;
-use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DualHostStorage;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\HostUploadStorage;
-use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\LegacyHostStorage;
+use Nowo\PageBuilderKitBundle\Tests\Integration\RemovedPorts\RemovedPortsKernelTest;
 use Nowo\UiKitBundle\NowoUiKitBundle;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -35,12 +33,15 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function sys_get_temp_dir;
 
 /**
- * Host kernel that wires the asset storage ports the way a host would (1.15):
+ * Host kernel that wires the asset storage port the way a host would (1.15; 2.0: the only port):
  *
- * - `local` / `s3` (built-in storages); `new` / `legacy` / `both`: the host aliases the 1.15 port, the deprecated port,
- *   or both; `decorator`: a decorator of the 1.15 port over the built-in storage;
- * - `service-new` / `service-legacy` / `service-both`: `storage: service` with such a service;
+ * - `local` / `s3` (built-in storages); `new`: the host aliases the port; `decorator`: a decorator of the port over the
+ *   built-in storage;
+ * - `service-new`: `storage: service` with such a service;
  * - `ddd`: `storage: service` with a DDD host adapter of its own domain service.
+ *
+ * The 1.x variants on the removed `PageBuilderAssetStorageInterface` fail the build since 2.0
+ * ({@see RemovedPortsKernelTest}).
  */
 final class AssetPortsKernel extends Kernel
 {
@@ -87,11 +88,12 @@ final class AssetPortsKernel extends Kernel
 
     protected function build(ContainerBuilder $container): void
     {
-        // Records where both port aliases point (and whether they are deprecated) before private aliases are removed.
+        // Records where the port alias (and the removed 1.x id) point, and whether they are deprecated, before private
+        // aliases are removed.
         $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
-                foreach (['new' => PageBuilderAssetUploadStorageInterface::class, 'legacy' => PageBuilderAssetStorageInterface::class] as $key => $port) {
+                foreach (['new' => PageBuilderAssetUploadStorageInterface::class, 'legacy' => 'Nowo\\PageBuilderKitBundle\\Media\\PageBuilderAssetStorageInterface'] as $key => $port) {
                     $value = null;
                     if ($container->hasAlias($port)) {
                         $alias = $container->getAlias($port);
@@ -125,12 +127,10 @@ final class AssetPortsKernel extends Kernel
 
         $upload = ['enabled' => true, 'local' => ['directory' => self::baseDir() . '/uploads', 'public_prefix' => '/uploads']];
         $upload += match ($this->variant) {
-            's3'             => ['storage' => 's3', 's3' => ['helper_service' => 'test.s3_helper']],
-            'service-new'    => ['storage' => 'service', 'service' => HostUploadStorage::class],
-            'service-legacy' => ['storage' => 'service', 'service' => LegacyHostStorage::class],
-            'service-both'   => ['storage' => 'service', 'service' => DualHostStorage::class],
-            'ddd'            => ['storage' => 'service', 'service' => MediaLibraryAssetStorage::class],
-            default          => [],
+            's3'          => ['storage' => 's3', 's3' => ['helper_service' => 'test.s3_helper']],
+            'service-new' => ['storage' => 'service', 'service' => HostUploadStorage::class],
+            'ddd'         => ['storage' => 'service', 'service' => MediaLibraryAssetStorage::class],
+            default       => [],
         };
         $container->extension('nowo_page_builder_kit', [
             'web_ui'   => ['path_prefix' => '/admin/page-builder'],
@@ -141,18 +141,11 @@ final class AssetPortsKernel extends Kernel
         $services->set('logger', NullLogger::class);
         $services->set('test.s3_helper', S3HelperStub::class);
         $services->set(HostUploadStorage::class);
-        $services->set(LegacyHostStorage::class);
-        $services->set(DualHostStorage::class);
         $services->set(MediaLibrary::class)->public();
         $services->set(MediaLibraryAssetStorage::class)->autowire();
 
         match ($this->variant) {
-            'new'    => $services->alias(PageBuilderAssetUploadStorageInterface::class, HostUploadStorage::class),
-            'legacy' => $services->alias(PageBuilderAssetStorageInterface::class, LegacyHostStorage::class),
-            'both'   => [
-                $services->alias(PageBuilderAssetUploadStorageInterface::class, DualHostStorage::class),
-                $services->alias(PageBuilderAssetStorageInterface::class, DualHostStorage::class),
-            ],
+            'new'       => $services->alias(PageBuilderAssetUploadStorageInterface::class, HostUploadStorage::class),
             'decorator' => $services->set(DecoratingUploadStorage::class)
                 ->decorate(PageBuilderAssetUploadStorageInterface::class)
                 ->args([service('.inner')]),

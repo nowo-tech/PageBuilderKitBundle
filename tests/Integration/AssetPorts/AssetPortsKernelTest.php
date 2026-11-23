@@ -11,9 +11,7 @@ use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DddHost\MediaLibrary;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DddHost\MediaLibraryAssetStorage;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DecoratingUploadStorage;
-use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\DualHostStorage;
 use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\HostUploadStorage;
-use Nowo\PageBuilderKitBundle\Tests\Integration\AssetPorts\Fixtures\LegacyHostStorage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -29,11 +27,11 @@ use function base64_decode;
 use function file_put_contents;
 
 /**
- * 1.15: `lint:container` (Symfony's `CheckAliasValidityPass` + `CheckTypeDeclarationsPass`) passes for the built-in
- * storages, a host on the new port only, on the deprecated port only, on both, with a decorator of the new port, and
- * with `storage: service` pointing at each kind of service. Each alias resolves to a service that implements it, the
- * deprecated alias exists (and is deprecated) only when its service implements it, and the upload handler uses the
- * host service. Plus a DDD host whose adapter maps the VO to its own domain service.
+ * `lint:container` (Symfony's `CheckAliasValidityPass` + `CheckTypeDeclarationsPass`) passes for the built-in storages, a
+ * host alias of the port, a decorator of it, and `storage: service`. The port alias resolves to a service that
+ * implements it, the 1.x id `PageBuilderAssetStorageInterface` (removed in 2.0) no longer exists, and the upload handler
+ * uses the host service (2.0: through `storeUpload()` only). Plus a DDD host whose adapter maps the VO to its own domain
+ * service.
  */
 #[CoversClass(AssetStoragePortsPass::class)]
 final class AssetPortsKernelTest extends TestCase
@@ -55,16 +53,12 @@ final class AssetPortsKernelTest extends TestCase
     {
         $local = LocalFilesystemAssetStorage::class;
 
-        // variant, handler storage, [new port class, deprecated], [deprecated port class, deprecated]
-        yield 'built-in local' => ['local', $local, [$local, false], [$local, true]];
-        yield 'built-in s3' => ['s3', AwsS3AssetStorage::class, [AwsS3AssetStorage::class, false], [AwsS3AssetStorage::class, true]];
-        yield 'new port only' => ['new', HostUploadStorage::class, [HostUploadStorage::class, false], [$local, true]];
-        yield 'deprecated port only' => ['legacy', LegacyHostStorage::class, [$local, false], [LegacyHostStorage::class, false]];
-        yield 'both ports' => ['both', DualHostStorage::class, [DualHostStorage::class, false], [DualHostStorage::class, false]];
-        yield 'decorator of the new port' => ['decorator', DecoratingUploadStorage::class, [DecoratingUploadStorage::class, false], [$local, true]];
-        yield 'storage: service, new port' => ['service-new', HostUploadStorage::class, [HostUploadStorage::class, false], null];
-        yield 'storage: service, deprecated port' => ['service-legacy', LegacyHostStorage::class, null, [LegacyHostStorage::class, true]];
-        yield 'storage: service, both ports' => ['service-both', DualHostStorage::class, [DualHostStorage::class, false], [DualHostStorage::class, true]];
+        // variant, handler storage, [port class, deprecated], the removed 1.x id (never registered since 2.0)
+        yield 'built-in local' => ['local', $local, [$local, false], null];
+        yield 'built-in s3' => ['s3', AwsS3AssetStorage::class, [AwsS3AssetStorage::class, false], null];
+        yield 'host alias of the port' => ['new', HostUploadStorage::class, [HostUploadStorage::class, false], null];
+        yield 'decorator of the port' => ['decorator', DecoratingUploadStorage::class, [DecoratingUploadStorage::class, false], null];
+        yield 'storage: service' => ['service-new', HostUploadStorage::class, [HostUploadStorage::class, false], null];
         yield 'storage: service, DDD adapter' => ['ddd', MediaLibraryAssetStorage::class, [MediaLibraryAssetStorage::class, false], null];
     }
 

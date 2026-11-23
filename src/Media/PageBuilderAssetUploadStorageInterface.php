@@ -9,11 +9,11 @@ use InvalidArgumentException;
 /**
  * Stores editor-uploaded assets (local disk, S3, or host custom) from a bundle value object (1.15, REQ-ARCH-001 rule 3).
  *
- * Framework-free twin of the deprecated {@see PageBuilderAssetStorageInterface}: the file is an {@see AssetUpload}
- * (stream, move, client name, size, MIME type detected on the server), not an HttpFoundation `UploadedFile`. The bundle
- * calls it only for a valid upload (`UPLOAD_ERR_OK`, a real HTTP upload); size, MIME and file name checks stay the
- * storage's job, exactly as with {@see PageBuilderAssetStorageInterface::store()} (the built-in local and S3 storages
- * run the same checks on both ports).
+ * Framework-free: the file is an {@see AssetUpload} (stream, move, client name, size, MIME type detected on the server),
+ * not an HttpFoundation `UploadedFile`. The bundle calls it only for a valid upload (`UPLOAD_ERR_OK`, a real HTTP
+ * upload); size, MIME and file name checks stay the storage's job (the built-in local and S3 storages run them). Since
+ * 2.0 it is the only asset storage port: `PageBuilderAssetStorageInterface::store(UploadedFile)` (deprecated since 1.15)
+ * was removed.
  *
  * Alias or decorate this interface (or point `grapesjs.assets_upload.service` at a service implementing it, with
  * `storage: service`): the bundle's upload handler then uses your service.

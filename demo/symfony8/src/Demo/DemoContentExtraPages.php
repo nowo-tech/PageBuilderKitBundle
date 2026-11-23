@@ -326,7 +326,7 @@ HTML,
 </div></section>
 <section class="pbk-band pbk-wrap">
   <h2 class="pbk-section-title">{% if locale == "es" %}Productos (bucle Twig){% else %}Products (Twig loop){% endif %}</h2>
-  <p class="pbk-muted">{% if locale == "es" %}Lista inyectada por GrapesTwigContextProviderInterface del host.{% else %}List injected by the host GrapesTwigContextProviderInterface.{% endif %}</p>
+  <p class="pbk-muted">{% if locale == "es" %}Lista inyectada por GrapesTwigPageContextProviderInterface del host.{% else %}List injected by the host GrapesTwigPageContextProviderInterface.{% endif %}</p>
   <ul class="pbk-twig-products" style="list-style:none;padding:0;margin:1.25rem 0 0;display:grid;gap:.75rem">
   {% for p in products %}
     <li style="border:1px solid #e2e8f0;border-radius:.75rem;padding:1rem 1.25rem;display:flex;justify-content:space-between;gap:1rem;align-items:center;background:#fff">
@@ -346,7 +346,7 @@ HTML,
   <p class="pbk-muted">Editors insert Twig tokens in GrapesJS (category Twig). On render, a sandboxed Twig environment interpolates variables, then HTML is sanitized again.</p>
   <ul>
     <li>Built-in: title, slug, pageKey, locale, status, page.*, seo.*</li>
-    <li>Host extras via GrapesTwigContextProviderInterface (e.g. products, highlights)</li>
+    <li>Host extras via GrapesTwigPageContextProviderInterface (e.g. products, highlights)</li>
     <li>Allowed tags: if, for, set — no include/embed/extends</li>
   </ul>
 </section>

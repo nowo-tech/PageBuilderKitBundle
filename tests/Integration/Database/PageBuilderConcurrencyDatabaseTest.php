@@ -76,8 +76,12 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
 {
     private const string ADMIN = '/admin/page-builder';
 
-    /** Suffix of a data set run with `doctrine.private_entity_manager: true` (1.19). */
-    private const string PRIVATE = '|private';
+    /**
+     * Suffix of a data set run with `doctrine.transaction: host` (2.0: the zero-config sets run on the private manager;
+     * the host-transaction sets run the bundle admin's writes on the application's default manager, the remaining
+     * forHostEntityManager() path).
+     */
+    private const string HOST = '|host';
 
     private ?AdminHttpKernel $kernel = null;
 
@@ -99,10 +103,10 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         yield 'MySQL 8.4' => ['PBK_MYSQL_URL'];
         yield 'MariaDB 11.4' => ['PBK_MARIADB_URL'];
         yield 'PostgreSQL 16' => ['PBK_POSTGRES_URL'];
-        // 1.19: the same rule 1 / 4 / 6 suite with doctrine.private_entity_manager: true.
-        yield 'MySQL 8.4, private manager' => ['PBK_MYSQL_URL' . self::PRIVATE];
-        yield 'MariaDB 11.4, private manager' => ['PBK_MARIADB_URL' . self::PRIVATE];
-        yield 'PostgreSQL 16, private manager' => ['PBK_POSTGRES_URL' . self::PRIVATE];
+        // 2.0: the zero-config sets above run on the private manager; the same rule 1 / 4 / 6 suite with transaction: host.
+        yield 'MySQL 8.4, transaction: host' => ['PBK_MYSQL_URL' . self::HOST];
+        yield 'MariaDB 11.4, transaction: host' => ['PBK_MARIADB_URL' . self::HOST];
+        yield 'PostgreSQL 16, transaction: host' => ['PBK_POSTGRES_URL' . self::HOST];
     }
 
     protected function tearDown(): void
@@ -491,10 +495,10 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      */
     private function boot(string $env, array $bundle = [], int $lockWait = 1): string
     {
-        $private = str_ends_with($env, self::PRIVATE);
-        $env     = $private ? substr($env, 0, -strlen(self::PRIVATE)) : $env;
-        if ($private) {
-            $bundle['doctrine'] = ['private_entity_manager' => true];
+        $host = str_ends_with($env, self::HOST);
+        $env  = $host ? substr($env, 0, -strlen(self::HOST)) : $env;
+        if ($host) {
+            $bundle['doctrine'] = ['transaction' => 'host'];
         }
 
         $url = getenv($env);
@@ -503,7 +507,7 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         }
 
         $this->url    = $url;
-        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env . ($private ? self::PRIVATE : ''), $url);
+        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env . ($host ? self::HOST : ''), $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);

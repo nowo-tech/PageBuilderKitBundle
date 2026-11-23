@@ -81,8 +81,9 @@ services:
         alias: Nowo\PageBuilderKitBundle\Repository\BuilderPageRevisionRepository
 
     # 1.17 (REQ-RUNTIME-003): the bundle's own runner, never a host alias of TransactionRunnerInterface (it may run on
-    # another manager). Null = transaction-doctrine's forHostEntityManager(); forEntityManager() for the bundle's own
-    # manager ($ownsEntityManager, set by PageBuilderEntityManagerPass). $managerName is set by the extension.
+    # another manager). Null = transaction-doctrine's forHostEntityManager() (transaction: host); forEntityManager() for
+    # the bundle's own manager: its private manager (2.0 default, set by the extension) or a dedicated
+    # doctrine.entity_manager ($ownsEntityManager, set by PageBuilderEntityManagerPass). $managerName is set by the extension.
     Nowo\PageBuilderKitBundle\Persistence\PageBuilderTransaction:
         arguments:
             $hostControlsTransaction: false
@@ -185,7 +186,7 @@ services:
     Nowo\PageBuilderKitBundle\Twig\PageBuilderKitExtension:
         arguments:
             $layoutTemplate: '%nowo_page_builder_kit.web_ui.layout_template%'
-            $cssFramework: '%nowo_page_builder_kit.web_ui.css_framework%'
+            $cssFramework: ''
             $accessChecker: '@Nowo\PageBuilderKitBundle\Security\PageBuilderKitAccessCheckerInterface'
             $inlineContentFieldRenderer: '@Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface'
             $pageRevisionStore: '@Nowo\PageBuilderKitBundle\Service\PageRevisionStore'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Service;
 
+use InvalidArgumentException;
 use Nowo\PageBuilderKitBundle\Debug\NullPageBuilderKitTrace;
 use Nowo\PageBuilderKitBundle\Debug\PageBuilderKitTraceInterface;
 use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
@@ -19,20 +20,23 @@ use Traversable;
 use function array_keys;
 use function array_map;
 use function array_values;
+use function get_debug_type;
 use function hrtime;
 use function is_array;
 use function is_string;
 use function iterator_to_array;
 use function round;
 use function sprintf;
-use function trigger_deprecation;
 
 final readonly class PageRenderProvider implements PageRenderProviderInterface
 {
-    /** 1.19: a Twig context provider that implements only the deprecated entity-based interface. */
-    public const string CONTEXT_PROVIDER_DEPRECATION = 'The Twig context provider "%s" implements only "%s", which 2.0 removes. Implement "%s" (getPageContext(PageContext $page, string $locale)) instead; see UPGRADING.md "To 1.19.0".';
+    /**
+     * 2.0: a Twig context provider that does not implement {@see GrapesTwigPageContextProviderInterface} (the
+     * entity-based `GrapesTwigContextProviderInterface`, deprecated since 1.15, was removed).
+     */
+    public const string CONTEXT_PROVIDER_REQUIRED = 'A Twig context provider must implement "%s" (getPageContext(PageContext $page, string $locale)) since 2.0; got "%s". See UPGRADING.md "To 2.0.0".';
 
-    /** @var list<GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface> */
+    /** @var list<GrapesTwigPageContextProviderInterface> */
     private array $twigContextProviders;
 
     private PageBuilderKitTraceInterface $trace;
@@ -46,7 +50,9 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
     private PublicHtmlHardener $publicHtmlHardener;
 
     /**
-     * @param iterable<GrapesTwigContextProviderInterface|GrapesTwigPageContextProviderInterface> $twigContextProviders
+     * @param iterable<GrapesTwigPageContextProviderInterface> $twigContextProviders
+     *
+     * @throws InvalidArgumentException when a provider does not implement {@see GrapesTwigPageContextProviderInterface}
      */
     public function __construct(
         private BuilderPageRepositoryInterface $pageRepository,
@@ -68,15 +74,16 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
         $providers = $twigContextProviders instanceof Traversable
             ? iterator_to_array($twigContextProviders, false)
             : $twigContextProviders;
-        $this->twigContextProviders = array_values($providers);
-        // 1.19: the 2.0 removal of the entity-based SPI, once per provider class and container (never per page).
-        $deprecated = [];
-        foreach ($this->twigContextProviders as $provider) {
-            if (!$provider instanceof GrapesTwigPageContextProviderInterface && !isset($deprecated[$provider::class])) {
-                $deprecated[$provider::class] = true;
-                trigger_deprecation('nowo-tech/page-builder-kit-bundle', '1.19', self::CONTEXT_PROVIDER_DEPRECATION, $provider::class, GrapesTwigContextProviderInterface::class, GrapesTwigPageContextProviderInterface::class);
+        $checked = [];
+        foreach (array_values($providers) as $provider) {
+            // Since 2.0 the container build already refuses such a service (PageBuilderRemovedPortsPass); this guards
+            // code that builds the provider itself.
+            if (!$provider instanceof GrapesTwigPageContextProviderInterface) {
+                throw new InvalidArgumentException(sprintf(self::CONTEXT_PROVIDER_REQUIRED, GrapesTwigPageContextProviderInterface::class, get_debug_type($provider)));
             }
+            $checked[] = $provider;
         }
+        $this->twigContextProviders     = $checked;
         $this->trace                    = $trace ?? new NullPageBuilderKitTrace();
         $this->contentFieldsNormalizer  = $contentFieldsNormalizer ?? new ContentFieldsNormalizer();
         $this->contentFieldSlotReplacer = $contentFieldSlotReplacer ?? new ContentFieldSlotReplacer();
@@ -265,14 +272,8 @@ final readonly class PageRenderProvider implements PageRenderProviderInterface
 
         $pageContext = null;
         foreach ($this->twigContextProviders as $provider) {
-            if ($provider instanceof GrapesTwigPageContextProviderInterface) {
-                $pageContext ??= $this->pageContext($page, $locale);
-                $context = [...$context, ...$provider->getPageContext($pageContext, $locale)];
-
-                continue;
-            }
-
-            $context = [...$context, ...$provider->getContext($page, $locale)];
+            $pageContext ??= $this->pageContext($page, $locale);
+            $context = [...$context, ...$provider->getPageContext($pageContext, $locale)];
         }
 
         return [...$context, ...$extraContext];

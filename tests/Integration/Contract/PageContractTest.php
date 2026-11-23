@@ -4,16 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\PageBuilderKitBundle\Tests\Integration\Contract;
 
+use LogicException;
 use Nowo\PageBuilderKitBundle\Enum\PageStatus;
 use Nowo\PageBuilderKitBundle\Tests\Support\PageFixtures;
 use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages;
 use Nowo\UiKitBundle\Test\PageContractTestCase;
 use Nowo\UiKitBundle\Test\PageFixture;
-use PHPUnit\Framework\Attributes\IgnoreDeprecations;
-use Twig\Environment;
-use Twig\TwigFunction;
-
-use function substr_count;
 
 /**
  * REQ-UI-003 page contract: the admin pages extend UiKit scaffolds (list, settings, form, show) or are declared unique
@@ -47,14 +43,8 @@ final class PageContractTest extends PageContractTestCase
         yield 'templates (empty)' => new PageFixture(self::VIEWS . 'templates.html.twig', PageFixtures::templates(true));
     }
 
-    /** A copy of a 1.x page: extends the deprecated layout function and fills `page_title` / `header_actions` / `admin`. */
-    private const string PAGE_1X = '{% extends nowo_page_builder_layout_template() %}{% block page_title %}Old title{% endblock %}{% block header_actions %}<a id="old-action" href="#">Old</a>{% endblock %}{% block admin %}<p id="old-content">Old content</p>{% endblock %}';
-
     /** A 1.x host layout (renders `{% block admin %}`, no canonical blocks). */
     private const string HOST_1X = '<div id="host1x"><title>{% block title %}{% endblock %}</title>{% block stylesheets %}<link id="host-css">{% endblock %}<h1 id="host-title">{% block page_title %}{% endblock %}</h1>{% block admin %}{% endblock %}{% block javascripts %}<script id="host-js"></script>{% endblock %}</div>';
-
-    /** A copy of the 1.x bundle layout: renders `admin` and the canonical flashes block itself. */
-    private const string HOST_1X_COPY = '<div id="host1xcopy"><div id="host-flashes">{% block nowo_ui_flashes %}{% endblock %}</div>{% block admin %}{% endblock %}</div>';
 
     public function testDuplicateAndApplyAskTheirFieldsInsideTheConfirmDialog(): void
     {
@@ -108,60 +98,25 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringContainsString('No fields yet. Add one below.', $bare);
     }
 
-    public function testOneXPageCopiesStillRenderInsideTheUiKitLayoutWithoutACdn(): void
+    /**
+     * 2.0: the 1.x layout bridge (deprecated since 1.12) and the `nowo_page_builder_layout_template()` function were
+     * removed. A 1.x host layout fails with a message that says what to do; it is never rendered half-styled.
+     */
+    public function testAOneXHostLayoutFailsClearly(): void
     {
-        $html = $this->twigWithLegacyTemplates()->render('page_1x.html.twig');
-
-        self::assertStringContainsString('data-nowo-ui-contract-layout="admin"', $html);
-        self::assertStringContainsString('Old title', $html);
-        self::assertStringContainsString('<a id="old-action" href="#">Old</a>', $html);
-        self::assertStringContainsString('<p id="old-content">Old content</p>', $html);
-        self::assertStringNotContainsString('cdn.jsdelivr.net', $html);
-        self::assertStringNotContainsString('<html', $html);
-    }
-
-    #[IgnoreDeprecations]
-    public function testAOneXHostLayoutIsBridged(): void
-    {
-        $twig    = $this->twigWithLegacyTemplates();
+        $twig    = $this->createTwig();
         $factory = PageFixtures::factory(new PageBuilderKitPages('host_1x.html.twig', [], $twig));
 
-        $html = $twig->render(self::VIEWS . 'revision_diff.html.twig', PageFixtures::revisionDiff(false, $factory));
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The layout "host_1x.html.twig" (nowo_page_builder_kit.web_ui.layout_template) does not render the UiKit canonical blocks');
 
-        self::assertStringContainsString('<div id="host1x">', $html);
-        self::assertStringContainsString('<title>Diff: home vs #7</title>', $html);
-        self::assertStringContainsString('<link id="host-css">', $html);
-        self::assertStringContainsString('/assets/css/nowo-ui.css', $html);
-        self::assertStringContainsString('<script id="host-js"></script>', $html);
-        self::assertStringContainsString('data-testid="pbk-diff-summary"', $html);
-    }
-
-    #[IgnoreDeprecations]
-    public function testACopyOfTheOneXBundleLayoutKeepsItsOwnFlashes(): void
-    {
-        $twig    = $this->twigWithLegacyTemplates();
-        $factory = PageFixtures::factory(new PageBuilderKitPages('host_1x_copy.html.twig', [], $twig));
-
-        $html = $twig->render(self::VIEWS . 'revision_diff.html.twig', PageFixtures::revisionDiff(true, $factory));
-
-        self::assertSame(1, substr_count($html, 'data-testid="pbk-revision-diff"'));
-        self::assertMatchesRegularExpression('#<div id="host-flashes">\s*<header#', $html);
+        $twig->render(self::VIEWS . 'revision_diff.html.twig', PageFixtures::revisionDiff(false, $factory));
     }
 
     protected static function inlineTemplates(): array
     {
         return [
-            'page_1x.html.twig'      => self::PAGE_1X,
-            'host_1x.html.twig'      => self::HOST_1X,
-            'host_1x_copy.html.twig' => self::HOST_1X_COPY,
+            'host_1x.html.twig' => self::HOST_1X,
         ];
-    }
-
-    private function twigWithLegacyTemplates(): Environment
-    {
-        $twig = $this->createTwig();
-        $twig->addFunction(new TwigFunction('nowo_page_builder_layout_template', static fn (): string => new PageBuilderKitPages()->legacyLayoutTemplate()));
-
-        return $twig;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\PageBuilderKitBundle\Tests\Unit\Media;
 
 use InvalidArgumentException;
+use Nowo\PageBuilderKitBundle\Media\AssetUploadData;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -60,7 +61,7 @@ final class AwsS3AssetStorageTest extends TestCase
         self::assertNotFalse($png);
         file_put_contents($tmp, $png);
 
-        $result = $storage->store(new UploadedFile($tmp, 'hero.png', 'image/png', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'hero.png', 'image/png', null, true)));
 
         self::assertStringStartsWith('https://cdn.example/page-builder/', $result->src);
         self::assertSame('hero.png', $result->name);
@@ -105,7 +106,7 @@ final class AwsS3AssetStorageTest extends TestCase
         self::assertNotFalse($png);
         file_put_contents($tmp, $png);
 
-        $result = $storage->store(new UploadedFile($tmp, '', 'image/png', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, '', 'image/png', null, true)));
 
         self::assertStringStartsWith('https://cdn.example/base/pb/', $result->src);
         self::assertSame('image/png', $result->mimeType);
@@ -190,7 +191,7 @@ final class AwsS3AssetStorageTest extends TestCase
 
         $invalid = new AwsS3AssetStorage($helper, 'pb', false, 10, ['image/png']);
         try {
-            $invalid->store(new UploadedFile(__FILE__, 'big.png', 'image/png', 100, true));
+            $invalid->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile(__FILE__, 'big.png', 'image/png', 100, true)));
             self::fail('Expected invalid upload rejection.');
         } catch (InvalidArgumentException) {
             // expected: invalid UploadedFile rejected
@@ -204,7 +205,7 @@ final class AwsS3AssetStorageTest extends TestCase
         $oversized = new AwsS3AssetStorage($helper, 'pb', false, 1, ['image/png']);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('File exceeds max size');
-        $oversized->store(new UploadedFile($tmp, 'tiny.png', 'image/png', null, true));
+        $oversized->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'tiny.png', 'image/png', null, true)));
     }
 
     #[Test]
@@ -319,7 +320,7 @@ final class AwsS3AssetStorageTest extends TestCase
                 }
             };
 
-            $result = $storage->store($file);
+            $result = $storage->storeUpload(AssetUploadData::fromUploadedFile($file));
             self::assertStringEndsWith($ext, (string) $result->storageKey);
             self::assertSame($mime, $result->mimeType);
         }
@@ -353,14 +354,14 @@ final class AwsS3AssetStorageTest extends TestCase
         file_put_contents($tmp, "GIF89a<?php echo 'pwned'; ?>");
 
         try {
-            $storage->store(new UploadedFile($tmp, 'x.php', 'image/gif', null, true));
+            $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'x.php', 'image/gif', null, true)));
             self::fail('Polyglot upload named .php must be rejected.');
         } catch (InvalidArgumentException $exception) {
             self::assertStringContainsString('does not match detected MIME type "image/gif"', $exception->getMessage());
         }
         self::assertSame(0, $helper->uploads);
 
-        $result = $storage->store(new UploadedFile($tmp, 'x.gif', 'image/gif', null, true));
+        $result = $storage->storeUpload(AssetUploadData::fromUploadedFile(new UploadedFile($tmp, 'x.gif', 'image/gif', null, true)));
         self::assertStringEndsWith('.gif', (string) $result->storageKey);
         self::assertSame(1, $helper->uploads);
     }

@@ -57,6 +57,8 @@ final readonly class PageTemplateService
 
     public function saveFromPage(BuilderPage $page, string $templateKey, string $label): BuilderPageTemplate
     {
+        $page = $this->documentService->own($page);
+
         return $this->documentService->unit(fn (): BuilderPageTemplate => $this->doSaveFromPage($page, $templateKey, $label));
     }
 

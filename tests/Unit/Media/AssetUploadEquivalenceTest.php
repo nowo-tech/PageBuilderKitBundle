@@ -11,7 +11,6 @@ use Nowo\PageBuilderKitBundle\Media\AssetUploadHandler;
 use Nowo\PageBuilderKitBundle\Media\AssetUploadResult;
 use Nowo\PageBuilderKitBundle\Media\AwsS3AssetStorage;
 use Nowo\PageBuilderKitBundle\Media\LocalFilesystemAssetStorage;
-use Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -35,11 +34,10 @@ use const UPLOAD_ERR_OK;
 use const UPLOAD_ERR_PARTIAL;
 
 /**
- * 1.15 equivalence: the same uploads give the same outcome through the deprecated `store(UploadedFile)` and through the
- * new `storeUpload(AssetUpload)` (local and S3 storages), and through the upload handler with a storage on the
- * deprecated port only and with one on the new port. Same accepted / rejected files (upload error, size limit,
- * server-side MIME allowlist, polyglot with a script extension, `..` in the name), same exception messages, same
- * stored content, MIME type, extension, name and image size.
+ * The upload checks of `storeUpload(AssetUpload)` (local and S3 storages; 2.0: the only port, the deprecated
+ * `store(UploadedFile)` was removed): accepted / rejected files (upload error, size limit, server-side MIME allowlist,
+ * polyglot with a script extension, `..` in the name), and the same outcome through the upload handler as through the
+ * storage. 1.15 proved `storeUpload()` gave the same outcome as the removed `store()` for each of these uploads.
  */
 #[CoversClass(LocalFilesystemAssetStorage::class)]
 #[CoversClass(AwsS3AssetStorage::class)]
@@ -88,39 +86,37 @@ final class AssetUploadEquivalenceTest extends TestCase
 
     #[Test]
     #[DataProvider('uploads')]
-    public function storageGivesTheSameOutcomeOnBothPorts(string $content, string $name, string $clientMime, int $error, bool $accepted): void
+    public function storageAcceptsOrRejectsTheUpload(string $content, string $name, string $clientMime, int $error, bool $accepted): void
     {
-        foreach (['local', 's3'] as $kind) {
-            $old = $this->outcome($kind, $content, $name, $clientMime, $error, static fn (LocalFilesystemAssetStorage|AwsS3AssetStorage $storage, UploadedFile $file): AssetUploadResult => $storage->store($file));
-            $new = $this->outcome($kind, $content, $name, $clientMime, $error, static function (LocalFilesystemAssetStorage|AwsS3AssetStorage $storage, UploadedFile $file): AssetUploadResult {
-                // What AssetUploadHandler does for a storage on the 1.15 port.
-                if (!$file->isValid()) {
-                    throw new InvalidArgumentException('Invalid uploaded file.');
-                }
+        $store = static function (LocalFilesystemAssetStorage|AwsS3AssetStorage $storage, UploadedFile $file): AssetUploadResult {
+            // What AssetUploadHandler does before the storage.
+            if (!$file->isValid()) {
+                throw new InvalidArgumentException('Invalid uploaded file.');
+            }
 
-                return $storage->storeUpload(AssetUploadData::fromUploadedFile($file));
-            });
-            self::assertSame($old, $new, $kind . ': ' . $name);
-        }
+            return $storage->storeUpload(AssetUploadData::fromUploadedFile($file));
+        };
 
-        $local = $this->outcome('local', $content, $name, $clientMime, $error, static fn (LocalFilesystemAssetStorage|AwsS3AssetStorage $storage, UploadedFile $file): AssetUploadResult => $storage->store($file));
+        $local = $this->outcome('local', $content, $name, $clientMime, $error, $store);
+        $s3    = $this->outcome('s3', $content, $name, $clientMime, $error, $store);
         if ($name === 'a..b.png') {
             // The local storage rejects ".." in the client name; the S3 storage never did (unchanged).
             self::assertSame('error', $local['outcome']);
-            self::assertSame('ok', $this->outcome('s3', $content, $name, $clientMime, $error, static fn (LocalFilesystemAssetStorage|AwsS3AssetStorage $storage, UploadedFile $file): AssetUploadResult => $storage->store($file))['outcome']);
+            self::assertSame('ok', $s3['outcome']);
         } else {
             self::assertSame($accepted ? 'ok' : 'error', $local['outcome'], $name);
+            self::assertSame($local['outcome'], $s3['outcome'], $name);
         }
     }
 
     #[Test]
     #[DataProvider('uploads')]
-    public function handlerGivesTheSameOutcomeForAStorageOnEitherPort(string $content, string $name, string $clientMime, int $error, bool $accepted): void
+    public function handlerGivesTheSameOutcomeAsTheStorage(string $content, string $name, string $clientMime, int $error, bool $accepted): void
     {
-        $legacy = $this->handlerOutcome(true, $content, $name, $clientMime, $error);
-        $new    = $this->handlerOutcome(false, $content, $name, $clientMime, $error);
+        $outcome = $this->handlerOutcome($content, $name, $clientMime, $error);
 
-        self::assertSame($legacy, $new, $name);
+        // The handler runs the local storage here, which also rejects ".." in the client name.
+        self::assertSame($accepted && $name !== 'a..b.png' ? 'ok' : 'error', $outcome['outcome'], $name);
     }
 
     /**
@@ -212,13 +208,12 @@ final class AssetUploadEquivalenceTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function handlerOutcome(bool $legacyPort, string $content, string $name, string $clientMime, int $error): array
+    private function handlerOutcome(string $content, string $name, string $clientMime, int $error): array
     {
         $run  = $this->dir . '/' . uniqid('', true);
         $path = $run . '-src';
         file_put_contents($path, $content);
-        $local   = new LocalFilesystemAssetStorage($run . '/public', '/uploads', 300, ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
-        $storage = $legacyPort ? new LegacyOnlyStorage($local) : $local;
+        $storage = new LocalFilesystemAssetStorage($run . '/public', '/uploads', 300, ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
         try {
             $assets = new AssetUploadHandler($storage, true)->handle([new UploadedFile($path, $name, $clientMime, $error, true)]);
@@ -255,20 +250,5 @@ final class AssetUploadEquivalenceTest extends TestCase
                 return 'https://fallback.example/' . $key;
             }
         };
-    }
-}
-
-/**
- * A pre-1.15 host storage: the deprecated port only (delegates to the local storage's deprecated method).
- */
-final readonly class LegacyOnlyStorage implements PageBuilderAssetStorageInterface
-{
-    public function __construct(private LocalFilesystemAssetStorage $inner)
-    {
-    }
-
-    public function store(UploadedFile $file): AssetUploadResult
-    {
-        return $this->inner->store($file);
     }
 }

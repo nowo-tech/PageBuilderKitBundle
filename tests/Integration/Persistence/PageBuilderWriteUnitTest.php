@@ -143,6 +143,9 @@ final class PageBuilderWriteUnitTest extends AbstractHttpTestCase
         $this->boot();
         $page = $this->documents->createPage('lock', 'Lock', 'en');
         $this->documents->saveDocument($page, self::grapes('<p>stored</p>'), []);
+        // 2.0: the bundle writes through its private manager; this unit runs on the test's manager, which loads the page.
+        $page = $this->em->find(BuilderPage::class, $page->getId());
+        self::assertInstanceOf(BuilderPage::class, $page);
         $document = $page->getDocument();
         self::assertInstanceOf(BuilderDocument::class, $document);
         $transaction = new PageBuilderTransaction($this->em);

@@ -12,6 +12,7 @@ use Nowo\PageBuilderKitBundle\Entity\BuilderDocument;
 use Nowo\PageBuilderKitBundle\Entity\BuilderPage;
 use Nowo\PageBuilderKitBundle\Service\DocumentService;
 use Nowo\PageBuilderKitBundle\Tests\Fixtures\Host\HostNote;
+use Nowo\PageBuilderKitBundle\Tests\Integration\Persistence\HostPendingChangesTestCase;
 use Nowo\PageBuilderKitBundle\Tests\Integration\Persistence\PersistenceTestKernel;
 use Nowo\TransactionContract\TransientStorageFailure;
 use Nowo\TransactionDoctrine\PrivateManager\PrivateEntityManager;
@@ -26,16 +27,16 @@ use function is_string;
 use function preg_replace_callback;
 use function restore_error_handler;
 use function set_error_handler;
-use function sprintf;
 use function str_contains;
 
 use const E_USER_DEPRECATED;
 
 /**
- * 1.19 (REQ-ARCH-001 rule 6): the application's pending changes against SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL
- * 16. With `doctrine.private_entity_manager: true` they stay pending through every bundle write, also through a write
- * refused by a lock conflict (REQ-RUNTIME-003 rule 6: nothing committed, the application's manager open and untouched,
- * the next write goes through). On the default path they are flushed, as in 1.x, and the host-flush probe reports them.
+ * 2.0 (REQ-ARCH-001 rule 6): the application's pending changes against SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL
+ * 16, with zero configuration (the private entity manager is the only mode). They stay pending through every bundle
+ * write, also through a write refused by a lock conflict (REQ-RUNTIME-003 rule 6: nothing committed, the application's
+ * manager open and untouched, the next write goes through). No host-flush probe remains. The full data-loss scenario
+ * is {@see HostPendingChangesTestCase}.
  *
  * Run by `make test-with-db` and the CI "Real databases" job (PBK_MYSQL_URL, PBK_MARIADB_URL, PBK_POSTGRES_URL).
  */
@@ -99,7 +100,7 @@ final class PrivateEntityManagerDatabaseTest extends TestCase
     #[DataProvider('databases')]
     public function testPrivateModeLeavesTheApplicationsPendingChangesPending(?string $env): void
     {
-        [$container, $default] = $this->boot($env, true);
+        [$container, $default] = $this->boot($env);
         $stored                = new HostNote('stored');
         $default->persist($stored);
         $default->flush();
@@ -131,7 +132,7 @@ final class PrivateEntityManagerDatabaseTest extends TestCase
     #[DataProvider('servers')]
     public function testALockConflictInPrivateModeNeverTouchesTheApplicationsManager(string $env): void
     {
-        [$container, $default] = $this->boot($env, true);
+        [$container, $default] = $this->boot($env);
         $documents             = $this->documents($container);
         $documents->saveDocument($documents->createPage('locked', 'Locked', 'en'), $this->grapes('<p>v1</p>'), []);
         $pending = new HostNote('pending through a conflict');
@@ -163,24 +164,10 @@ final class PrivateEntityManagerDatabaseTest extends TestCase
         self::assertTrue($default->getUnitOfWork()->isScheduledForInsert($pending));
     }
 
-    #[DataProvider('databases')]
-    public function testDefaultPathFlushesTheApplicationsChangesAndReportsThem(?string $env): void
-    {
-        [$container, $default] = $this->boot($env, null);
-        $documents             = $this->documents($container);
-        $page                  = $documents->createPage('home', 'Home', 'en');
-        $default->persist(new HostNote('flushed by the bundle'));
-
-        $documents->flushPage($page);
-
-        self::assertSame(['flushed by the bundle'], $this->other()->fetchFirstColumn('SELECT text FROM host_note'), '1.x behaviour');
-        self::assertSame([sprintf('Your pending changes to %s were flushed by NowoPageBuilderKitBundle; 2.0 no longer does.', HostNote::class)], $this->probeNotices());
-    }
-
     /**
      * @return array{0: ContainerInterface, 1: EntityManagerInterface}
      */
-    private function boot(?string $env, ?bool $private): array
+    private function boot(?string $env): array
     {
         if ($env === null) {
             $this->url = '';
@@ -204,7 +191,7 @@ final class PrivateEntityManagerDatabaseTest extends TestCase
                     'is_bundle' => false,
                 ],
             ]],
-        ], $private === null ? [] : ['private_entity_manager' => $private]);
+        ]);
         $this->kernel->boot();
         $container = $this->kernel->getContainer()->get('test.service_container');
         self::assertInstanceOf(ContainerInterface::class, $container);
@@ -218,9 +205,7 @@ final class PrivateEntityManagerDatabaseTest extends TestCase
         if ($this->url !== '') {
             DatabaseUrl::limitLockWait($default->getConnection(), 1);
         }
-        if ($private === true) {
-            self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'));
-        }
+        self::assertInstanceOf(PrivateEntityManager::class, $container->get('nowo_page_builder_kit.entity_manager'), 'zero configuration');
         $this->deprecations = [];
 
         return [$container, $default];

@@ -11,20 +11,26 @@ use Nowo\PageBuilderKitBundle\Service\InlineContentFieldRendererInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRenderProviderInterface;
 use Nowo\PageBuilderKitBundle\Service\PageRevisionStore;
 use Nowo\PageBuilderKitBundle\Service\PublicBindHydratorInterface;
-use Nowo\PageBuilderKitBundle\Ui\PageBuilderKitPages;
 use Nowo\PageBuilderKitBundle\Util\ContentSectionFilter;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeInterface;
 use Nowo\PageBuilderKitBundle\Widget\WidgetTypeRegistry;
-use Twig\DeprecatedCallableInfo;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
 
+/**
+ * Twig filters and functions of the page builder. 2.0: the functions `nowo_page_builder_layout_template()` and
+ * `nowo_page_builder_css_framework()` (deprecated since 1.12) were removed.
+ */
 final class PageBuilderKitExtension extends AbstractExtension
 {
-    public function __construct(
-        private readonly ?string $layoutTemplate,
-        private readonly string $cssFramework,
+    /**
+     * @param string|null $layoutTemplate deprecated since 2.0, ignored (it fed the removed `nowo_page_builder_layout_template()`); removed in 3.0
+     * @param string $cssFramework deprecated since 2.0, ignored (it fed the removed `nowo_page_builder_css_framework()`); removed in 3.0
+     */
+    public function __construct(// @phpstan-ignore constructor.unusedParameter, constructor.unusedParameter (BC: kept until 3.0)
+        ?string $layoutTemplate,
+        string $cssFramework,
         private readonly PageRenderProviderInterface $pageRenderProvider,
         private readonly WidgetTypeRegistry $widgetTypeRegistry,
         private readonly PageBuilderKitAccessCheckerInterface $accessChecker,
@@ -33,6 +39,7 @@ final class PageBuilderKitExtension extends AbstractExtension
         private readonly ?PublicBindHydratorInterface $publicBindHydrator = null,
         private readonly PublicHtmlHardener $publicHtmlHardener = new PublicHtmlHardener(),
     ) {
+        unset($layoutTemplate, $cssFramework);
     }
 
     public function getFilters(): array
@@ -50,9 +57,6 @@ final class PageBuilderKitExtension extends AbstractExtension
     public function getFunctions(): array
     {
         return [
-            // Deprecated since 1.12 (REQ-UI-003): the admin pages extend UiKit scaffolds; kept for 1.x page copies.
-            new TwigFunction('nowo_page_builder_layout_template', $this->layoutTemplate(...), ['deprecation_info' => new DeprecatedCallableInfo('nowo-tech/page-builder-kit-bundle', '1.12')]),
-            new TwigFunction('nowo_page_builder_css_framework', $this->cssFramework(...), ['deprecation_info' => new DeprecatedCallableInfo('nowo-tech/page-builder-kit-bundle', '1.12')]),
             new TwigFunction('nowo_page_builder_render', $this->renderPage(...)),
             new TwigFunction('nowo_page_builder_widget_types', $this->widgetTypes(...)),
             new TwigFunction('nowo_page_builder_can_edit', $this->canEdit(...)),
@@ -63,20 +67,6 @@ final class PageBuilderKitExtension extends AbstractExtension
             new TwigFunction('nowo_page_builder_sanitize_section', ContentSectionFilter::sanitize(...)),
             new TwigFunction('nowo_page_builder_filter_schema_by_section', ContentSectionFilter::filterSchema(...)),
         ];
-    }
-
-    /**
-     * Layout of 1.x page copies (deprecated `nowo_page_builder_layout_template()`): `web_ui.layout_template`, else the
-     * deprecated 1.x default layout, which extends the UiKit admin layout (`nowo_ui_kit.layouts.admin`).
-     */
-    public function layoutTemplate(): string
-    {
-        return new PageBuilderKitPages($this->layoutTemplate)->legacyLayoutTemplate();
-    }
-
-    public function cssFramework(): string
-    {
-        return $this->cssFramework;
     }
 
     /**
