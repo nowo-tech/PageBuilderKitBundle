@@ -100,12 +100,12 @@ final class PageContentController extends AbstractController
             $originals = [];
             foreach ($request->request->all('fieldOriginals') as $locale => $bag) {
                 if (is_string($locale) && in_array($locale, $locales, true)) {
-                    $originals[$locale] = self::strings($bag);
+                    $originals[$locale] = $this->strings($bag);
                 }
             }
 
-            $labels         = self::strings($request->request->all('fieldLabels')[$active] ?? []);
-            $labelOriginals = self::strings($request->request->all('labelOriginals')[$active] ?? []);
+            $labels         = $this->strings($request->request->all('fieldLabels')[$active] ?? []);
+            $labelOriginals = $this->strings($request->request->all('labelOriginals')[$active] ?? []);
 
             try {
                 $this->contentFieldsService->mergeValues($page, $posted, $originals, $active, $labels, $labelOriginals);
@@ -281,7 +281,7 @@ final class PageContentController extends AbstractController
     /**
      * @return array<string, string> the string entries of a posted bag
      */
-    private static function strings(mixed $bag): array
+    private function strings(mixed $bag): array
     {
         $out = [];
         foreach (is_array($bag) ? $bag : [] as $key => $value) {

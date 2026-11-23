@@ -240,8 +240,8 @@ final class RevisionsContentTemplatesHttpTest extends AbstractHttpTestCase
         self::assertSame(403, $this->request('POST', self::ADMIN . '/assets/upload')->getStatusCode(), 'no token at all');
         self::assertSame(400, $this->request('POST', self::ADMIN . '/assets/upload', [], ['X-CSRF-TOKEN' => 'x'])->getStatusCode(), 'no file');
 
-        $png      = $this->tmpFile('pixel.png', (string) base64_decode(self::PNG));
-        $png2     = $this->tmpFile('pixel2.png', (string) base64_decode(self::PNG));
+        $png      = $this->tmpFile('pixel.png', base64_decode(self::PNG));
+        $png2     = $this->tmpFile('pixel2.png', base64_decode(self::PNG));
         $uploaded = $this->request('POST', self::ADMIN . '/assets/upload', [], ['X-CSRF-TOKEN' => 'x'], null, ['files' => [new UploadedFile($png, 'pixel.png', 'image/png', null, true)]]);
         self::assertSame(200, $uploaded->getStatusCode(), (string) $uploaded->getContent());
         $single = $this->request('POST', self::ADMIN . '/assets/upload', ['_token' => 'x'], [], null, ['file' => new UploadedFile($png2, 'pixel2.png', 'image/png', null, true)]);
