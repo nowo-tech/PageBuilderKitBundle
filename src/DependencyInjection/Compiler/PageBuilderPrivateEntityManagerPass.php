@@ -34,11 +34,8 @@ final class PageBuilderPrivateEntityManagerPass implements CompilerPassInterface
     public function process(ContainerBuilder $container): void
     {
         $default = $this->defaultManager($container);
-        $named   = $container->hasParameter(NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER)
-            ? $container->getParameter(NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER)
-            : null;
-        $host = $container->hasParameter('nowo_page_builder_kit.doctrine.transaction')
-            && $container->getParameter('nowo_page_builder_kit.doctrine.transaction') === 'host';
+        $named   = $container->hasParameter(NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER) ? $container->getParameter(NowoPageBuilderKitExtension::ENTITY_MANAGER_PARAMETER) : null;
+        $host    = $container->hasParameter('nowo_page_builder_kit.doctrine.transaction') && $container->getParameter('nowo_page_builder_kit.doctrine.transaction') === 'host';
 
         if (is_string($named) && $named === $default && !$host && !$container->hasDefinition(NowoPageBuilderKitExtension::PRIVATE_MIDDLEWARE_SERVICE)) {
             $container->removeDefinition(OwnEntityManagerSubscriber::class);

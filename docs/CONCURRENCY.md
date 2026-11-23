@@ -161,9 +161,8 @@ nowo_page_builder_kit:
 
 ## Tests and CI
 
-- `tests/Integration/Database/PageBuilderConcurrencyDatabaseTest.php` runs against real servers, each server twice:
-  with zero configuration (2.0: the private manager) and with `doctrine.transaction: host` (the bundle admin's writes
-  on your default manager). `PrivateEntityManagerDatabaseTest` (SQLite and the three servers) checks that your pending
+- `tests/Integration/Database/PageBuilderConcurrencyDatabaseTest.php` runs against real servers with zero
+  configuration (2.0: the private manager). `PrivateEntityManagerDatabaseTest` (SQLite and the three servers) checks that your pending
   changes stay pending, also through a write refused by a lock conflict; `HostPendingChanges*Test` (SQLite and each
   server) runs the full data-loss scenario of the 2.0 flip. In the concurrency test each session bounds its
   lock waits with `innodb_lock_wait_timeout` / `lock_timeout`. The second session is a plain connection, or a child

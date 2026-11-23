@@ -418,9 +418,6 @@ final class NowoPageBuilderKitExtension extends Extension implements PrependExte
         $container->register(self::PRIVATE_MIDDLEWARE_SERVICE, PrivateEntityManagerMiddleware::class)
             ->setArguments([new Reference(self::PRIVATE_ENTITY_MANAGER_SERVICE), 'nowo_page_builder_kit_']);
 
-        if ($container->hasDefinition(self::ENTITY_MANAGER_SERVICE)) {
-            $container->removeDefinition(self::ENTITY_MANAGER_SERVICE);
-        }
         $container->setAlias(self::ENTITY_MANAGER_SERVICE, self::PRIVATE_ENTITY_MANAGER_SERVICE);
 
         // The service repositories (also what the application's manager's getRepository() returns for the bundle

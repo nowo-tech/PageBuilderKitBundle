@@ -48,11 +48,8 @@ use function proc_get_status;
 use function proc_open;
 use function rawurlencode;
 use function str_contains;
-use function str_ends_with;
 use function stream_get_contents;
-use function strlen;
 use function strtolower;
-use function substr;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
@@ -76,13 +73,6 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
 {
     private const string ADMIN = '/admin/page-builder';
 
-    /**
-     * Suffix of a data set run with `doctrine.transaction: host` (2.0: the zero-config sets run on the private manager;
-     * the host-transaction sets run the bundle admin's writes on the application's default manager, the remaining
-     * forHostEntityManager() path).
-     */
-    private const string HOST = '|host';
-
     private ?AdminHttpKernel $kernel = null;
 
     private ?Connection $other = null;
@@ -103,10 +93,7 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
         yield 'MySQL 8.4' => ['PBK_MYSQL_URL'];
         yield 'MariaDB 11.4' => ['PBK_MARIADB_URL'];
         yield 'PostgreSQL 16' => ['PBK_POSTGRES_URL'];
-        // 2.0: the zero-config sets above run on the private manager; the same rule 1 / 4 / 6 suite with transaction: host.
-        yield 'MySQL 8.4, transaction: host' => ['PBK_MYSQL_URL' . self::HOST];
-        yield 'MariaDB 11.4, transaction: host' => ['PBK_MARIADB_URL' . self::HOST];
-        yield 'PostgreSQL 16, transaction: host' => ['PBK_POSTGRES_URL' . self::HOST];
+        // 2.0: these zero-config sets run on the private manager (1.19 ran them twice: default path and private opt-in).
     }
 
     protected function tearDown(): void
@@ -495,19 +482,13 @@ final class PageBuilderConcurrencyDatabaseTest extends TestCase
      */
     private function boot(string $env, array $bundle = [], int $lockWait = 1): string
     {
-        $host = str_ends_with($env, self::HOST);
-        $env  = $host ? substr($env, 0, -strlen(self::HOST)) : $env;
-        if ($host) {
-            $bundle['doctrine'] = ['transaction' => 'host'];
-        }
-
         $url = getenv($env);
         if (!is_string($url) || $url === '') {
             self::markTestSkipped($env . ' is not set (make test-with-db).');
         }
 
         $this->url    = $url;
-        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env . ($host ? self::HOST : ''), $url);
+        $this->kernel = new AdminHttpKernel($bundle, self::class . '|' . $env, $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer()->get('test.service_container');
         assert($container instanceof ContainerInterface);
