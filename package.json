@@ -18,14 +18,14 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.1.0",
-    "grapesjs": "0.22.9",
+    "@vitest/coverage-v8": "^5.1.1",
+    "grapesjs": "0.23.9",
     "grapick": "0.1.13",
     "jsdom": "^31.0.1",
     "only-allow": "^1.2.2",
     "typescript": "~7.0.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "description": "Build and unit tests of the Page Builder Kit Bundle TypeScript (GrapesJS canvas, inline edit, admin media picker)"
 }
