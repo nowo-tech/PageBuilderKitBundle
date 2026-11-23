@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[2.0.0] - 2026-11-23](#200---2026-11-23)
 - [[1.19.0] - 2026-11-20](#1190---2026-11-20)
 - [[1.18.0] - 2026-11-20](#1180---2026-11-20)
 - [[1.17.0] - 2026-11-19](#1170---2026-11-19)
@@ -48,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-09-27](#100---2026-09-27)
 
 ## [Unreleased]
+
+## [2.0.0] - 2026-11-23
 
 2.0.0 (major, REQ-ARCH-001 rules 1, 3 and 6): removes only what 1.x deprecated. An application that runs 1.19 without
 deprecation notices from this bundle upgrades without code changes, except for application code that relied on a page

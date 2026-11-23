@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.0.0](#to-200)
   - [Before you upgrade](#before-you-upgrade)
   - [The private entity manager is the only mode](#the-private-entity-manager-is-the-only-mode)
   - [Removed](#removed)
@@ -65,6 +66,8 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 2.0.0
 
 From **1.19.x** (upgrade to 1.19 first and clear its notices, see [Before you upgrade](#before-you-upgrade)):
 
