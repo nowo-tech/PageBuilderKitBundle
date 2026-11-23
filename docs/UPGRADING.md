@@ -5,6 +5,11 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Before you upgrade](#before-you-upgrade)
+  - [The private entity manager is the only mode](#the-private-entity-manager-is-the-only-mode)
+  - [Removed](#removed)
+  - [Private manager only](#private-manager-only)
+  - [1.x support](#1x-support)
 - [To 1.19.0](#to-1190)
 - [To 1.19.0](#to-1190-1)
   - [The private entity manager notice](#the-private-entity-manager-notice)
@@ -60,6 +65,167 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+From **1.19.x** (upgrade to 1.19 first and clear its notices, see [Before you upgrade](#before-you-upgrade)):
+
+```bash
+composer require nowo-tech/page-builder-kit-bundle:^2.0 -W
+```
+
+2.0 contains only changes that 1.x announced through deprecation notices: an application that runs the last 1.x
+minor without deprecation notices from this bundle upgrades without code changes. After 2.0.0 is released, the 1.x
+line receives security fixes for 6 months: fixes rated Moderate and above are backported to the last 1.x minor;
+Low ones are fixed in 2.x only.
+
+No PHP, Symfony, Doctrine or database change: same requirements as 1.19 (`nowo-tech/transaction-doctrine` ^1.9.1),
+same tables, no migration. No package moves in or out of `require`.
+
+**Correction to 1.19's "Preparing for 2.0".** It said "`doctrine.private_entity_manager` is removed". 2.0 keeps the key
+as a **deprecated no-op** instead (the shared rule of the 2.0 majors): `true` is accepted and does nothing (it triggers
+a deprecation notice; remove it), `false` fails the build. The key is removed in 3.0. The list also named "the legacy
+admin layout bridge"; 2.0 removes, with it, the other 1.12 deprecations of the same layout contract that 1.12 announced
+for 2.0: the 1.x default layout `admin/layout.html.twig` and the Twig functions `nowo_page_builder_layout_template()`
+and `nowo_page_builder_css_framework()` (CHANGELOG 1.12.0, "removal in 2.0").
+
+### Before you upgrade
+
+**Data-loss check first.** In 1.x without configuration (`doctrine.transaction: bundle`, no `entity_manager`), every page
+builder write (the admin, `PagePublisherInterface`, `DocumentService`, revisions, templates, content fields, the SEO
+form) flushed your default entity manager. 2.0 never does: a change of yours that was only stored because a page builder
+write flushed your manager is **no longer stored**. Typically: a listener of a page builder event (`PageCreatedEvent`,
+`PagePublishedEvent`, ...), a Twig context provider or an asset storage of yours, or code that changes an entity and
+then calls `flushPage()` or the revision and template services.
+
+1.19 tells you whether your application does this. Run your usual traffic and test suite on 1.19 with deprecations
+logged (the Symfony profiler, the `deprecation` log channel, or PHPUnit's deprecation report) and look for this line,
+one per entity class and request / message / command:
+
+> Your pending changes to App\Entity\Order were flushed by NowoPageBuilderKitBundle; 2.0 no longer does.
+
+```bash
+# for example, in your application's logs of a 1.19 run
+grep -h 'were flushed by NowoPageBuilderKitBundle; 2.0 no longer does' var/log/*.log | sort | uniq -c
+```
+
+- **No such line** (and you never ran 1.19 with `private_entity_manager: true`, which silences the probe): nothing of
+  yours relied on the bundle's flush.
+- **One or more lines:** each class listed is work of yours that only reached the database through a page builder
+  write. Make the code that changes it flush (or run it in your own transaction), then check again. Upgrading with a
+  line left means those changes stay pending in your manager and are lost unless something else of yours flushes it.
+- If you opted in on 1.19 (`private_entity_manager: true`), remove the key for one run (or check the period before you
+  set it) to see the list.
+
+Then clear every other notice of this bundle on 1.19:
+
+| 1.19 notice | What to do |
+| --- | --- |
+| `Not setting "nowo_page_builder_kit.doctrine.private_entity_manager" is deprecated: page builder writes (doctrine.transaction: bundle) flush the application's default entity manager, …` | After the data-loss check: nothing (2.0 is that behaviour). Setting `true` silences it on 1.19 (and is a deprecated no-op in 2.0: remove it then). |
+| `Setting "nowo_page_builder_kit.doctrine.private_entity_manager" to false is deprecated and removed in 2.0: …` | Remove the key (data-loss check first), or set a dedicated `doctrine.entity_manager`. |
+| `Your pending changes to App\X were flushed by NowoPageBuilderKitBundle; 2.0 no longer does.` | See the data-loss check above. |
+| `The Twig context provider "App\…" implements only "Nowo\PageBuilderKitBundle\Service\GrapesTwigContextProviderInterface", which 2.0 removes. …` | Implement `GrapesTwigPageContextProviderInterface::getPageContext(PageContext $page, string $locale)` (see [To 1.15.0](#to-1150)). |
+| `Storing page builder assets through "Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface" is deprecated, implement "Nowo\PageBuilderKitBundle\Media\PageBuilderAssetUploadStorageInterface" instead; removed in 2.0.` (since 1.15) | Implement `storeUpload(AssetUpload)` (see [To 1.15.0](#to-1150)); alias or decorate `PageBuilderAssetUploadStorageInterface` instead of the old id. |
+| `Since nowo-tech/page-builder-kit-bundle 1.15: The "Nowo\PageBuilderKitBundle\Media\PageBuilderAssetStorageInterface" service alias is deprecated, …` | Inject or alias `PageBuilderAssetUploadStorageInterface`. |
+| `The layout "…" does not render the UiKit canonical blocks (nowo_ui_page_header, nowo_ui_content, ...); it is wrapped in a deprecated bridge. …` (since 1.12) | Render the UiKit canonical blocks in `web_ui.layout_template` (or extend `@NowoUiKit/layout/admin.html.twig`), or set it to `null` to use `nowo_ui_kit.layouts.admin`. |
+| `Twig Function "nowo_page_builder_layout_template" is deprecated` / `"nowo_page_builder_css_framework" is deprecated` (since 1.12) | Page copies: extend the bundle's UiKit scaffolds (`{% extends '@!NowoPageBuilderKitBundle/admin/pages/<page>.html.twig' %}`, see [TEMPLATES](TEMPLATES.md)); use `nowo_ui_kit.css_framework`. |
+| `The "nowo_page_builder_kit.web_ui.css_framework" option is deprecated: …` (since 1.12) | Remove it; list the GrapesJS canvas iframe stylesheets in `grapesjs.canvas_styles` if you relied on it. |
+| `The "connection" option at path "nowo_page_builder_kit.doctrine" is deprecated and ignored: …` (since 1.8) | Remove the key. |
+
+Also search your code for the two removed ports, which a class can implement without triggering a notice on 1.19
+(for example a storage that was never called): `grep -rn 'PageBuilderAssetStorageInterface\|GrapesTwigContextProviderInterface' src/ config/`.
+
+### The private entity manager is the only mode
+
+| 1.x setting | 1.x behaviour | 2.0 |
+| --- | --- | --- |
+| no `doctrine` keys (the default: `transaction: bundle`, no `entity_manager`) | writes flush your default manager (notice + probe) | the bundle's private manager on your default manager's connection, mapping and listeners; same tables; your manager is never flushed |
+| `doctrine.entity_manager: <your default manager's name>` | same as unset (notice + probe) | same as unset: the private manager on it |
+| `doctrine.private_entity_manager: true` | the private manager (1.19 opt-in) | the same; the key is deprecated (no effect), remove it; removed in 3.0 |
+| `doctrine.private_entity_manager: false` | writes flush your manager (notice + probe) | **build error**: remove the key |
+| `doctrine.entity_manager: <a dedicated manager>` (DDD option) | the bundle uses that manager directly | unchanged, no notice |
+| `doctrine.transaction: host` (DDD hosts) | your use case owns the flush; the bundle's own admin controllers flush the manager | unchanged, no notice |
+| `private_entity_manager: true` with `entity_manager` or `transaction: host` | build error | still a build error |
+
+The private manager is transaction-doctrine's `PrivateEntityManager`: created on your default manager's connection,
+configuration (mapping, metadata cache) and event manager (your Doctrine listeners), with your enabled SQL filters
+mirrored. A write flushes only the bundle's rows, no longer refuses to start while your manager holds pending changes
+(the 1.17 `LogicException` of the write units is gone with that mode), and a failed write closes only the private
+manager (replaced on the next use; your manager stays open). Lock conflicts still answer 409 + `CONFLICT_001` /
+`CONFLICT_002`. It is dropped at every request, Messenger message and console command boundary and at `kernel.reset`
+(FrankenPHP worker mode with the kernel reset off included); changes the bundle left unflushed then are discarded and
+logged as a warning (classes and counts only). The demo's seeder writes through `nowo_page_builder_kit.entity_manager`.
+
+To keep the bundle's rows away from your manager entirely, use a dedicated `doctrine.entity_manager`, or
+`transaction: host` when your use cases own the transaction (both unchanged).
+
+### Removed
+
+| Removed | Deprecated since | Replacement |
+| --- | --- | --- |
+| The mode in which page builder writes flushed your default entity manager; its two notices, `NowoPageBuilderKitExtension::PRIVATE_ENTITY_MANAGER_UNSET_DEPRECATION`, `::PRIVATE_ENTITY_MANAGER_FALSE_DEPRECATION`, `::NAMED_DEFAULT_MANAGER_NOTICE_PARAMETER`, `::HOST_FLUSH_PROBE_SERVICE`, `::registerHostFlushProbe()` | 1.19 | The private entity manager (above) |
+| `doctrine.private_entity_manager: false` | 1.19 | Remove the key (build error otherwise) |
+| The host-flush probe (`nowo_page_builder_kit.host_flush_probe`, `PageBuilderPrivateEntityManagerPass::SHARED_BOUNDARY_LISTENER`); `PageBuilderTransaction`'s `$hostFlushProbe` and `$resetsHostFlushProbe` arguments are kept and ignored (removed in 3.0) | 1.19 | None needed: the bundle never flushes your manager |
+| `Media\PageBuilderAssetStorageInterface` and its service alias; `LocalFilesystemAssetStorage::store()`, `AwsS3AssetStorage::store(UploadedFile)`; the bridge in `AssetUploadHandler` | 1.15 | `PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)`; alias or decorate that port |
+| `Service\GrapesTwigContextProviderInterface` (`getContext(BuilderPage, string)`) and its selection in `PageRenderProvider`; `PageRenderProvider::CONTEXT_PROVIDER_DEPRECATION` | 1.15 (notice 1.19) | `GrapesTwigPageContextProviderInterface::getPageContext(PageContext, string)` (same tag, autoconfigured) |
+| The layout bridge `admin/_legacy_layout.html.twig`, `PageBuilderKitPages::LEGACY_ADMIN_BRIDGE`, `::legacyLayoutTemplate()`, the bridge variables `nowo_page_builder_legacy_layout` / `nowo_page_builder_legacy_blocks` | 1.12 | A layout that renders the UiKit canonical blocks; a 1.x layout now fails the admin page with a `LogicException` naming the fix |
+| The 1.x default layout `admin/layout.html.twig` | 1.12 | `nowo_ui_kit.layouts.admin`; the old value of `web_ui.layout_template` still means `null` |
+| Twig functions `nowo_page_builder_layout_template()`, `nowo_page_builder_css_framework()`; the two `Twig\PageBuilderKitExtension` constructor arguments that fed them are kept and ignored (removed in 3.0) | 1.12 | The bundle's UiKit scaffolds; `nowo_ui_kit.css_framework` |
+| `web_ui.css_framework` (and the `nowo_page_builder_kit.web_ui.css_framework` parameter) | 1.12 | `nowo_ui_kit.css_framework` for the admin; `grapesjs.canvas_styles` for the canvas iframe. A leftover key fails the build |
+| `doctrine.connection` (and the `nowo_page_builder_kit.doctrine.connection` parameter) | 1.8 | Remove it (it had no effect); a leftover key fails the build |
+
+Without `grapesjs.canvas_styles` the GrapesJS canvas iframe gets what the 1.x default (`web_ui.css_framework:
+tailwind`) gave it, no extra stylesheet: an application that never set the key sees the same canvas. If you set
+`bootstrap5`, `bootstrap4`, `tabler` or `foundation`, list that stylesheet in `grapesjs.canvas_styles`.
+
+**Fails loudly, never silently.** A service of yours still tied to a removed port fails the container build with a
+message naming the service, the removed interface and its replacement: a class (autodiscovered or registered by hand)
+that still implements `PageBuilderAssetStorageInterface` or `GrapesTwigContextProviderInterface` (it can no longer be
+loaded, and Symfony would otherwise drop it without a word), an `#[AsAlias]` or `services.yaml` alias of a removed id,
+an `#[AsDecorator]` of a removed id (also with `onInvalid: IGNORE`), a service tagged
+`nowo_page_builder_kit.grapes_twig_context` that does not implement `GrapesTwigPageContextProviderInterface`, and a
+`grapesjs.assets_upload.service` that does not implement `PageBuilderAssetUploadStorageInterface`. A dropped context
+provider would render your pages without your data; a dropped storage or checking decorator would silently change where
+uploads go.
+
+Hooks: a decorator of the removed storage id decorates `PageBuilderAssetUploadStorageInterface` instead; a Twig context
+provider implements `GrapesTwigPageContextProviderInterface`. The removed probe and layout bridge had no extension point.
+
+### Private manager only
+
+What breaks, and how to do it in 2.0:
+
+- **Your pending changes are no longer flushed by the bundle.** A change of yours that was only stored because a page
+  builder write flushed your manager is no longer stored: typically in a listener of a page builder event, a Twig
+  context provider or an asset storage of yours, or code that changes an entity and then calls a page builder service.
+  Flush your own manager yourself. Your pending changes are never written, cleared, detached or reverted by the bundle:
+  they stay in your manager until you flush it.
+- **A port of yours that relied on the bundle's flush** (for example a storage that only changed a managed row of
+  yours): your implementation must commit its own change.
+- **The reverse, which no probe could see:** host code that loads a page through the bundle's repository
+  (`BuilderPageRepository`, or `getRepository(BuilderPage::class)` on your manager: both read through the private
+  manager), changes it and flushes its own manager saves nothing (the private manager drops the change at the next
+  boundary, with a warning). Change pages through the bundle's services (`PagePublisherInterface`, `DocumentService`,
+  the revision, template and content-field services), or persist and flush them through
+  `nowo_page_builder_kit.entity_manager`. Do not `persist()` or `flush()` bundle entities through your manager.
+- **A page your own manager loaded** (`$yourManager->find(BuilderPage::class, $id)`, a DQL query of yours, a
+  `#[MapEntity]` controller argument) handed to a bundle write (`saveDocument()`, `publish()`, `unpublish()`,
+  `duplicatePage()`, the revision, template and content-field services) is re-loaded by id in the private manager and
+  the change is applied there: never inserted again. Your instance is not updated; read the page again if you need the
+  new values. `DocumentService::flushPage()` and `saveTranslation()` save the changes YOU made to the page, so a page
+  your manager holds is refused there with a `LogicException` before anything is written: load it with
+  `DocumentService::loadPageByKey()` and change that instance.
+- **Associations to a page:** an entity of yours that points at a bundle entity (a many-to-one or one-to-one to
+  `BuilderPage`) must get it from your own manager with `$yourManager->getReference(BuilderPage::class, $id)`, not from
+  the bundle's repository: a page loaded through the private manager is unknown to your manager, and your flush refuses
+  it as a new entity found through a relationship.
+- **Shared connection:** a transaction you open around a bundle call includes the bundle's rows (the private flush then
+  uses a savepoint), and your rollback undoes them. The write events are still dispatched after the real commit. With
+  DBAL 3 and `use_savepoints` off, a failed private flush inside your transaction marks it rollback-only: turn
+  savepoints on (always on in DBAL 4).
+
+### 1.x support
+
+After 2.0.0 is released, the 1.x line (1.19) receives security fixes for 6 months: Moderate and above are backported
+to 1.19 as patches; Low ones are fixed in 2.x only, with the advice to upgrade. Advisories name both lines.
 
 ## To 1.19.0
 

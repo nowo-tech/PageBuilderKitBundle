@@ -16,7 +16,7 @@ missing-translation rule, 15 fixtures). Twig namespace: `@NowoPageBuilderKitBund
 - [Overriding templates (REQ-TWIG-001)](#overriding-templates-req-twig-001)
 - [Bundle partials and assets](#bundle-partials-and-assets)
 - [Translations](#translations)
-- [Layout bridge (1.x layouts)](#layout-bridge-1x-layouts)
+- [1.x layouts (bridge removed in 2.0)](#1x-layouts-bridge-removed-in-20)
 - [Allowed exceptions](#allowed-exceptions)
 
 ## Pages
@@ -49,8 +49,8 @@ are kept): `builder_page` (the `BuilderPage` entity — the 1.x `page` variable 
 `schema_remove_forms`, `values_form`, `can_edit_schema`, `can_edit_values`, `asset_*` (content); `locale`, `form`
 (seo, sections); `sections_tree`, `publish_form`, `unpublish_form` (sections); `revisions`, `engine`, `max_per_page`,
 `create_form`, `restore_forms` (revisions); `revisionId`, `diff` (revision diff); `templates`, `save_forms`,
-`import_form`, `apply_forms`, `delete_forms` (templates); plus the bridge variables `nowo_page_builder_legacy_layout`
-/ `nowo_page_builder_legacy_blocks`.
+`import_form`, `apply_forms`, `delete_forms` (templates). The 1.x bridge variables `nowo_page_builder_legacy_layout` /
+`nowo_page_builder_legacy_blocks` were removed in 2.0 with the bridge.
 
 ## Unique pages
 
@@ -113,8 +113,6 @@ anything.
 | `admin/pages/revisions.html.twig` | Versions (list scaffold) |
 | `admin/pages/revision_diff.html.twig` | Version diff (show scaffold) |
 | `admin/pages/templates.html.twig` | Templates (list scaffold) |
-| `admin/layout.html.twig` | Deprecated 1.x default layout (extends the UiKit admin layout) |
-| `admin/_legacy_layout.html.twig` | Deprecated 1.x host-layout bridge |
 | `public/page.html.twig` | Public page (`/p/{pageKey}`) |
 | `public/_seo_meta.html.twig` | SEO / Open Graph meta tags |
 | `public/_edit_button.html.twig`, `public/_editable_field.html.twig`, `public/_icon_pencil.svg.twig` | Front-end edit pencil and inline field editor |
@@ -125,8 +123,7 @@ Renaming or removing a `<subpath>` or a data block listed here is a breaking cha
 
 ## Bundle partials and assets
 
-The bundle ships no admin layout of its own (the deprecated 1.x `admin/layout.html.twig` extends the UiKit admin
-layout), no local pagination, flash, confirm, modal, page header or empty-state partial and no inline script: the
+The bundle ships no admin layout of its own (the 1.x `admin/layout.html.twig` was removed in 2.0), no local pagination, flash, confirm, modal, page header or empty-state partial and no inline script: the
 scaffolds and the UiKit partials (`action`, `confirm`, `dialog`, `empty`, `flashes`, `pagination`, `page_header`,
 `section_form`, `table`, `tabs`, `scripts`) render them, and the host layout loads the CSS framework. Bundle assets
 (asset package `nowo_page_builder_kit`): `css/page-builder.css` (token-based layout rules on `pbk-*` classes),
@@ -142,16 +139,15 @@ for en, es, fr, it, pt, de and nl (same keys; `make validate-translations`). Fla
 controllers add them, so any host layout prints them as is. Override any key in the application
 (`translations/NowoPageBuilderKitBundle.<locale>.yaml`).
 
-## Layout bridge (1.x layouts)
+## 1.x layouts (bridge removed in 2.0)
 
-`web_ui.layout_template` may still point at a 1.x layout (no `nowo_ui_page_header` block, e.g. the project
-`base.html.twig` rendering `admin`, or a copy of the 1.x `admin/layout.html.twig`): `PageBuilderKitPages` then wraps
-it in `admin/_legacy_layout.html.twig` (maps the canonical blocks into `admin`, `title`, `page_title`, `stylesheets`,
-`javascripts`) and triggers a deprecation. When the 1.x layout renders `nowo_ui_flashes` itself, the flashes are not
-printed twice and the page header is printed there. The value `@NowoPageBuilderKitBundle/admin/layout.html.twig` (the
-1.x default) is mapped to null. Page copies that still extend the deprecated `nowo_page_builder_layout_template()`
-function render inside the UiKit admin layout. The bridge, the 1.x layout and the deprecated functions are removed in
-2.0.
+`web_ui.layout_template` must point at a layout that renders the UiKit canonical blocks (`nowo_ui_page_header`,
+`nowo_ui_content`, ...), or be `null` (`nowo_ui_kit.layouts.admin`). A 1.x layout (no `nowo_ui_page_header` block, for
+example a project `base.html.twig` rendering `admin`, or a copy of the 1.x `admin/layout.html.twig`) was wrapped in the
+bridge `admin/_legacy_layout.html.twig` with a deprecation notice from 1.12 to 1.19; since 2.0 it fails the admin pages
+with a `LogicException` that names the fix. The value `@NowoPageBuilderKitBundle/admin/layout.html.twig` (the 1.x
+default) still means null. Page copies that extended the removed `nowo_page_builder_layout_template()` function extend
+the bundle's scaffolds instead (`{% extends '@!NowoPageBuilderKitBundle/admin/pages/<page>.html.twig' %}`).
 
 ## Allowed exceptions
 

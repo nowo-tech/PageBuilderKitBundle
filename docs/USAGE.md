@@ -124,8 +124,11 @@ Both paths are supported (1.14); the standard one is the zero-config default.
 
 ### Standard Symfony host
 
-Nothing to configure. The admin UI and `DocumentService` write the bundle entities on the
-entity manager that maps them (your default one) and flush right away. Listen to the write events when you need to
+Nothing to configure. The admin UI and `DocumentService` write the bundle entities through the bundle's private entity
+manager (2.0: on your default manager's connection, mapping and listeners, same tables) and flush right away; your own
+manager is never flushed, so flush your own changes yourself. Change bundle entities through the bundle's services, not
+through your manager; a page your manager loaded and handed to a bundle write is re-loaded by id (see UPGRADING "To
+2.0.0", "Private manager only"). Listen to the write events when you need to
 react (cache purge, search index, audit):
 
 ```php
@@ -196,10 +199,10 @@ final readonly class PublishLandingPage
 - **Ports without framework types or entities (1.15).** Asset storage: implement
   `Media\PageBuilderAssetUploadStorageInterface::storeUpload(AssetUpload)` (an `AssetUpload` VO: `openStream()`,
   `moveTo()`, `getClientName()`, `getClientExtension()`, `getSize()`, `getMimeType()` detected on the server) instead
-  of the deprecated `PageBuilderAssetStorageInterface::store(UploadedFile)`. Twig context: implement
+  of `PageBuilderAssetStorageInterface::store(UploadedFile)` (removed in 2.0). Twig context: implement
   `Service\GrapesTwigPageContextProviderInterface::getPageContext(PageContext, string $locale)` (a `PageContext` VO:
-  `id`, `uuid`, `pageKey`, `status`, `publishedAt`, `title`, `slug`) instead of the deprecated
-  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)`.
+  `id`, `uuid`, `pageKey`, `status`, `publishedAt`, `title`, `slug`) instead of
+  `GrapesTwigContextProviderInterface::getContext(BuilderPage, …)` (removed in 2.0).
 
 ```php
 use Nowo\PageBuilderKitBundle\Media\AssetUpload;
@@ -433,7 +436,7 @@ Optional blocks: Custom HTML (`grapesjs.allow_custom_code`), Script (`grapesjs.a
 1. Insert tokens from the Block Manager category **Twig**, or type `{{ title }}` in text.
 2. On public render, `GrapesTwigRenderer` evaluates a **sandboxed** Twig template.
 3. Built-in vars: `title`, `slug`, `pageKey`, `locale`, `status`, `page.title`, …
-4. Host vars: implement `GrapesTwigPageContextProviderInterface` (1.15; the entity-based `GrapesTwigContextProviderInterface` is deprecated) or pass `$context` to `getRenderedTree()` / `nowo_page_builder_render()`.
+4. Host vars: implement `GrapesTwigPageContextProviderInterface` (1.15; the entity-based `GrapesTwigContextProviderInterface` was removed in 2.0) or pass `$context` to `getRenderedTree()` / `nowo_page_builder_render()`.
 
 Demo: `/twig` and `/p/twig`.
 
@@ -567,8 +570,8 @@ nowo_page_builder_kit:
                 public_base_url: 'https://cdn.example.com'  # optional CloudFront
 ```
 
-Custom backends: implement `PageBuilderAssetUploadStorageInterface` (1.15; `PageBuilderAssetStorageInterface` is
-deprecated) and set `storage: service` + `service: app.my_storage`. You can also alias or decorate
+Custom backends: implement `PageBuilderAssetUploadStorageInterface` (1.15; `PageBuilderAssetStorageInterface` was
+removed in 2.0, and a service without the new port fails the build) and set `storage: service` + `service: app.my_storage`. You can also alias or decorate
 `PageBuilderAssetUploadStorageInterface` in your services: the upload handler uses your service.
 For media library browsing, also implement `PageBuilderAssetLibraryInterface::list()`.
 

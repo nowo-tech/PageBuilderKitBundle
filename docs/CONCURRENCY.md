@@ -27,9 +27,10 @@ the residual risks. Worker mode (FrankenPHP, kernel reset off) is covered in
   page's document row with `SELECT … FOR UPDATE` and reads the document and its locale rows again under the lock. The
   page row is locked instead when the page has no document yet. Two editors who change the same page therefore run one
   after the other, and the second one starts from what the first one committed.
-- **Your entity manager is never cleared or reset while it is open.** Without `doctrine.entity_manager`, the bundle
-  writes on the manager that maps its entities (usually your default one) with
-  `DoctrineTransactionRunner::forHostEntityManager()`:
+- **Your entity manager is never cleared or reset while it is open.** With `doctrine.transaction: host`, when a bundle
+  admin controller serves the request, the bundle writes on your default manager (or the one `doctrine.entity_manager`
+  names) with `DoctrineTransactionRunner::forHostEntityManager()` (2.0: the only path that still writes on your
+  manager; without configuration the bundle uses its private manager, below):
   - an open manager is never closed, cleared or reset;
   - a manager that a failed flush closed is replaced through the registry;
   - the runner refuses to start (`LogicException`) while your manager holds unflushed changes.
@@ -38,10 +39,10 @@ the residual risks. Worker mode (FrankenPHP, kernel reset off) is covered in
   reset that manager after a failed unit. `OwnEntityManagerSubscriber` clears it at the request, message and command
   boundaries.
 
-  With `doctrine.private_entity_manager: true` (1.19, the 2.0 behaviour) the bundle writes through its private manager
-  on the same connection with `forEntityManager()` and a `PrivateManagerRegistry`: a failed unit drops the private
-  manager only, your manager and its pending changes are never touched, and the runner does not look at them. The
-  conflict answer (rule 6) is the same in both modes.
+  Without a dedicated `doctrine.entity_manager` (2.0: the only mode of `transaction: bundle`) the bundle writes through
+  its private manager on the same connection with `forEntityManager()` and a `PrivateManagerRegistry`: a failed unit
+  drops the private manager only, your manager and its pending changes are never touched, and the runner does not look
+  at them. The conflict answer (rule 6) is the same in every mode.
 - **`doctrine.transaction: host` (DDD hosts).** When your code calls the bundle, your use case owns the transaction:
   `run()` runs the operation as is and the bundle never flushes. `lockPage()` takes the lock only when your
   transaction is open. The bundle's own admin controllers are a use case of their own and still run their units.
@@ -160,10 +161,11 @@ nowo_page_builder_kit:
 
 ## Tests and CI
 
-- `tests/Integration/Database/PageBuilderConcurrencyDatabaseTest.php` runs against real servers, each server twice
-  (1.19): on the default path and with `doctrine.private_entity_manager: true`.
-  `PrivateEntityManagerDatabaseTest` (SQLite and the three servers) checks that your pending changes stay pending in
-  private mode, also through a write refused by a lock conflict. In the concurrency test each session bounds its
+- `tests/Integration/Database/PageBuilderConcurrencyDatabaseTest.php` runs against real servers, each server twice:
+  with zero configuration (2.0: the private manager) and with `doctrine.transaction: host` (the bundle admin's writes
+  on your default manager). `PrivateEntityManagerDatabaseTest` (SQLite and the three servers) checks that your pending
+  changes stay pending, also through a write refused by a lock conflict; `HostPendingChanges*Test` (SQLite and each
+  server) runs the full data-loss scenario of the 2.0 flip. In the concurrency test each session bounds its
   lock waits with `innodb_lock_wait_timeout` / `lock_timeout`. The second session is a plain connection, or a child
   process holding its transaction open:
   - a document save that meets another session's row lock answers 409 + `Retry-After` + `CONFLICT_001` in the JSON
