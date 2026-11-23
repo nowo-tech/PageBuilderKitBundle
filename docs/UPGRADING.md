@@ -5,6 +5,7 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.1.0](#to-210)
 - [To 2.0.0](#to-200)
   - [Before you upgrade](#before-you-upgrade)
   - [The private entity manager is the only mode](#the-private-entity-manager-is-the-only-mode)
@@ -66,6 +67,14 @@ This document describes how to upgrade **Page Builder Kit Bundle** between relea
   - [Optional demo](#optional-demo)
 
 ## Unreleased
+
+## To 2.1.0
+
+From **2.0.0**:
+
+```bash
+composer update nowo-tech/page-builder-kit-bundle
+```
 
 ## To 2.0.0
 
