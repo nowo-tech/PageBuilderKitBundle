@@ -314,13 +314,12 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
             return $page;
         }
 
-        $id = $page->getId();
-        if ($id === null) {
-            $this->refuseNewPageOfYourManager($this->entityManager, $page);
-
+        if ($this->entityManager->contains($page)) {
             return $page;
         }
-        if ($this->entityManager->contains($page)) {
+        $this->refuseNewPageOfYourManager($this->entityManager, $page);
+        $id = $page->getId();
+        if ($id === null) {
             return $page;
         }
 
@@ -341,12 +340,11 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
         if (!$this->entityManager instanceof PrivateEntityManager) {
             return;
         }
-        if ($page->getId() === null) {
-            $this->refuseNewPageOfYourManager($this->entityManager, $page);
-
+        if ($this->entityManager->contains($page)) {
             return;
         }
-        if ($this->entityManager->contains($page)) {
+        $this->refuseNewPageOfYourManager($this->entityManager, $page);
+        if ($page->getId() === null) {
             return;
         }
 
@@ -362,7 +360,10 @@ final class PageBuilderTransaction implements PageBuilderPendingEventsInterface,
      */
     private function refuseNewPageOfYourManager(PrivateEntityManager $manager, BuilderPage $page): void
     {
-        if (!$manager->source()->contains($page)) {
+        // Scheduled for insertion there: a generated id may already be set (a sequence assigns it on persist, for
+        // example PostgreSQL on DBAL 3), so the id alone cannot tell a new page.
+        $source = $manager->source();
+        if (!$source->contains($page) || ($page->getId() !== null && !$source->getUnitOfWork()->isScheduledForInsert($page))) {
             return;
         }
 
