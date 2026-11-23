@@ -58,6 +58,10 @@ updates:
     labels:
       - "dependencies"
       - "javascript"
+    ignore:
+      # Pinned to grapesjs.cdn_version (vendored CSS); bump together with the config default.
+      - dependency-name: "grapesjs"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
     groups:
       npm-root:
         patterns:
