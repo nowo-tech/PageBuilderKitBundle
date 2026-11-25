@@ -57,6 +57,7 @@ As an integrator, I can run `PublicHtmlNormalizer::normalize()` on public Grapes
 | FR-P9-FE-001 | `grapes-types.ts` exports typed canvas config/structure helpers | Done |
 | FR-P9-FE-002 | `page-builder-canvas.ts` typechecks under `strict` without `@ts-nocheck` | Done |
 | FR-P9-FE-003 | Public canvas JS is rebuilt from Vite sources (`src/Resources/public/js/page-builder-canvas.js`) | Done |
+| FR-P9-FE-004 | Each shipped entry (`page-builder-admin.ts` as `page-builder-kit/admin`, `page-builder-canvas.ts`, `page-builder-inline-edit.ts`) logs one `📦 [name] script loaded, build: <date> UTC` console line through `logger.ts` (`createBundleLogger().scriptLoaded()`, build label injected as `__PAGE_BUILDER_KIT_BUILD_TIME__` from the committed `build-info.json`); `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE = 'quiet'` silences it, and `debug/info/warn/error` are no-ops unless `setDebug(true)` (REQ-ASSETS-005, 2.1.0) | Done |
 | FR-P9-TEST-001 | Unit tests cover `DocumentStructureValidator`, `ClassicPageTreeBuilder`, `ContentFieldsService`, content-field / capability enums | Done |
 | FR-P9-TEST-002 | PHP line coverage reported by local `make test-coverage` is ≥90% | Done (superseded by STD-001) |
 
