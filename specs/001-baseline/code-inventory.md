@@ -2,11 +2,11 @@
 
 **Specs:** [Phase 1](spec.md) · [Phase 2](../002-phase2-grapesjs/spec.md) · [Phase 3](../003-phase3-revisions-templates/spec.md) · [Phase 4](../004-phase4-external-widgets/spec.md) · [Phase 5](../005-content-fields-i18n/spec.md) · [Phase 6](../006-phase6-content-hardening/spec.md) · [Phase 6b](../007-phase6b-content-wave2/spec.md) · [Phase 7](../008-phase7-media-tags-nesting/spec.md) · [Phase 9](../009-product-polish-compliance/spec.md)  
 **Package:** `nowo-tech/page-builder-kit-bundle`  
-**Last audited:** 2026-11-22 (post **v1.19.0**)
+**Last audited:** 2026-11-25 (post **v2.1.0**: 2.0.0 private-manager-only and port removals already mapped; 2.1.0 console banner added)
 
 Maps production files under `src/` to functional requirements across shipped phases (`FR-*`, `FR-P2-*` … `FR-P9-*`, plus relevant `REQ-*`).
 
-**Total production sources:** **213** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
+**Total production sources:** **211** files (every file tracked under `src/` except the Vitest suite in `src/Resources/assets/tests`; audit: `git ls-files src | grep -v Resources/assets/tests | wc -l`)
 
 ## Bundle entry
 
@@ -318,6 +318,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 
 | Source file | Purpose | Requirement IDs |
 | --- | --- | --- |
+| `Resources/assets/src/logger.ts` | Bundle logger: `scriptLoaded()` console banner with the build label, quiet switch (`data-nowo-console`, `NOWO_CONSOLE`), debug-gated level methods; used by the three entries ([spec 009](../009-product-polish-compliance/spec.md)) | FR-P9-FE-004, REQ-ASSETS-005 |
 | `Resources/assets/src/grapes-types.ts` | Typed canvas config/structure helpers | FR-P9-FE-001, REQ-ASSETS-003 |
 | `Resources/assets/src/page-builder-canvas.ts` | Grapes canvas ESM source (strict TS) | FR-ADM-002, FR-P2-ADM-001, FR-P7-TAG-001, FR-P9-FE-002 |
 | `Resources/assets/src/page-builder-inline-edit.ts` | Inline content-field editor source | FR-P5-SCH-005 |
@@ -359,7 +360,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Bundle entry | 1 | 1 |
 | Controllers | 12 | 12 |
 | Debug / Web Profiler | 5 | 5 |
-| Dependency injection and compiler | 13 | 13 |
+| Dependency injection and compiler | 14 | 14 |
 | Entities | 12 | 12 |
 | Enums and locale | 6 | 6 |
 | Event subscribers and listeners | 3 | 3 |
@@ -367,9 +368,9 @@ Maps production files under `src/` to functional requirements across shipped pha
 | Persistence — entity manager, unit of work and outbox | 11 | 11 |
 | Forms | 13 | 13 |
 | Grapes block packs | 2 | 2 |
-| Media | 10 | 10 |
+| Media | 9 | 9 |
 | Repository | 8 | 8 |
-| Services | 27 | 27 |
+| Services | 26 | 26 |
 | HTML | 2 | 2 |
 | Content fields and bind slots | 4 | 4 |
 | Utilities | 1 | 1 |
@@ -378,7 +379,7 @@ Maps production files under `src/` to functional requirements across shipped pha
 | UiKit page contract | 2 | 2 |
 | Widget system | 12 | 12 |
 | Resources — config and routing | 2 | 2 |
-| Resources — admin and public Twig | 27 | 27 |
-| Resources — frontend assets | 12 | 12 |
+| Resources — admin and public Twig | 25 | 25 |
+| Resources — frontend assets | 13 | 13 |
 | Resources — translations | 7 | 7 |
-| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **213** | **213** |
+| **Total production files (`git ls-files src`, without `src/Resources/assets/tests`)** | **211** | **211** |
